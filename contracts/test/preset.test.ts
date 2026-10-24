@@ -1,7 +1,16 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import example from "../../fixtures/preset.example.json" with { type: "json" };
+import cases from "../../fixtures/preset.parameter-cases.json" with { type: "json" };
 import { parsePreset } from "../src/index.ts";
+
+for (const item of cases) {
+  test(`shared parameter case: ${item.name}`, () => {
+    const preset = { ...example, parameters: { ...example.parameters, ...item.parameters } };
+    if (item.valid) assert.doesNotThrow(() => parsePreset(preset));
+    else assert.throws(() => parsePreset(preset));
+  });
+}
 
 test("the shared example is valid and parsing does not share mutable data", () => {
   const parsed = parsePreset(example);

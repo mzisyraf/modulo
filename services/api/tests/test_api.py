@@ -1,10 +1,11 @@
 from copy import deepcopy
+import json
 
 from fastapi.testclient import TestClient
 from jsonschema import ValidationError
 import pytest
 
-from app.contracts import example_preset, validate_preset
+from app.contracts import ROOT, example_preset, validate_preset
 from app.main import app
 
 client = TestClient(app)
@@ -27,7 +28,7 @@ def test_analysis_does_not_fake_a_successful_job():
     assert "job_id" not in response.json()
 
 
-@pytest.mark.parametrize("value", [-0.01, 1.01, float("nan"), float("inf"), "0.5", None, True])
+@pytest.mark.parametrize("value", [-0.01, 1.01, float("nan"), float("inf"), "0.5", None, True, 10**400])
 def test_shared_schema_rejects_unsafe_drive(value):
     preset = example_preset()
     preset["parameters"]["drive"] = value
@@ -44,3 +45,18 @@ def test_schema_rejects_unsupported_controls_and_false_provenance():
     preset["provenance"]["kind"] = "generated"
     with pytest.raises(ValidationError):
         validate_preset(preset)
+
+
+@pytest.mark.parametrize(
+    "case",
+    json.loads((ROOT / "fixtures" / "preset.parameter-cases.json").read_text(encoding="utf-8")),
+    ids=lambda case: case["name"],
+)
+def test_shared_parameter_cases(case):
+    preset = example_preset()
+    preset["parameters"].update(case["parameters"])
+    if case["valid"]:
+        validate_preset(preset)
+    else:
+        with pytest.raises(ValidationError):
+            validate_preset(preset)
