@@ -1,0 +1,36 @@
+# Credentials and local configuration
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+
+# JavaScript / frontend outputs
+node_modules/
+dist/
+coverage/
+
+# Python
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Local audio, models and generated jobs
+/data/
+/uploads/
+/artifacts/
+/models/
+/separated/
+*.pt
+*.pth
+*.ckpt
+*.onnx
+
+# Machine-specific files
+.DS_Store
+Thumbs.db
+*.log
