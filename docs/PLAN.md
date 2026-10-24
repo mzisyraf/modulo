@@ -111,7 +111,7 @@ Use simple semantic controls first. Show stage names instead of fabricated progr
 
 ## 6. Shared contract to freeze first
 
-This section is a proposal, not implemented endpoints or an agreed schema yet.
+This section describes the target contract. A runnable starter now implements only `GET /api/health`, `GET /api/presets/example`, and an explicit HTTP 501 response for `POST /api/jobs`. `contracts/preset.schema.json` is a shared draft covering only the currently implemented gain/drive/EQ/master controls. It still needs team review in issue #1. See DEVELOPMENT.md for setup and current limits.
 
 | Interface | Initial shape |
 |---|---|
@@ -203,4 +203,4 @@ Open decisions for the kickoff:
 Requested folder: `C:\Users\mzisy\OneDrive\Coding Environments\VS Code\Winrina NVIDEA Hackathon`.
 It was inspected while empty, then received the new `mzisyraf/toneforge` repository. This is a personal project, outside the Wiz workspace roots.
 
-No separate Codex coding chat has been created. The app's saved-project list did not include this folder, and its creation tool accepts saved project IDs rather than an arbitrary Windows path. Add/open this folder as a Codex project, then start a chat using the continuation prompt in `TEAM_HANDOFF.md`. The documents and repository are usable independently of that UI step.
+The user will open the folder and start the separate Codex coding chat themselves. Use the updated continuation prompt in `TEAM_HANDOFF.md`; it identifies the existing scaffold and avoids repeating setup. No separate coding chat was created by this planning/scaffolding task.

@@ -1,0 +1,15 @@
+{
+  "schema_version": "1",
+  "name": "Starter crunch",
+  "description": "A manual example for connecting the API, interface and audio engine. It is not generated from a song.",
+  "quality_flags": ["fixture_only", "not_tone_matched"],
+  "provenance": { "kind": "fixture", "provider": null, "model": null },
+  "parameters": {
+    "input_gain_db": 0,
+    "drive": 0.25,
+    "bass_db": 1,
+    "mid_db": 2,
+    "treble_db": -1,
+    "master_gain_db": -18
+  }
+}

@@ -1,0 +1,40 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "ToneForge scaffold preset (draft; team review required)",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "name", "description", "quality_flags", "provenance", "parameters"],
+  "properties": {
+    "schema_version": { "const": "1" },
+    "name": { "type": "string", "minLength": 1, "maxLength": 80 },
+    "description": { "type": "string", "maxLength": 1000 },
+    "quality_flags": { "type": "array", "maxItems": 20, "items": { "type": "string", "maxLength": 100 } },
+    "provenance": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "provider", "model"],
+      "properties": {
+        "kind": { "enum": ["fixture", "generated"] },
+        "provider": { "type": ["string", "null"], "minLength": 1, "maxLength": 100 },
+        "model": { "type": ["string", "null"], "minLength": 1, "maxLength": 200 }
+      },
+      "allOf": [{
+        "if": { "properties": { "kind": { "const": "generated" } } },
+        "then": { "properties": { "provider": { "type": "string" }, "model": { "type": "string" } } }
+      }]
+    },
+    "parameters": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["input_gain_db", "drive", "bass_db", "mid_db", "treble_db", "master_gain_db"],
+      "properties": {
+        "input_gain_db": { "type": "number", "minimum": -24, "maximum": 12 },
+        "drive": { "type": "number", "minimum": 0, "maximum": 1 },
+        "bass_db": { "type": "number", "minimum": -12, "maximum": 12 },
+        "mid_db": { "type": "number", "minimum": -12, "maximum": 12 },
+        "treble_db": { "type": "number", "minimum": -12, "maximum": 12 },
+        "master_gain_db": { "type": "number", "minimum": -36, "maximum": -6 }
+      }
+    }
+  }
+}

@@ -2,14 +2,14 @@
 
 Turn a guitar sound in a mixed song into a browser preset you can play through.
 
-**Status:** planning and requirements baseline; application code has not been scaffolded or implemented.
+**Status:** runnable development scaffold. Browser sample processing and a fixture API work; song analysis, AI generation and live input are not implemented yet.
 
 - **Team:** Isyraf — AI/backend/integration; Dinnie — browser audio/DSP; Shazlin — frontend/UX.
 - **Deadline:** 31 October 2026, 01:00 MYT (30 October, 17:00 UTC).
 - **Working target:** complete submission by 30 October, 22:00 MYT.
 - **Track proposal:** Best Apps and Agents, Nebius x NVIDIA Global AI Hackathon.
 
-Start with the [consolidated plan](docs/PLAN.md), then read your [team handoff](docs/TEAM_HANDOFF.md).
+Start with the [development setup](docs/DEVELOPMENT.md), [consolidated plan](docs/PLAN.md), and your [team handoff](docs/TEAM_HANDOFF.md).
 Work packages are tracked in [GitHub Issues](https://github.com/mzisyraf/toneforge/issues).
 
 ## MVP
@@ -23,18 +23,29 @@ Work packages are tracked in [GitHub Issues](https://github.com/mzisyraf/tonefor
 Short tabs are optional and start only after the core flow passes acceptance checks.
 ToneForge aims for a useful approximation, not exact amp identification or perfect tone cloning.
 
-## Proposed repository layout
+## Repository layout
 
 ```text
 apps/web/            React + TypeScript UI; Shazlin
 packages/audio/      TypeScript Web Audio engine; Dinnie
 services/api/        FastAPI orchestration, analysis, inference; Isyraf
-contracts/           Agreed preset, job and engine interfaces; shared
-fixtures/            Licensed small test data and expected results; shared
+contracts/           Draft preset schema and runtime validator; shared
+fixtures/            Manual example preset; shared
 docs/                Requirements, architecture and team handoffs
 ```
 
-Only the documentation exists today. Runtime setup commands and pinned dependencies will be added with the first implementation changes; there is no runnable application yet.
+## Run locally
+
+Use Node.js 24.15.0. From the root:
+
+```powershell
+npm ci
+npm run dev
+```
+
+Open **http://127.0.0.1:5173**. Run `npm run check` for TypeScript, unit checks and the production build. The app can audition a synthetic test signal or your own dry recording without a backend. No audio is uploaded by the scaffold.
+
+Python 3.12 API setup and tests are in [DEVELOPMENT.md](docs/DEVELOPMENT.md). The API exposes a health check and an explicitly manual example preset; analysis requests return HTTP 501 until implemented. The shared preset schema is a reviewable draft with only implemented audio controls.
 
 ## Working agreement
 
