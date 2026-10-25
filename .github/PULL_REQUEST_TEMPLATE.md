@@ -1,3 +1,5 @@
+Optional review aid: PRs are not required for staging. Direct integrations use the work-issue handoff and tested merge commit instead.
+
 Related issue: #...
 Human / GitHub author:
 Scope / files:
@@ -22,4 +24,4 @@ Work-issue HANDOFF link / claim release:
 - [ ] Scope and current remote baseline checked; unrelated changes preserved.
 - [ ] Relevant checks recorded for this version; remaining gaps explicit.
 - [ ] Shared interfaces reviewed with affected owners; requested reviewers named.
-- [ ] Partial work leaves the broader issue open; no automatic merge/publication/spend.
+- [ ] Partial work leaves the broader issue open; main promotion/publication/spend has the required authorization.

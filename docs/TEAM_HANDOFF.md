@@ -8,7 +8,7 @@ Read [DEVELOPMENT.md](DEVELOPMENT.md) for the runnable scaffold and [PLAN.md](PL
 - Accept the repository invitation and clone `https://github.com/mzisyraf/toneforge.git` into a local working folder. Isyraf's clone is already in the requested `Winrina NVIDEA Hackathon` folder.
 - Install Git, an editor and a current supported Node.js LTS. The first frontend/audio implementation must pin and document the same tested Node version and commit its package lock.
 - Use desktop Chrome/Edge, headphones and rights-cleared audio. Do not exchange cloud keys in repository files, issue comments or frontend environment variables.
-- Work on a short feature branch and open a small PR. Do not rewrite teammates' edits. Include what works, how to reproduce it and known limits.
+- Develop on your own named branch (`Isyraf`, `Dinnie` or `Shazlin`). No PR is required for staging: record a ready-for-staging handoff in the work issue, then Isyraf coordinates the direct merge and combined checks. Sync staging back into your branch. Keep `main` for approved, tested releases; do not rewrite teammates' edits.
 - Freeze the preset, job and engine contracts together before depending on them. Label synthetic fixtures; never present them as live AI output.
 
 Do not install every proposed audio/ML project on every laptop. Dinnie and Shazlin can build against fixtures and the shared dev API without a local GPU.
@@ -64,8 +64,14 @@ Handoff: frontend startup instructions, all job/audio states, labelled controls 
 3. Ten minutes: identify GPU, model, audio rig and fixture blockers; agree a spending cap.
 4. Five minutes: choose today's individual deliverable and the next shared integration check.
 
-## Prompt for the next Codex coding chat
+## Start the next development session
 
-Paste into a new chat after opening this repository folder as a Codex project:
+Fetch current remote refs, check out your own named branch without overwriting local changes, then invoke the project skill:
 
-> Continue ToneForge in this repository. Read AGENTS.md, README.md, docs/DEVELOPMENT.md, docs/PLAN.md, docs/TEAM_HANDOFF.md and GitHub issues #1–8 before changes. This is personal hackathon work, outside Wiz work systems. The team is Isyraf (AI/FastAPI/Nebius/NVIDIA/analysis), Dinnie (TypeScript Web Audio DSP), and Shazlin (React/TypeScript frontend). A runnable scaffold already exists; inspect it and Git status, preserve other people's edits, and do not scaffold again. It has a React UI, local sample audio processing, a shared draft preset schema and a FastAPI manual-preset service. Analysis, NVIDIA/Nebius calls, reference selection and live input are not implemented. Begin with issue #1: review the draft contract against the engine and API, run the documented checks, then implement the smallest useful next step in Isyraf's analysis/backend work. Coordinate any changes to Dinnie's or Shazlin's interfaces. Preserve the core mixed-song → isolated guitar → automatic passage → real NVIDIA/Nebius preset → browser amp → live interface goal. Short tabs remain optional. Deadline: 31 October 2026, 01:00 MYT; target submission Oct 30, 22:00. Keep fixtures and fallbacks labelled, prove model availability and output quality with real checks, never commit secrets or unlicensed music, and do not start paid infrastructure without an agreed budget. Use a small feature branch and PR for implementation.
+| Person | Branch | Invoke |
+|---|---|---|
+| Isyraf | `Isyraf` | `$toneforge Isyraf` |
+| Dinnie | `Dinnie` | `$toneforge Dinnie` |
+| Shazlin | `Shazlin` | `$toneforge Shazlin` |
+
+The skill reads the live hub and issue handoffs for current progress and the next unfinished task. Use `$toneforge status` for a read-only review and `$toneforge handoff` when ending. See [COLLABORATION.md](COLLABORATION.md) for first checkout, identity and merge rules.

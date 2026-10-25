@@ -17,11 +17,11 @@ Use `$toneforge Isyraf`, `$toneforge Dinnie` or `$toneforge Shazlin` to start or
 
 ## Route the next task
 
-| Operator / expected GitHub | Area | Starting issues and priorities |
-|---|---|---|
-| Isyraf / `mzisyraf` | `services/api/`, ML/providers, integration | #1 contract decisions, #2 isolation/reference, #3 NVIDIA/Nebius; coordinate #7 integration and #8 submission |
-| Dinnie / `dinni3` | `packages/audio/`, live rig | Pending #1 DSP/lifecycle decisions, #4 live input/latency, #5 DSP/effects |
-| Shazlin / `shazlinn` | `apps/web/`, UX | Pending #1 frontend/API/engine decisions, #6 fixture-to-real frontend flow |
+| Operator / expected GitHub | Development branch | Area | Starting issues and priorities |
+|---|---|---|---|
+| Isyraf / `mzisyraf` | `Isyraf` | `services/api/`, ML/providers, integration | #1 contract decisions, #2 isolation/reference, #3 NVIDIA/Nebius; coordinate #7 integration and #8 submission |
+| Dinnie / `dinni3` | `Dinnie` | `packages/audio/`, live rig | Pending #1 DSP/lifecycle decisions, #4 live input/latency, #5 DSP/effects |
+| Shazlin / `shazlinn` | `Shazlin` | `apps/web/`, UX | Pending #1 frontend/API/engine decisions, #6 fixture-to-real frontend flow |
 
 These are routing seeds, not fixed task status. Also check newer assigned issues and dependencies. Choose the next unfinished, unclaimed, useful item in the operator's scope based on current acceptance criteria and handoffs. A merged partial PR does not complete its parent issue. Prioritize core-flow blockers and requested boundary reviews; optional tabs remain last. If a task is blocked, report the dependency and choose another useful unblocked item within scope. Do not start paid cloud/model work without an explicit approved cap or substitute synthetic evidence for real audio/model/hardware acceptance.
 
@@ -30,12 +30,12 @@ Briefly report the latest evidenced state, the selected issue/scope and next con
 ## Continue development
 
 - Check claims and overlapping PRs before editing. Post a scoped START to the work issue using the collaboration guide, then re-read for competing claims. Claims are advisory, not locks; obtain an explicit split/release/reassignment before touching overlap. Do not assume silence releases another session's claim.
-- Use the operator's small feature branch from the verified working baseline, or resume their existing branch after checking its state. Do not switch two running sessions through one checkout. Coordinate shared preset/job/engine changes with the affected owners.
+- Develop on the operator's exact persistent branch: `Isyraf`, `Dinnie` or `Shazlin`. Fetch and safely fast-forward that branch from its remote, then merge `origin/staging` into it without rewriting unmerged work; staging is the integration baseline. Preserve dirty/diverged work and resolve conflicts with the owners. One active writer per personal branch; do not switch two sessions through one checkout or write to another operator's branch. Coordinate shared interfaces with affected owners.
 - Continue the authorized task after the brief report; do not stop merely to offer a plan or ask permission for routine local work. Preserve existing validation and truthful fixture/provenance labels. Run relevant documented checks and verify changed browser behavior; actual model/separation/live latency acceptance needs actual evidence.
-- Keep the work and progress in this repository's issues/PRs, never Wiz records. Do not merge PRs, force push, publish the repository, pick a licence or start paid infrastructure without the appropriate explicit authorization.
+- Keep progress and review evidence in work issues/commits, never Wiz records. No PR is required for staging. A checked, pushed commit with a Ready for staging handoff may be integrated directly by Isyraf's coordinator session, following the guide's serialized merge/test/push sequence. Test the combined candidate before pushing staging; failed candidates stay unpublished. Do not force push, promote main, publish, pick a licence or start paid infrastructure beyond the appropriate explicit authorization.
 
 ## Handoff
 
-At completion or an explicit handoff request, append a HANDOFF to the same work issue with human/session, scope, state, branch/base/head commit, PR, demonstrated changes, checks tied to their tested commit, gaps, blockers and next action/reviewer. Distinguish checks run now from earlier reported results. Release the editing claim; a blocked update names any files still reserved. If writing fails, show the update as **not posted** and never claim it succeeded. Do not run a new development task for a handoff-only request.
+At completion or an explicit handoff request, append a HANDOFF to the same work issue with human/session, scope, state, branch/base/head commit, staging merge or optional PR, demonstrated changes, checks tied to their tested commit, gaps, blockers and next action/reviewer. Distinguish checks run now from earlier reported results. Release the editing claim; a blocked update names any files still reserved. If writing fails, show the update as **not posted** and never claim it succeeded. Do not run a new development task for a handoff-only request.
 
-Only Isyraf's coordinator session refreshes the hub body, after re-reading current issue/PR evidence to preserve others' updates. Other operators update their work issues. Do not mark broad acceptance done without the affected humans' approval and real evidence. End with what changed, where to review it, what was checked and remaining limits.
+Only Isyraf's coordinator session integrates into staging and refreshes the hub body, after re-reading current issue/commit/PR evidence to preserve others' updates. Other operators update their work issues and personal branches. After integration, merge staging back into personal branches without rewriting history. Main is reserved for finalized releases: promotion requires Isyraf's approval of the exact tested staging commit, never a routine resume action. Do not mark broad acceptance done without the affected humans' approval and real evidence. End with what changed, where to review it, what was checked and remaining limits.

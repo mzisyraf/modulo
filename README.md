@@ -50,6 +50,6 @@ Python 3.12 API setup and tests are in [DEVELOPMENT.md](docs/DEVELOPMENT.md). Th
 
 ## Working agreement
 
-Use short feature branches and small pull requests. Keep `main` usable. Review changes across ownership boundaries together. Do not commit API keys, local uploads, model weights or unlicensed music. Team members are building in parallel; preserve one another's edits.
+Develop on your named branch: `Isyraf`, `Dinnie` or `Shazlin`. Isyraf coordinates direct merges into `staging`, where the combined code is tested before pushing. No PR is required for staging; keep scope, reviews, tested commits and handoffs in the work issue. Merge `staging` back into your personal branch regularly. `main` receives only an explicitly approved, tested staging release; creating these branches does not mean the MVP is finalized. See [COLLABORATION.md](docs/COLLABORATION.md) for the merge sequence. Preserve teammates' edits and keep API keys, uploads, model weights and unlicensed music out of Git.
 
 The repository is private during planning. The [event rules](https://nebiusglobalaihackathon.devpost.com/rules) require public source and an open-source licence for submission. The team must settle the licence and authorize publication before the deadline.

@@ -158,7 +158,7 @@ The initial work packages are live in GitHub:
 
 Owners are listed in issue bodies; teammate assignment depends on accepted invitations.
 
-Daily rhythm: post what works, today's deliverable and blockers in the relevant issue; hold a brief integration check each evening. A change to a shared contract needs both affected owners. Use short feature branches and small PRs against `main`, with the relevant owner reviewing. Treat `main` as the stable demo baseline. No force pushes or direct overwrites of someone else's work.
+Daily rhythm: post what works, today's deliverable and blockers in the relevant issue; hold a brief integration check each evening. A change to a shared contract needs both affected owners. Branch workflow updated by Isyraf on 25 October: develop on `Isyraf`, `Dinnie` or `Shazlin`; integrate directly into `staging` without a required PR; test the combined commit before pushing staging. Record reviews and handoffs in the issue. Only promote an approved, tested staging release to `main`, and sync staging back into personal branches without rewriting history. Follow [COLLABORATION.md](COLLABORATION.md). No force pushes or direct overwrites of someone else's work.
 
 ## 8. Test plan, risks and fallback rules
 
