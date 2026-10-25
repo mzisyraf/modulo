@@ -4,6 +4,7 @@ Read [DEVELOPMENT.md](DEVELOPMENT.md) for the runnable scaffold and [PLAN.md](PL
 
 ## Everyone
 
+- Start each session at the [development hub](https://github.com/mzisyraf/toneforge/issues/11) and follow [COLLABORATION.md](COLLABORATION.md). State the human/GitHub owner and issue, read current claims/PRs, and leave a scoped start/handoff update on the work issue. The hub is shared across tools and laptops; private chat history is not the handoff.
 - Accept the repository invitation and clone `https://github.com/mzisyraf/toneforge.git` into a local working folder. Isyraf's clone is already in the requested `Winrina NVIDEA Hackathon` folder.
 - Install Git, an editor and a current supported Node.js LTS. The first frontend/audio implementation must pin and document the same tested Node version and commit its package lock.
 - Use desktop Chrome/Edge, headphones and rights-cleared audio. Do not exchange cloud keys in repository files, issue comments or frontend environment variables.
