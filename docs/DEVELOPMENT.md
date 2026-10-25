@@ -50,6 +50,22 @@ Vite proxies `/api` to port 8000. There is no permissive CORS setting or public 
 
 The exact resolved Python environment is in `requirements-lock.txt`. The shorter requirements files list direct dependencies for intentional updates; regenerate the lock in a fresh Python 3.12 venv and run the checks when changing them.
 
+## Backend environment template
+
+Use [services/api/.env.example](../services/api/.env.example) as the team's shared format. Each developer keeps their own values in `services/api/.env`. From the repository root, create it only if it does not already exist:
+
+```powershell
+if (-not (Test-Path -LiteralPath 'services/api/.env')) {
+    Copy-Item -LiteralPath 'services/api/.env.example' -Destination 'services/api/.env'
+}
+```
+
+Open `services/api/.env` in your editor and fill in `NEBIUS_API_KEY` with your Token Factory key. `NEBIUS_BASE_URL` is the API base URL; `NEBIUS_MODEL` is the exact serving ID, with a candidate supplied in the template. Verify that model is available to your account before using it.
+
+Commit only the example with its empty key. The real `.env` is already Git-ignored; keep credentials out of chat, issue comments and frontend files, including `VITE_` variables. Frontend/audio contributors do not need a Nebius key for the scaffold.
+
+This template reserves the names for backend provider integration. The current fixture API does **not** automatically load `.env`, read these variables or call Nebius; normal development still needs no cloud credentials. Adding a key does not enable inference or spend credits.
+
 ## Checks
 
 From the root:
