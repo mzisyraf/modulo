@@ -1,4 +1,4 @@
-# ToneForge — running the scaffold
+# modulo — running the scaffold
 
 This starter connects a React page, a TypeScript audio package, a shared preset schema and a FastAPI fixture service. It is not the completed MVP.
 

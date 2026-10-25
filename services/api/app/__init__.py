@@ -1,1 +1,1 @@
-"""ToneForge API scaffold; no cloud inference is configured."""
+"""modulo API scaffold; no cloud inference is configured."""

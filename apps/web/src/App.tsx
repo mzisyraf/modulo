@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
-import { AudioEngine } from "@toneforge/audio";
-import { parsePreset, type Preset } from "@toneforge/contracts";
+import { AudioEngine } from "@modulo/audio";
+import { parsePreset, type Preset } from "@modulo/contracts";
 import example from "../../../fixtures/preset.example.json";
 
 const initialPreset = parsePreset(example);
@@ -72,7 +72,7 @@ export function App() {
   }
 
   return <main>
-    <header><span className="eyebrow">TONEFORGE / DEVELOPMENT STARTER</span><h1>Find the sound.<br /><em>Make it yours.</em></h1><p>A shared starting point for the guitar tone workflow.</p></header>
+    <header><span className="eyebrow">modulo / DEVELOPMENT STARTER</span><h1>Find the sound.<br /><em>Make it yours.</em></h1><p>A shared starting point for the guitar tone workflow.</p></header>
     <p className="notice"><strong>Example mode.</strong> Song isolation, automatic passage selection and AI presets are not connected. This preset is manually authored.</p>
     <div className="status" role="status">{apiState}</div>
     <div className="grid">

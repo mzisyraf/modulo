@@ -3,7 +3,7 @@ from fastapi.responses import JSONResponse
 
 from .contracts import example_preset
 
-app = FastAPI(title="ToneForge API", version="0.1.0")
+app = FastAPI(title="modulo API", version="0.1.0")
 
 
 @app.get("/api/health")

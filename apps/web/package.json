@@ -1,12 +1,12 @@
 {
-  "name": "@toneforge/web",
+  "name": "@modulo/web",
   "version": "0.1.0",
   "private": true,
   "type": "module",
   "scripts": { "dev": "vite", "build": "vite build" },
   "dependencies": {
-    "@toneforge/audio": "0.1.0",
-    "@toneforge/contracts": "0.1.0",
+    "@modulo/audio": "0.1.0",
+    "@modulo/contracts": "0.1.0",
     "react": "19.3.1",
     "react-dom": "19.3.1"
   },

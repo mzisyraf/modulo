@@ -1,6 +1,6 @@
-# ToneForge collaboration across three laptops
+# modulo collaboration across three laptops
 
-Start at the [development hub, issue #11](https://github.com/mzisyraf/toneforge/issues/11). GitHub holds shared progress, blockers, decisions and evidence. Each laptop keeps its own clone, local environment and credentials.
+Start at the [development hub, issue #11](https://github.com/mzisyraf/modulo/issues/11). GitHub holds shared progress, blockers, decisions and evidence. Each laptop keeps its own clone, local environment and credentials.
 
 ## Ownership and branch flow
 
@@ -76,16 +76,16 @@ Run `npm ci` / `npm run check` and the API's local-venv tests as documented in D
 
 ## Start with the project skill
 
-All three personal branches contain `.agents/skills/toneforge/SKILL.md`. Inspect Git status and fetch remote refs first. For a first checkout, use `git switch --track origin/Dinnie` (substitute your branch). If it already exists, use `git switch Dinnie`, then fast-forward its remote updates. Preserve local work rather than switching over a dirty tree. Open that folder in Codex and use your own line:
+All three personal branches contain `.agents/skills/modulo/SKILL.md`. Inspect Git status and fetch remote refs first. For a first checkout, use `git switch --track origin/Dinnie` (substitute your branch). If it already exists, use `git switch Dinnie`, then fast-forward its remote updates. Preserve local work rather than switching over a dirty tree. Open that folder in Codex and use your own line:
 
 ```text
-$toneforge Isyraf
-$toneforge Dinnie
-$toneforge Shazlin
+$modulo Isyraf
+$modulo Dinnie
+$modulo Shazlin
 ```
 
-The skill reads live state, selects your next unfinished task, records START and proceeds on your named branch. Bare `$toneforge` works once your human identity is established in that chat; otherwise it asks. Your verified GitHub identity must match before shared writes.
+The skill reads live state, selects your next unfinished task, records START and proceeds on your named branch. Bare `$modulo` works once your human identity is established in that chat; otherwise it asks. Your verified GitHub identity must match before shared writes.
 
-Use `$toneforge status` for a read-only review and `$toneforge handoff` before ending. Codex discovers repo skills under `.agents/skills`; reopen/restart if it is missing after checkout. [Official skill documentation](https://learn.chatgpt.com/docs/build-skills).
+Use `$modulo status` for a read-only review and `$modulo handoff` before ending. Codex discovers repo skills under `.agents/skills`; reopen/restart if it is missing after checkout. [Official skill documentation](https://learn.chatgpt.com/docs/build-skills).
 
-For another AI tool without discovery: `Read and follow .agents/skills/toneforge/SKILL.md. I am Shazlin. Continue my next ToneForge task.` Use the actual person's name. No other tool's configuration changes.
+For another AI tool without discovery: `Read and follow .agents/skills/modulo/SKILL.md. I am Shazlin. Continue my next modulo task.` Use the actual person's name. No other tool's configuration changes.

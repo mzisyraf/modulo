@@ -1,11 +1,11 @@
-# ToneForge — team setup and handoffs
+# modulo — team setup and handoffs
 
 Read [DEVELOPMENT.md](DEVELOPMENT.md) for the runnable scaffold and [PLAN.md](PLAN.md) for the full requirements. The scaffold provides sample audio processing and a manual preset API; analysis, NVIDIA/Nebius generation and live input remain unimplemented. Deadline: **31 October 2026, 01:00 MYT**; submission target **30 October, 22:00 MYT**.
 
 ## Everyone
 
-- Start each session at the [development hub](https://github.com/mzisyraf/toneforge/issues/11) and follow [COLLABORATION.md](COLLABORATION.md). State the human/GitHub owner and issue, read current claims/PRs, and leave a scoped start/handoff update on the work issue. The hub is shared across tools and laptops; private chat history is not the handoff.
-- Accept the repository invitation and clone `https://github.com/mzisyraf/toneforge.git` into a local working folder. Isyraf's clone is already in the requested `Winrina NVIDEA Hackathon` folder.
+- Start each session at the [development hub](https://github.com/mzisyraf/modulo/issues/11) and follow [COLLABORATION.md](COLLABORATION.md). State the human/GitHub owner and issue, read current claims/PRs, and leave a scoped start/handoff update on the work issue. The hub is shared across tools and laptops; private chat history is not the handoff.
+- Accept the repository invitation and clone `https://github.com/mzisyraf/modulo.git` into a local working folder. Isyraf's clone is already in the requested `Winrina NVIDEA Hackathon` folder.
 - Install Git, an editor and a current supported Node.js LTS. The first frontend/audio implementation must pin and document the same tested Node version and commit its package lock.
 - Use desktop Chrome/Edge, headphones and rights-cleared audio. Do not exchange cloud keys in repository files, issue comments or frontend environment variables.
 - Develop on your own named branch (`Isyraf`, `Dinnie` or `Shazlin`). No PR is required for staging: record a ready-for-staging handoff in the work issue, then Isyraf coordinates the direct merge and combined checks. Sync staging back into your branch. Keep `main` for approved, tested releases; do not rewrite teammates' edits.
@@ -70,8 +70,8 @@ Fetch current remote refs, check out your own named branch without overwriting l
 
 | Person | Branch | Invoke |
 |---|---|---|
-| Isyraf | `Isyraf` | `$toneforge Isyraf` |
-| Dinnie | `Dinnie` | `$toneforge Dinnie` |
-| Shazlin | `Shazlin` | `$toneforge Shazlin` |
+| Isyraf | `Isyraf` | `$modulo Isyraf` |
+| Dinnie | `Dinnie` | `$modulo Dinnie` |
+| Shazlin | `Shazlin` | `$modulo Shazlin` |
 
-The skill reads the live hub and issue handoffs for current progress and the next unfinished task. Use `$toneforge status` for a read-only review and `$toneforge handoff` when ending. See [COLLABORATION.md](COLLABORATION.md) for first checkout, identity and merge rules.
+The skill reads the live hub and issue handoffs for current progress and the next unfinished task. Use `$modulo status` for a read-only review and `$modulo handoff` when ending. See [COLLABORATION.md](COLLABORATION.md) for first checkout, identity and merge rules.

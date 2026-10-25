@@ -1,18 +1,18 @@
 ---
-name: toneforge
-description: Start or resume ToneForge development, review live team progress, or hand off a session. Reads shared GitHub progress and routes the next scoped task for Isyraf, Dinnie or Shazlin. Use for this project's session coordination, not unrelated repositories.
+name: modulo
+description: Start or resume modulo development, review live team progress, or hand off a session. Reads shared GitHub progress and routes the next scoped task for Isyraf, Dinnie or Shazlin. Use for this project's session coordination, not unrelated repositories.
 ---
 
-# ToneForge session coordination
+# modulo session coordination
 
-Use `$toneforge Isyraf`, `$toneforge Dinnie` or `$toneforge Shazlin` to start or resume. With a human already established in this session, `$toneforge` is enough. `status` means read-only progress review; `handoff` means close the current session without starting another task.
+Use `$modulo Isyraf`, `$modulo Dinnie` or `$modulo Shazlin` to start or resume. With a human already established in this session, `$modulo` is enough. `status` means read-only progress review; `handoff` means close the current session without starting another task.
 
 ## Establish the operator and current state
 
 - Use the human explicitly named in this request or current session. If unknown or ambiguous, ask which of the three is operating before selecting work or writing to GitHub. Never infer the human from a shared AI account, an earlier chat's author or the current branch name.
-- Work in the existing `mzisyraf/toneforge` checkout. Inspect Git status and remote; preserve local edits and teammates' branches. Do not recreate or reset the repository.
+- Work in the existing `mzisyraf/modulo` checkout. Inspect Git status and remote; preserve local edits and teammates' branches. Do not recreate or reset the repository.
 - Follow repository-root AGENTS.md and [the collaboration guide](../../../docs/COLLABORATION.md). Read their required project docs. They hold the update format, claim rules, reviewers and acceptance boundaries; do not invent a second workflow.
-- Read the live hub https://github.com/mzisyraf/toneforge/issues/11, relevant work issues including their latest comments, and linked PRs including review/merge state. Fetch remote refs and compare the actual working baseline from the hub. Resolve disagreement using current GitHub evidence, not private chat memory or this skill's age. No baseline commit or current progress is hardcoded here.
+- Read the live hub https://github.com/mzisyraf/modulo/issues/11, relevant work issues including their latest comments, and linked PRs including review/merge state. Fetch remote refs and compare the actual working baseline from the hub. Resolve disagreement using current GitHub evidence, not private chat memory or this skill's age. No baseline commit or current progress is hardcoded here.
 - Prefer the connected GitHub tools; otherwise use an available authenticated GitHub CLI or browser. Confirm the authenticated GitHub identity matches the declared human before any shared write. No credentials in chat, logs or Git. If live access is unavailable or the identity is wrong, state what could not be verified, mark proposed updates **not posted**, and do not invent latest progress, post as a teammate or claim shared ownership. Local preparation remains explicitly uncoordinated.
 
 ## Route the next task

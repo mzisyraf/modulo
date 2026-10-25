@@ -1,6 +1,6 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
-  "title": "ToneForge scaffold preset (draft; team review required)",
+  "title": "modulo scaffold preset (draft; team review required)",
   "type": "object",
   "additionalProperties": false,
   "required": ["schema_version", "name", "description", "quality_flags", "provenance", "parameters"],

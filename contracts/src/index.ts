@@ -20,6 +20,6 @@ export interface Preset {
 const validate = new Ajv({ allErrors: true, strictNumbers: true }).compile<Preset>(schema);
 
 export function parsePreset(value: unknown): Preset {
-  if (!validate(value)) throw new Error("Preset does not match the supported ToneForge controls.");
+  if (!validate(value)) throw new Error("Preset does not match the supported modulo controls.");
   return structuredClone(value);
 }

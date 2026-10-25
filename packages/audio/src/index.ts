@@ -1,4 +1,4 @@
-import { parsePreset, type Preset } from "@toneforge/contracts";
+import { parsePreset, type Preset } from "@modulo/contracts";
 import { driveCurve, pluckSamples } from "./dsp.ts";
 
 export class AudioEngine {

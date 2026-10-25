@@ -1,4 +1,4 @@
-# ToneForge
+# modulo
 
 Turn a guitar sound in a mixed song into a browser preset you can play through.
 
@@ -10,8 +10,8 @@ Turn a guitar sound in a mixed song into a browser preset you can play through.
 - **Track proposal:** Best Apps and Agents, Nebius x NVIDIA Global AI Hackathon.
 
 Start with the [development setup](docs/DEVELOPMENT.md), [consolidated plan](docs/PLAN.md), and your [team handoff](docs/TEAM_HANDOFF.md).
-Use the [development hub](https://github.com/mzisyraf/toneforge/issues/11) for current progress, ownership, blockers and reviews. The [collaboration guide](docs/COLLABORATION.md) gives every laptop and AI agent the same start/handoff workflow.
-After updating to the shared skill, start a Codex session with `$toneforge Isyraf`, `$toneforge Dinnie` or `$toneforge Shazlin`.
+Use the [development hub](https://github.com/mzisyraf/modulo/issues/11) for current progress, ownership, blockers and reviews. The [collaboration guide](docs/COLLABORATION.md) gives every laptop and AI agent the same start/handoff workflow.
+After updating to the shared skill, start a Codex session with `$modulo Isyraf`, `$modulo Dinnie` or `$modulo Shazlin`.
 
 ## MVP
 
@@ -22,7 +22,7 @@ After updating to the shared skill, start a Codex session with `$toneforge Isyra
 5. Play through it with a guitar audio interface, or audition a provided dry guitar recording.
 
 Short tabs are optional and start only after the core flow passes acceptance checks.
-ToneForge aims for a useful approximation, not exact amp identification or perfect tone cloning.
+modulo aims for a useful approximation, not exact amp identification or perfect tone cloning.
 
 ## Repository layout
 

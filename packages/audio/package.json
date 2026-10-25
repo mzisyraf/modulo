@@ -1,8 +1,8 @@
 {
-  "name": "@toneforge/audio",
+  "name": "@modulo/audio",
   "version": "0.1.0",
   "private": true,
   "type": "module",
   "exports": { ".": "./src/index.ts" },
-  "dependencies": { "@toneforge/contracts": "0.1.0" }
+  "dependencies": { "@modulo/contracts": "0.1.0" }
 }

@@ -1,8 +1,8 @@
-# ToneForge coding context
+# modulo coding context
 
 This is a personal hackathon project. Keep work out of Wiz work records.
 Read README.md, docs/DEVELOPMENT.md, docs/PLAN.md and docs/TEAM_HANDOFF.md before changes.
-For development tasks, also follow docs/COLLABORATION.md and read the live development hub at https://github.com/mzisyraf/toneforge/issues/11. Identify the human operator and work issue explicitly; never infer ownership from the AI account. Read current issue updates/PRs, record a scoped START before editing and a HANDOFF afterward. Claims are advisory; resolve overlapping claims before changing those files. If GitHub access or identity is wrong, report the update as not posted; do not impersonate another developer or claim a shared lock.
+For development tasks, also follow docs/COLLABORATION.md and read the live development hub at https://github.com/mzisyraf/modulo/issues/11. Identify the human operator and work issue explicitly; never infer ownership from the AI account. Read current issue updates/PRs, record a scoped START before editing and a HANDOFF afterward. Claims are advisory; resolve overlapping claims before changing those files. If GitHub access or identity is wrong, report the update as not posted; do not impersonate another developer or claim a shared lock.
 
 Ownership: Isyraf owns services/api and ML/provider integration on branch Isyraf; Dinnie owns packages/audio on branch Dinnie; Shazlin owns apps/web on branch Shazlin. contracts and fixtures are shared. Preserve other people's changes. staging is the integration/test baseline; main is reserved for approved finalized releases. No PR is required for staging: use small commits and issue handoffs, with Isyraf coordinating serialized merges and testing before pushing staging. Sync staging back into personal branches without rewriting history. Do not promote main without Isyraf's approval of the tested staging commit.
 

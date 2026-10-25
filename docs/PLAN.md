@@ -1,10 +1,10 @@
-# ToneForge — requirements, architecture and delivery plan
+# modulo — requirements, architecture and delivery plan
 
 Planning baseline: 24 October 2026. All dates and working times below are **MYT (UTC+8)**.
 
 ## 1. Product and preserved decisions
 
-ToneForge helps a guitarist hear a tone in a mixed song, extract a useful guitar reference, and get a playable approximation through a browser amp/effects chain.
+modulo helps a guitarist hear a tone in a mixed song, extract a useful guitar reference, and get a playable approximation through a browser amp/effects chain.
 
 The decisions supplied by Isyraf are the baseline:
 
@@ -147,14 +147,14 @@ The initial work packages are live in GitHub:
 
 | Issue | Owner | Checkpoint |
 |---|---|---|
-| [#1 Shared contracts](https://github.com/mzisyraf/toneforge/issues/1) | Isyraf coordinates; all agree | Oct 25, 12:00 |
-| [#2 Isolation and passage selection](https://github.com/mzisyraf/toneforge/issues/2) | Isyraf | Oct 26 |
-| [#3 NVIDIA/Nebius preset generation](https://github.com/mzisyraf/toneforge/issues/3) | Isyraf | Oct 27 |
-| [#4 Live interface feasibility](https://github.com/mzisyraf/toneforge/issues/4) | Dinnie | Oct 25 |
-| [#5 Browser DSP engine](https://github.com/mzisyraf/toneforge/issues/5) | Dinnie | Oct 27 |
-| [#6 React frontend](https://github.com/mzisyraf/toneforge/issues/6) | Shazlin | Oct 28 |
-| [#7 Integration and acceptance](https://github.com/mzisyraf/toneforge/issues/7) | Isyraf coordinates; all verify | Oct 28–29 |
-| [#8 Submission package](https://github.com/mzisyraf/toneforge/issues/8) | All; Isyraf coordinates | Oct 30, 22:00 |
+| [#1 Shared contracts](https://github.com/mzisyraf/modulo/issues/1) | Isyraf coordinates; all agree | Oct 25, 12:00 |
+| [#2 Isolation and passage selection](https://github.com/mzisyraf/modulo/issues/2) | Isyraf | Oct 26 |
+| [#3 NVIDIA/Nebius preset generation](https://github.com/mzisyraf/modulo/issues/3) | Isyraf | Oct 27 |
+| [#4 Live interface feasibility](https://github.com/mzisyraf/modulo/issues/4) | Dinnie | Oct 25 |
+| [#5 Browser DSP engine](https://github.com/mzisyraf/modulo/issues/5) | Dinnie | Oct 27 |
+| [#6 React frontend](https://github.com/mzisyraf/modulo/issues/6) | Shazlin | Oct 28 |
+| [#7 Integration and acceptance](https://github.com/mzisyraf/modulo/issues/7) | Isyraf coordinates; all verify | Oct 28–29 |
+| [#8 Submission package](https://github.com/mzisyraf/modulo/issues/8) | All; Isyraf coordinates | Oct 30, 22:00 |
 
 Owners are listed in issue bodies; teammate assignment depends on accepted invitations.
 
@@ -201,6 +201,6 @@ Open decisions for the kickoff:
 ## Workspace and continuation status
 
 Requested folder: `C:\Users\mzisy\OneDrive\Coding Environments\VS Code\Winrina NVIDEA Hackathon`.
-It was inspected while empty, then received the new `mzisyraf/toneforge` repository. This is a personal project, outside the Wiz workspace roots.
+It was inspected while empty, then received the new `mzisyraf/modulo` repository. This is a personal project, outside the Wiz workspace roots.
 
 The user will open the folder and start the separate Codex coding chat themselves. Use the updated continuation prompt in `TEAM_HANDOFF.md`; it identifies the existing scaffold and avoids repeating setup. No separate coding chat was created by this planning/scaffolding task.
