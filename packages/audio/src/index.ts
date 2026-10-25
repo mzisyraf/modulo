@@ -1,6 +1,17 @@
 import { parsePreset, type Preset } from "@modulo/contracts";
 import { driveCurve, pluckSamples } from "./dsp.ts";
 
+export interface LiveInputInfo {
+  /** Zero-based hardware input channel. */
+  channel: 0 | 1;
+  trackLabel: string;
+  settings: MediaTrackSettings;
+  contextSampleRate: number;
+  /** Browser estimates in seconds, not measured round-trip latency. */
+  baseLatencySeconds?: number;
+  outputLatencySeconds?: number;
+}
+
 export class AudioEngine {
   private context?: AudioContext;
   private input?: GainNode;
@@ -12,6 +23,10 @@ export class AudioEngine {
   private dry?: GainNode;
   private master?: GainNode;
   private source?: AudioBufferSourceNode;
+  private liveSource?: MediaStreamAudioSourceNode;
+  private liveSplitter?: ChannelSplitterNode;
+  private liveStream?: MediaStream;
+  private liveEnded?: () => void;
   private preset: Preset;
   private request = 0;
   private disposed = false;
@@ -108,13 +123,94 @@ export class AudioEngine {
     return this.play(async (context) => context.decodeAudioData(await file.arrayBuffer()));
   }
 
+  /** Call from a user gesture. False means a newer start/stop canceled this request. */
+  async startLive(deviceId?: string, channel: number = 0): Promise<LiveInputInfo | false> {
+    if (this.disposed) throw new Error("Audio engine is closed.");
+    if (channel !== 0 && channel !== 1) throw new Error("Choose input channel 0 or 1.");
+    this.stop();
+    const request = this.request;
+    let stream: MediaStream | undefined;
+    let source: MediaStreamAudioSourceNode | undefined;
+    let splitter: ChannelSplitterNode | undefined;
+    try {
+      const context = await this.initialize();
+      if (request !== this.request || this.disposed) return false;
+      if (!globalThis.navigator?.mediaDevices?.getUserMedia) {
+        throw new Error("Live input requires media capture in HTTPS or localhost.");
+      }
+      stream = await navigator.mediaDevices.getUserMedia({
+        video: false,
+        audio: {
+          ...(deviceId ? { deviceId: { exact: deviceId } } : {}),
+          channelCount: { ideal: 2 },
+          echoCancellation: false,
+          noiseSuppression: false,
+          autoGainControl: false,
+        },
+      });
+      if (request !== this.request || this.disposed) {
+        stream.getTracks().forEach((track) => track.stop());
+        return false;
+      }
+      const track = stream.getAudioTracks()[0];
+      if (!track || track.readyState === "ended") throw new Error("No active audio input was returned.");
+      const settings = track.getSettings();
+      // Do not silently route a missing/unconfirmed right channel as silence.
+      if (channel === 1 && !(settings.channelCount && settings.channelCount >= 2)) {
+        throw new Error("The browser did not confirm a second input channel. Choose channel 0.");
+      }
+      // A single-track stream removes any ambiguity about which track is routed.
+      source = context.createMediaStreamSource(new MediaStream([track]));
+      splitter = context.createChannelSplitter(2);
+      source.connect(splitter);
+      splitter.connect(this.input!, channel, 0);
+      const ended = () => {
+        if (this.liveStream !== stream) return;
+        this.stop();
+        this.onEnded?.();
+      };
+      this.liveStream = stream;
+      this.liveSource = source;
+      this.liveSplitter = splitter;
+      this.liveEnded = ended;
+      track.addEventListener("ended", ended);
+      return {
+        channel,
+        trackLabel: track.label,
+        settings,
+        contextSampleRate: context.sampleRate,
+        baseLatencySeconds: context.baseLatency,
+        outputLatencySeconds: context.outputLatency,
+      };
+    } catch (error) {
+      source?.disconnect();
+      splitter?.disconnect();
+      stream?.getTracks().forEach((track) => track.stop());
+      if (request !== this.request || this.disposed) return false;
+      throw error;
+    }
+  }
+
   stop(): void {
     this.request++;
-    if (!this.source) return;
-    this.source.onended = null;
-    this.source.stop();
-    this.source.disconnect();
-    this.source = undefined;
+    if (this.source) {
+      this.source.onended = null;
+      this.source.stop();
+      this.source.disconnect();
+      this.source = undefined;
+    }
+    if (this.liveStream) {
+      for (const track of this.liveStream.getTracks()) {
+        if (this.liveEnded) track.removeEventListener("ended", this.liveEnded);
+        track.stop();
+      }
+      this.liveStream = undefined;
+    }
+    this.liveSource?.disconnect();
+    this.liveSplitter?.disconnect();
+    this.liveSource = undefined;
+    this.liveSplitter = undefined;
+    this.liveEnded = undefined;
   }
 
   async dispose(): Promise<void> {
