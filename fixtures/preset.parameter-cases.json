@@ -1,0 +1,20 @@
+[
+  { "name": "minimum controls", "valid": true, "parameters": { "input_gain_db": -24, "drive": 0, "bass_db": -12, "mid_db": -12, "treble_db": -12, "master_gain_db": -36 } },
+  { "name": "maximum controls", "valid": true, "parameters": { "input_gain_db": 12, "drive": 1, "bass_db": 12, "mid_db": 12, "treble_db": 12, "master_gain_db": -6 } },
+  { "name": "input below minimum", "valid": false, "parameters": { "input_gain_db": -24.01 } },
+  { "name": "input above maximum", "valid": false, "parameters": { "input_gain_db": 12.01 } },
+  { "name": "drive below minimum", "valid": false, "parameters": { "drive": -0.01 } },
+  { "name": "drive above maximum", "valid": false, "parameters": { "drive": 1.01 } },
+  { "name": "bass below minimum", "valid": false, "parameters": { "bass_db": -12.01 } },
+  { "name": "bass above maximum", "valid": false, "parameters": { "bass_db": 12.01 } },
+  { "name": "mid below minimum", "valid": false, "parameters": { "mid_db": -12.01 } },
+  { "name": "mid above maximum", "valid": false, "parameters": { "mid_db": 12.01 } },
+  { "name": "treble below minimum", "valid": false, "parameters": { "treble_db": -12.01 } },
+  { "name": "treble above maximum", "valid": false, "parameters": { "treble_db": 12.01 } },
+  { "name": "master below minimum", "valid": false, "parameters": { "master_gain_db": -36.01 } },
+  { "name": "master above maximum", "valid": false, "parameters": { "master_gain_db": -5.99 } },
+  { "name": "numeric string", "valid": false, "parameters": { "drive": "0.5" } },
+  { "name": "boolean", "valid": false, "parameters": { "drive": true } },
+  { "name": "null", "valid": false, "parameters": { "drive": null } },
+  { "name": "unsupported effect", "valid": false, "parameters": { "delay_ms": 250 } }
+]

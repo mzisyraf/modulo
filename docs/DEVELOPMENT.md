@@ -12,6 +12,8 @@ This starter connects a React page, a TypeScript audio package, a shared preset 
 
 Still unimplemented: mixed-song upload/separation, automatic reference selection, NVIDIA/Nebius calls, job processing/storage, live interface input, cabinet simulation, compressor, delay, reverb and optional tabs. `POST /api/jobs` deliberately returns HTTP 501. No uploads are saved, and no cloud credentials or GPU are required for this starter.
 
+An offline [reference-selection prototype](ANALYSIS.md) now accepts an already-isolated PCM16 guitar WAV and aligned mix. It is not connected to song analysis or the browser. The [issue #1 contract review](CONTRACT_REVIEW.md) records actual controls, methods and pending team decisions.
+
 ## Prerequisites
 
 Use Node.js **24.15.0** (see `.nvmrc`) and Python **3.12**. Other Node 24/Python 3.12 patches may work, but use the tested versions for the first team setup. Git is needed to clone/update the repository. All terminal examples below are PowerShell; frontend/audio contributors do not need to run the Python service.

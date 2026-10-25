@@ -9,7 +9,9 @@ SCHEMA = json.loads((ROOT / "contracts" / "preset.schema.json").read_text(encodi
 
 
 def finite_number(_checker, value):
-    return isinstance(value, (int, float)) and not isinstance(value, bool) and math.isfinite(value)
+    if isinstance(value, bool):
+        return False
+    return isinstance(value, int) or (isinstance(value, float) and math.isfinite(value))
 
 
 PresetValidator = validators.extend(
