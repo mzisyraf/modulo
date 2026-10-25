@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { AudioEngine } from "@modulo/audio";
 import { parsePreset, type Preset } from "@modulo/contracts";
 import example from "../../../fixtures/preset.example.json";
@@ -13,6 +13,19 @@ const controls = [
   ["master_gain_db", "Output level", -36, -6, 1, "dB"],
 ] as const;
 
+const stages = [
+  ["queued", "Queued", "Waiting for an analysis worker"],
+  ["separating", "Separate guitar", "Creating a guitar stem"],
+  ["selecting", "Select reference", "Finding a useful passage"],
+  ["generating", "Generate preset", "Mapping measured features to controls"],
+] as const;
+
+type ActiveStage = (typeof stages)[number][0];
+type JobStage = "idle" | ActiveStage | "ready" | "failed";
+type FixtureOutcome = "ready" | "low_quality" | "failed";
+
+const wait = (milliseconds: number) => new Promise((resolve) => window.setTimeout(resolve, milliseconds));
+
 export function App() {
   const [preset, setPreset] = useState<Preset>(initialPreset);
   const [apiState, setApiState] = useState("Checking API…");
@@ -20,8 +33,19 @@ export function App() {
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
   const [bypass, setBypass] = useState(false);
-  const [file, setFile] = useState<File>();
+  const [songFile, setSongFile] = useState<File>();
+  const [dryFile, setDryFile] = useState<File>();
+  const [jobStage, setJobStage] = useState<JobStage>("idle");
+  const [fixtureOutcome, setFixtureOutcome] = useState<FixtureOutcome>("ready");
   const engine = useRef<AudioEngine | null>(null);
+  const jobRun = useRef(0);
+  const jobRunning = useRef(false);
+  const mixPlayer = useRef<HTMLAudioElement>(null);
+  const referencePlayer = useRef<HTMLAudioElement>(null);
+  const songUrl = useMemo(() => songFile ? URL.createObjectURL(songFile) : "", [songFile]);
+  const processing = stages.some(([stage]) => stage === jobStage);
+  const hasResult = jobStage === "ready";
+  const currentStageIndex = stages.findIndex(([stage]) => stage === jobStage);
 
   useEffect(() => {
     const audio = new AudioEngine(initialPreset);
@@ -35,10 +59,12 @@ export function App() {
         if (health.status !== "ok" || health.mode !== "scaffold") throw new Error();
         setApiState("API connected · scaffold mode");
       })
-      .catch(() => { if (!controller.signal.aborted) setApiState("API unavailable · local example still works"); else setApiState("API check timed out · local example still works"); })
+      .catch(() => { if (!controller.signal.aborted) setApiState("API unavailable · local fixture still works"); else setApiState("API check timed out · local fixture still works"); })
       .finally(() => window.clearTimeout(timeout));
-    return () => { controller.abort(); void audio.dispose(); };
+    return () => { controller.abort(); jobRun.current++; void audio.dispose(); };
   }, []);
+
+  useEffect(() => () => { if (songUrl) URL.revokeObjectURL(songUrl); }, [songUrl]);
 
   function changeControl(key: keyof Preset["parameters"], value: number) {
     const next = parsePreset({ ...preset, parameters: { ...preset.parameters, [key]: value } });
@@ -46,14 +72,51 @@ export function App() {
     setPreset(next);
   }
 
+  function selectSong(nextFile?: File) {
+    jobRun.current++;
+    jobRunning.current = false;
+    mixPlayer.current?.pause();
+    referencePlayer.current?.pause();
+    setSongFile(nextFile);
+    setJobStage("idle");
+    setError("");
+  }
+
+  async function runFixtureJob() {
+    if (!songFile || jobRunning.current) return;
+    jobRunning.current = true;
+    const run = ++jobRun.current;
+    setError("");
+    try {
+      for (const [stage] of stages) {
+        if (run !== jobRun.current) return;
+        setJobStage(stage);
+        await wait(stage === "queued" ? 350 : 650);
+      }
+      if (run !== jobRun.current) return;
+      if (fixtureOutcome === "failed") {
+        setJobStage("failed");
+        setError("Fixture failure: preset generation timed out. Retry this file or choose a different fixture outcome.");
+        return;
+      }
+      setJobStage("ready");
+      engine.current?.applyPreset(initialPreset);
+      setPreset(initialPreset);
+    } finally {
+      if (run === jobRun.current) jobRunning.current = false;
+    }
+  }
+
   async function play(useFile: boolean) {
     setBusy(true);
     setError("");
     setAudioState("Starting…");
     try {
+      mixPlayer.current?.pause();
+      referencePlayer.current?.pause();
       const audio = engine.current!;
-      const started = await (useFile && file ? audio.playFile(file) : audio.playTestSignal());
-      setAudioState(started ? (useFile ? "Playing local recording" : "Playing synthetic test signal") : "Stopped");
+      const started = await (useFile && dryFile ? audio.playFile(dryFile) : audio.playTestSignal());
+      setAudioState(started ? (useFile ? "Playing local dry recording" : "Playing synthetic test signal") : "Stopped");
     } catch (failure) {
       setAudioState("Stopped");
       setError(failure instanceof Error ? failure.message : "Audio could not start.");
@@ -71,23 +134,85 @@ export function App() {
     } catch (failure) { setError(failure instanceof Error ? failure.message : "Could not load the preset."); }
   }
 
+  function playSource(player: "mix" | "reference") {
+    engine.current?.stop();
+    setAudioState("Stopped");
+    if (player === "mix") referencePlayer.current?.pause();
+    else mixPlayer.current?.pause();
+  }
+
   return <main>
-    <header><span className="eyebrow">modulo / DEVELOPMENT STARTER</span><h1>Find the sound.<br /><em>Make it yours.</em></h1><p>A shared starting point for the guitar tone workflow.</p></header>
-    <p className="notice"><strong>Example mode.</strong> Song isolation, automatic passage selection and AI presets are not connected. This preset is manually authored.</p>
+    <header className="hero">
+      <div><span className="eyebrow">modulo / FIXTURE WORKFLOW</span><h1>Find the sound.<br /><em>Make it yours.</em></h1><p>Walk through the upload-to-play journey before the real analysis service is connected.</p></div>
+      <div className="mode-badge"><strong>Fixture mode</strong><span>No song data leaves this browser</span></div>
+    </header>
+    <p className="notice"><strong>Development fixture.</strong> Stage timing, stem/reference results and preset generation below are simulated. The selected song is only reused locally to exercise the player layouts; it is not separated or analysed.</p>
     <div className="status" role="status">{apiState}</div>
+
+    <div className="workflow-grid">
+      <section className="upload-panel" aria-labelledby="upload-title">
+        <span className="step">01 / SONG</span><h2 id="upload-title">Choose a mixed song</h2>
+        <p>Use a rights-cleared WAV or MP3. This fixture flow keeps the file in your browser.</p>
+        <label className="file-label" htmlFor="song-file">Mixed-song audio</label>
+        <input id="song-file" type="file" accept="audio/wav,audio/mpeg,.wav,.mp3" disabled={processing} onChange={(event) => selectSong(event.target.files?.[0])} />
+        {songFile && <div className="file-summary"><strong>{songFile.name}</strong><span>{(songFile.size / (1024 * 1024)).toFixed(1)} MB · local only</span></div>}
+        <label className="select-label" htmlFor="fixture-outcome">Fixture outcome</label>
+        <select id="fixture-outcome" value={fixtureOutcome} disabled={processing} onChange={(event) => setFixtureOutcome(event.target.value as FixtureOutcome)}>
+          <option value="ready">Ready result</option>
+          <option value="low_quality">Low-quality reference</option>
+          <option value="failed">Provider failure</option>
+        </select>
+        <button className="primary-action" disabled={!songFile || processing} onClick={() => void runFixtureJob()}>{processing ? "Fixture job running…" : hasResult ? "Run fixture again" : "Start fixture analysis"}</button>
+        <p className="hint">The outcome selector is a development aid for testing success, warning and retry states.</p>
+      </section>
+
+      <section className="progress-panel" aria-labelledby="progress-title">
+        <span className="step">02 / PROGRESS</span><h2 id="progress-title">Analysis stages</h2>
+        <ol className="stage-list" aria-label="Fixture analysis progress">
+          {stages.map(([stage, label, description], index) => {
+            const complete = hasResult || currentStageIndex > index || jobStage === "failed";
+            const current = jobStage === stage;
+            return <li key={stage} className={current ? "is-current" : complete ? "is-complete" : ""} aria-current={current ? "step" : undefined}>
+              <span className="stage-marker" aria-hidden="true">{complete ? "✓" : index + 1}</span><span><strong>{label}</strong><small>{description}</small></span>
+            </li>;
+          })}
+        </ol>
+        {jobStage === "idle" && <p className="empty-state">Choose a song to preview the real job stages.</p>}
+        {processing && <p className="job-state" role="status">Fixture job · {stages[currentStageIndex][1].toLowerCase()}…</p>}
+        {jobStage === "failed" && <div className="failure-state"><strong>Fixture job failed</strong><p>No preset or analysis result was accepted.</p><button onClick={() => void runFixtureJob()}>Retry fixture job</button></div>}
+        {hasResult && <p className="success-state" role="status">Fixture result ready. Review the passage and preset below.</p>}
+      </section>
+    </div>
+
+    {hasResult && <section className="result-panel" aria-labelledby="result-title">
+      <div className="result-heading"><div><span className="step">03 / REFERENCE</span><h2 id="result-title">Review the selected passage</h2></div><span className={fixtureOutcome === "low_quality" ? "quality-badge warning" : "quality-badge"}>{fixtureOutcome === "low_quality" ? "Low-quality fixture" : "Fixture result"}</span></div>
+      {fixtureOutcome === "low_quality" && <p className="warning-message" role="status"><strong>Reference may be unreliable.</strong> The fixture represents heavy bleed and unstable tone. A real result should offer another passage or a new upload.</p>}
+      <div className="players">
+        <div><h3>Mixed-song preview</h3><p>Original local file.</p><audio ref={mixPlayer} controls preload="metadata" src={songUrl} onPlay={() => playSource("mix")}>Your browser does not support audio playback.</audio></div>
+        <div><h3>Guitar stem / reference layout</h3><p>Fixture placeholder · 00:42–00:57 · currently replays the original file.</p><audio ref={referencePlayer} controls preload="metadata" src={songUrl} onPlay={() => playSource("reference")}>Your browser does not support audio playback.</audio></div>
+      </div>
+      <div className="explanation"><span>Why this passage</span><p>Fixture explanation: stable energy and a clear sustained phrase made this 15-second window the strongest candidate. No measurements were performed in this browser flow.</p></div>
+    </section>}
+
     <div className="grid">
-      <section aria-labelledby="reference-title"><span className="step">01 / REFERENCE</span><h2 id="reference-title">Start with a song</h2><p>Mixed-song upload and guitar analysis will be connected here.</p><button disabled>Song analysis · coming next</button><p className="hint">Isyraf: analysis API · Shazlin: reference player</p><hr /><h3>Team workspace</h3><p>Isyraf — AI &amp; backend<br />Dinnie — audio engine<br />Shazlin — interface</p><p className="hint">Submission deadline: Oct 31, 2026 · 01:00 MYT</p></section>
-      <section aria-labelledby="amp-title"><span className="step">02 / PRESET</span><h2 id="amp-title">{preset.name}</h2><p>{preset.description}</p>
+      <section aria-labelledby="amp-title"><span className="step">04 / PRESET</span><h2 id="amp-title">{preset.name}</h2><p>{preset.description}</p>
+        <div className="provenance"><strong>Manual fixture preset</strong><span>Not AI-generated · not tone-matched</span></div>
         <div className="controls">{controls.map(([key, label, min, max, step, unit]) => <label key={key} htmlFor={key}><span>{label}<output>{preset.parameters[key]} {unit}</output></span><input id={key} type="range" min={min} max={max} step={step} value={preset.parameters[key]} onChange={(event) => changeControl(key, Number(event.target.value))} /></label>)}</div>
         <button className="secondary" onClick={() => void loadApiExample()}>Load API example</button>
       </section>
-      <section aria-labelledby="audition-title"><span className="step">03 / AUDITION</span><h2 id="audition-title">Hear the chain</h2><p>Working gain, drive and EQ. Start at a comfortable listening level.</p><button disabled={busy} onClick={() => void play(false)}>Play test signal</button><p className="hint">A two-second synthesized pluck, not an isolated guitar or AI result.</p>
-        <label className="file-label" htmlFor="dry-file">Dry guitar recording · local audition only</label><input id="dry-file" type="file" accept="audio/*" onChange={(event) => setFile(event.target.files?.[0])} /><button className="secondary" disabled={!file || busy} onClick={() => void play(true)}>Play dry recording</button>
+      <section aria-labelledby="audition-title"><span className="step">05 / AUDITION</span><h2 id="audition-title">Hear the browser amp</h2><p>Working gain, drive and EQ. Start at a comfortable listening level.</p><button disabled={busy} onClick={() => void play(false)}>Play test signal</button><p className="hint">A two-second synthesized pluck, not an isolated guitar or AI result.</p>
+        <label className="file-label" htmlFor="dry-file">Dry guitar recording · local audition only</label><input id="dry-file" type="file" accept="audio/*" onChange={(event) => setDryFile(event.target.files?.[0])} /><button className="secondary" disabled={!dryFile || busy} onClick={() => void play(true)}>Play dry recording</button>
         <label className="toggle"><input type="checkbox" checked={bypass} onChange={(event) => { setBypass(event.target.checked); engine.current?.setBypass(event.target.checked); }} />Bypass drive and EQ</label>
-        <button className="stop" onClick={() => { engine.current?.stop(); setAudioState("Stopped"); }}>Stop audio</button><p role="status">{audioState}</p><hr /><button disabled>Live interface · next audio milestone</button><p className="hint">Cabinet, compressor, delay, reverb and live input remain for Dinnie to implement.</p>
+        <button className="stop" onClick={() => { engine.current?.stop(); setAudioState("Stopped"); }}>Stop audio</button><p role="status">{audioState}</p>
+      </section>
+      <section aria-labelledby="live-title"><span className="step">06 / LIVE INPUT</span><h2 id="live-title">Connect your guitar</h2><p>Device and channel controls will use Dinnie’s agreed audio-engine lifecycle.</p>
+        <label className="select-label" htmlFor="device">Input device</label><select id="device" disabled><option>Live input not implemented</option></select>
+        <label className="select-label" htmlFor="channel">Channel</label><select id="channel" disabled><option>Channel selection pending</option></select>
+        <button disabled>Start live input</button><button className="stop" disabled>Mute / stop</button>
+        <p className="hint">No microphone permission is requested by this fixture. Live interface capture, device recovery and measured latency remain unimplemented.</p>
       </section>
     </div>
     {error && <p className="error" role="alert">{error}</p>}
-    <footer>Draft contract v1 · fixture preset · no audio is uploaded by this starter</footer>
+    <footer>Draft contract v1 · fixture data stays visibly labelled · no audio is uploaded by this frontend increment</footer>
   </main>;
 }

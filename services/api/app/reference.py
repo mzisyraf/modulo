@@ -37,17 +37,29 @@ def _read_levels(path: Path) -> tuple[int, int, list[tuple[float, float]]]:
     return rate, frames, levels
 
 
-def select_reference(guitar_path: Path, mixture_path: Path) -> dict:
-    """Choose a whole-second 10–15s passage; the caller supplies time-aligned WAVs."""
+def select_reference(
+    guitar_path: Path, mixture_path: Path, *,
+    start_seconds: int | None = None, end_seconds: int | None = None,
+) -> dict:
+    """Select automatically or check a manual 10–20s interval in time-aligned WAVs."""
+    manual = start_seconds is not None or end_seconds is not None
+    if manual and (type(start_seconds) is not int or type(end_seconds) is not int):
+        raise ValueError("Supply both start_seconds and end_seconds as whole seconds.")
     rate, frames, guitar = _read_levels(guitar_path)
     mix_rate, mix_frames, mixture = _read_levels(mixture_path)
     if (rate, frames) != (mix_rate, mix_frames):
         raise ValueError("Guitar and mix must have the same sample rate and frame count.")
     seconds = frames // rate
     length = min(15, seconds)
+    starts = range(seconds - length + 1)
+    if manual:
+        if not 0 <= start_seconds < end_seconds <= seconds or not 10 <= end_seconds - start_seconds <= 20:
+            raise ValueError("Manual passage must be 10–20 seconds long and within the audio's whole seconds.")
+        length = end_seconds - start_seconds
+        starts = [start_seconds]
     best = None
     # shortcut: energy dominance is not a bleed detector; calibrate on real separated clips before release.
-    for start in range(seconds - length + 1):
+    for start in starts:
         window = guitar[start:start + length]
         energy = sum(item[0] for item in window) / length
         silence = sum(item[0] < 1e-5 for item in window) / length
@@ -62,9 +74,9 @@ def select_reference(guitar_path: Path, mixture_path: Path) -> dict:
         if best is None or score > best[0]:
             best = (score, start, energy, ratio, silence, clipped)
     if best is None:
-        raise ValueError("No usable passage: audio is too quiet, sparse or clipped; choose another stem.")
+        raise ValueError("No usable passage: audio is too quiet, sparse or clipped; choose another passage or stem.")
     _, start, energy, ratio, silence, clipped = best
-    flags = ["heuristic_selection", "separation_quality_unverified"]
+    flags = ["manual_selection" if manual else "heuristic_selection", "separation_quality_unverified"]
     if ratio < 0.1:
         flags.append("weak_guitar_energy")
     if ratio > 1:
@@ -74,7 +86,7 @@ def select_reference(guitar_path: Path, mixture_path: Path) -> dict:
     if clipped > 0:
         flags.append("contains_clipping")
     return {
-        "method": "energy_dominance_v1",
+        "method": "manual_interval_v1" if manual else "energy_dominance_v1",
         "start_seconds": start,
         "end_seconds": start + length,
         "quality_flags": flags,
@@ -84,8 +96,10 @@ def select_reference(guitar_path: Path, mixture_path: Path) -> dict:
             "quiet_second_fraction": silence,
             "clipped_sample_fraction": clipped,
         },
-        "explanation": "Ranked guitar energy and stem/mix energy ratio, penalizing quiet seconds and clipping. "
-                       "This heuristic does not establish guitar presence, separation quality or tone similarity.",
+        "explanation": (
+            "Checked the requested interval for energy, quiet seconds and clipping. " if manual else
+            "Ranked guitar energy and stem/mix energy ratio, penalizing quiet seconds and clipping. "
+        ) + "These checks do not establish guitar presence, separation quality or tone similarity.",
     }
 
 
@@ -93,9 +107,13 @@ def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("guitar", type=Path, help="Already-isolated guitar, 16-bit PCM WAV")
     parser.add_argument("mixture", type=Path, help="Time-aligned original mix, 16-bit PCM WAV")
+    parser.add_argument("--start-seconds", type=int, help="Manual interval start (whole seconds; requires --end-seconds)")
+    parser.add_argument("--end-seconds", type=int, help="Manual interval end (whole seconds; requires --start-seconds)")
     args = parser.parse_args()
     try:
-        result = select_reference(args.guitar, args.mixture)
+        result = select_reference(
+            args.guitar, args.mixture, start_seconds=args.start_seconds, end_seconds=args.end_seconds,
+        )
     except (OSError, ValueError, wave.Error, EOFError) as failure:
         parser.exit(2, f"Reference selection failed: {failure}\n")
     print(json.dumps(result, allow_nan=False, indent=2))
