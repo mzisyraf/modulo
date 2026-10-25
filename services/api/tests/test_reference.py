@@ -43,6 +43,44 @@ def test_prefers_dominant_guitar_over_louder_low_ratio_passage(tmp_path):
     assert select_reference(guitar, mix)["start_seconds"] == 15
 
 
+@pytest.mark.parametrize("start,end", [(0, 10), (5, 20), (10, 30)])
+def test_manual_interval_preserves_requested_bounds_and_provenance(tmp_path, start, end):
+    audio = write_wav(tmp_path / "guitar.wav", [0.2] * 15 + [0.4] * 15)
+    assert select_reference(audio, audio)["start_seconds"] == 15
+    result = select_reference(audio, audio, start_seconds=start, end_seconds=end)
+    assert (result["start_seconds"], result["end_seconds"]) == (start, end)
+    assert result["method"] == "manual_interval_v1"
+    assert result["quality_flags"] == ["manual_selection", "separation_quality_unverified"]
+    assert "requested interval" in result["explanation"]
+    json.dumps(result, allow_nan=False)
+
+
+@pytest.mark.parametrize("start,end", [
+    (None, 10), (0, None), (True, 10), (0, False), (0.5, 11), (0, 10.5), ("0", 10),
+    (-1, 10), (5, 5), (10, 0), (0, 9), (0, 21), (21, 31),
+])
+def test_rejects_invalid_manual_intervals(tmp_path, start, end):
+    audio = write_wav(tmp_path / "guitar.wav", [0.2] * 30)
+    with pytest.raises(ValueError, match="whole seconds|Manual passage"):
+        select_reference(audio, audio, start_seconds=start, end_seconds=end)
+
+
+@pytest.mark.parametrize("problem,amplitudes", [
+    ("quiet", [0] * 15), ("sparse", [0] * 6 + [0.2] * 9),
+    ("clipped", [0.2] * 15), ("silent_mix", [0.2] * 15),
+])
+def test_unusable_manual_interval_does_not_fall_back_to_automatic(tmp_path, problem, amplitudes):
+    guitar = write_wav(tmp_path / "guitar.wav", amplitudes + [0.2] * 15)
+    mix = write_wav(tmp_path / "mix.wav", ([0] * 15 if problem == "silent_mix" else [0.4] * 15) + [0.4] * 15)
+    if problem == "clipped":
+        data = bytearray(guitar.read_bytes())
+        data[44:44 + 15 * 8000 * 2] = b"\xff\x7f" * 15 * 8000
+        guitar.write_bytes(data)
+    assert select_reference(guitar, mix)["start_seconds"] > 0
+    with pytest.raises(ValueError, match="No usable passage"):
+        select_reference(guitar, mix, start_seconds=0, end_seconds=15)
+
+
 @pytest.mark.parametrize("duration,tail", [(10, 0), (14, 4000), (15, 0)])
 def test_short_valid_clips_stay_in_range_and_ties_choose_earliest(tmp_path, duration, tail):
     guitar = write_wav(tmp_path / "guitar.wav", [0.2] * duration, tail_frames=tail)
@@ -137,5 +175,18 @@ def test_cli_outputs_json_and_invalid_input_has_no_traceback(tmp_path):
     )
     assert failure.returncode == 2
     assert "Reference selection failed" in failure.stderr
+    assert "Traceback" not in failure.stderr
+    assert not failure.stdout
+
+
+def test_cli_manual_interval_and_missing_bound(tmp_path):
+    audio = write_wav(tmp_path / "synthetic.wav", [0.2] * 30)
+    command = [sys.executable, "-m", "app.reference", str(audio), str(audio), "--start-seconds", "10"]
+    valid = subprocess.run(command + ["--end-seconds", "30"], capture_output=True, text=True, check=True)
+    result = json.loads(valid.stdout)
+    assert (result["start_seconds"], result["end_seconds"], result["method"]) == (10, 30, "manual_interval_v1")
+    failure = subprocess.run(command, capture_output=True, text=True)
+    assert failure.returncode == 2
+    assert "Supply both" in failure.stderr
     assert "Traceback" not in failure.stderr
     assert not failure.stdout
