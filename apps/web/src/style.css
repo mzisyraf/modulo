@@ -1,7 +1,7 @@
 :root { --accent: #ffd21f; --accent-strong: #f5b914; --coral: #e96f51; --mint: #68b684; --lavender: #c9a66b; --amber: #ffd21f; --surface: #120d0d; --text: #f7f0e7; --muted: #b8aaa2; color-scheme: dark; font-family: Inter, "Segoe UI", sans-serif; color: var(--text); background: var(--surface); font-synthesis: none; }
 * { box-sizing: border-box; }
 body { margin: 0; min-width: 320px; }
-button, input, select { font: inherit; }
+button, input { font: inherit; }
 .app-shell { min-height: 100vh; display: grid; grid-template-columns: 232px minmax(0, 1fr); background: radial-gradient(circle at 72% -8%, rgba(116, 58, 25, .28) 0, transparent 34%), linear-gradient(145deg, #17100f 0, var(--surface) 46%, #0b0909 100%); transition: grid-template-columns 180ms ease; }
 .app-shell.sidebar-collapsed { grid-template-columns: 76px minmax(0, 1fr); }
 .sidebar { position: sticky; top: 0; height: 100vh; display: flex; flex-direction: column; gap: 24px; padding: 24px 16px; overflow: hidden; border-right: 1px solid rgba(255, 210, 31, .18); background: linear-gradient(180deg, rgba(93, 48, 25, .7), rgba(45, 27, 19, .58) 54%, rgba(64, 37, 20, .68)); box-shadow: inset -1px 0 rgba(255, 238, 207, .06), 16px 0 48px rgba(30, 14, 7, .25); backdrop-filter: blur(26px) saturate(1.25); }
@@ -106,7 +106,34 @@ input[type="range"] { width: 100%; accent-color: var(--accent-strong); cursor: p
 output { color: var(--accent); font-variant-numeric: tabular-nums; white-space: nowrap; }
 .file-label, .select-label { display: block; margin-top: 20px; font-size: 13px; font-weight: 650; color: #e4e0d9; }
 input[type="file"] { display: block; width: 100%; font-size: 12px; color: var(--muted); margin-top: 10px; }
-select { width: 100%; margin-top: 9px; padding: 11px; border: 1px solid #5b463b; border-radius: 7px; color: var(--text); background: #17110f; }
+.choice-menu { position: relative; z-index: 4; width: 100%; min-width: 0; margin-top: 9px; }
+.choice-menu.is-open { z-index: 40; }
+.choice-menu-trigger { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 10px; width: 100%; min-width: 0; padding: 11px 12px; border: 1px solid #6a5143; border-radius: 10px; background: linear-gradient(180deg, rgba(43, 29, 24, .98), rgba(23, 17, 15, .99)); box-shadow: inset 0 1px rgba(255, 255, 255, .045); color: var(--text); text-align: left; }
+.choice-menu-device .choice-menu-trigger { grid-template-columns: 20px minmax(0, 1fr) auto; }
+.choice-menu-trigger-label { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.choice-menu-trigger:hover:not(:disabled), .choice-menu.is-open .choice-menu-trigger { border-color: var(--accent); background: linear-gradient(180deg, rgba(55, 37, 28, .99), rgba(27, 19, 16, .99)); filter: none; }
+.choice-menu.is-open .choice-menu-trigger { box-shadow: 0 0 0 3px rgba(255, 210, 31, .1), inset 0 1px rgba(255, 255, 255, .05); }
+.choice-menu-icon, .choice-menu-search-icon { width: 19px; height: 19px; fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; color: #e7ded7; }
+.choice-menu-chevron { color: #f7e8ce; font-size: 17px; line-height: 1; transition: transform 150ms ease; }
+.choice-menu.is-open .choice-menu-chevron { transform: rotate(180deg); }
+.choice-menu-panel { position: absolute; top: calc(100% + 9px); right: 0; width: 100%; padding: 8px; overflow: hidden; border: 1px solid rgba(255, 210, 31, .68); border-radius: 17px; background: linear-gradient(145deg, rgba(48, 32, 26, .98), rgba(22, 16, 14, .99)); box-shadow: 0 24px 55px rgba(8, 4, 2, .62), inset 0 1px rgba(255, 244, 222, .07); backdrop-filter: blur(22px) saturate(1.2); }
+.choice-menu-device .choice-menu-panel { width: min(440px, calc(100vw - 32px)); padding: 13px; }
+.choice-menu-search { display: grid; grid-template-columns: 22px minmax(0, 1fr); align-items: center; gap: 10px; margin-bottom: 8px; padding: 0 13px; border: 1px solid rgba(205, 176, 153, .4); border-radius: 10px; background: rgba(34, 25, 22, .82); }
+.choice-menu-search-icon { color: #a99a91; }
+.choice-menu-search input { width: 100%; min-width: 0; padding: 12px 0; border: 0; outline: 0; background: transparent; color: var(--text); font: inherit; }
+.choice-menu-search input::placeholder { color: #a99a91; }
+.choice-menu-search:focus-within { border-color: rgba(255, 210, 31, .62); box-shadow: 0 0 0 3px rgba(255, 210, 31, .08); }
+.choice-menu-options { display: grid; gap: 4px; max-height: 255px; overflow-x: hidden; overflow-y: auto; overscroll-behavior: contain; }
+.choice-menu-option { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 10px; width: 100%; min-width: 0; min-height: 42px; padding: 10px 12px; border: 1px solid transparent; border-radius: 10px; background: transparent; box-shadow: none; color: #e0d5ce; text-align: left; font-size: 12px; font-weight: 600; line-height: 1.38; }
+.choice-menu-device .choice-menu-option { grid-template-columns: 22px minmax(0, 1fr) 18px; min-height: 54px; }
+.choice-menu-option > span:not(.choice-menu-check) { min-width: 0; overflow-wrap: anywhere; }
+.choice-menu-option:hover:not(:disabled), .choice-menu-option:focus-visible { border-color: rgba(255, 210, 31, .25); background: rgba(255, 210, 31, .08); color: var(--text); filter: none; outline: none; }
+.choice-menu-option.is-selected { border-color: rgba(255, 210, 31, .75); background: linear-gradient(135deg, rgba(255, 210, 31, .25), rgba(130, 83, 13, .34)); color: #fff4c4; box-shadow: inset 0 0 22px rgba(255, 210, 31, .06); }
+.choice-menu-option.is-selected .choice-menu-icon { color: #fff0a3; }
+.choice-menu-check { color: var(--accent); font-size: 17px; font-weight: 800; text-align: right; }
+.choice-menu-empty { margin: 0; padding: 18px 12px; color: var(--muted); text-align: center; font-size: 12px; }
+.choice-menu-options::-webkit-scrollbar { width: 8px; }
+.choice-menu-options::-webkit-scrollbar-thumb { border: 2px solid transparent; border-radius: 99px; background: rgba(255, 210, 31, .32); background-clip: padding-box; }
 .file-summary, .provenance { display: grid; gap: 3px; margin-top: 14px; padding: 12px; border: 1px solid #534036; border-radius: 8px; background: #1a1311; overflow-wrap: anywhere; }
 .file-summary strong, .provenance strong { color: #e8e3db; font-size: 13px; }
 .file-summary span, .provenance span { color: #999da5; font-size: 12px; }
