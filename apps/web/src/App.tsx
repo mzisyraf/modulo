@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { AudioEngine } from "@modulo/audio";
 import { parsePreset, type Preset } from "@modulo/contracts";
 import example from "../../../fixtures/preset.example.json";
+import { AppShell, type AppView } from "./AppShell";
 
 const initialPreset = parsePreset(example);
 const controls = [
@@ -14,10 +15,10 @@ const controls = [
 ] as const;
 
 const stages = [
-  ["queued", "Queued", "Waiting for an analysis worker"],
-  ["separating", "Separate guitar", "Creating a guitar stem"],
-  ["selecting", "Select reference", "Finding a useful passage"],
-  ["generating", "Generate preset", "Mapping measured features to controls"],
+  ["queued", "Getting ready", "Preparing your demo session"],
+  ["separating", "Find the guitar", "Preparing the guitar reference"],
+  ["selecting", "Choose a passage", "Looking for a clear section"],
+  ["generating", "Build the preset", "Turning tone details into controls"],
 ] as const;
 
 type ActiveStage = (typeof stages)[number][0];
@@ -27,6 +28,7 @@ type FixtureOutcome = "ready" | "low_quality" | "failed";
 const wait = (milliseconds: number) => new Promise((resolve) => window.setTimeout(resolve, milliseconds));
 
 export function App() {
+  const [view, setView] = useState<AppView>("workspace");
   const [preset, setPreset] = useState<Preset>(initialPreset);
   const [apiState, setApiState] = useState("Checking API…");
   const [audioState, setAudioState] = useState("Stopped");
@@ -141,78 +143,81 @@ export function App() {
     else mixPlayer.current?.pause();
   }
 
-  return <main>
-    <header className="hero">
-      <div><span className="eyebrow">modulo / FIXTURE WORKFLOW</span><h1>Find the sound.<br /><em>Make it yours.</em></h1><p>Walk through the upload-to-play journey before the real analysis service is connected.</p></div>
-      <div className="mode-badge"><strong>Fixture mode</strong><span>No song data leaves this browser</span></div>
-    </header>
-    <p className="notice"><strong>Development fixture.</strong> Stage timing, stem/reference results and preset generation below are simulated. The selected song is only reused locally to exercise the player layouts; it is not separated or analysed.</p>
-    <div className="status" role="status">{apiState}</div>
+  function navigate(nextView: AppView) {
+    jobRun.current++;
+    jobRunning.current = false;
+    if (processing) setJobStage("idle");
+    engine.current?.stop();
+    mixPlayer.current?.pause();
+    referencePlayer.current?.pause();
+    setAudioState("Stopped");
+    setView(nextView);
+  }
 
-    <div className="workflow-grid">
-      <section className="upload-panel" aria-labelledby="upload-title">
-        <span className="step">01 / SONG</span><h2 id="upload-title">Choose a mixed song</h2>
-        <p>Use a rights-cleared WAV or MP3. This fixture flow keeps the file in your browser.</p>
-        <label className="file-label" htmlFor="song-file">Mixed-song audio</label>
-        <input id="song-file" type="file" accept="audio/wav,audio/mpeg,.wav,.mp3" disabled={processing} onChange={(event) => selectSong(event.target.files?.[0])} />
-        {songFile && <div className="file-summary"><strong>{songFile.name}</strong><span>{(songFile.size / (1024 * 1024)).toFixed(1)} MB · local only</span></div>}
-        <label className="select-label" htmlFor="fixture-outcome">Fixture outcome</label>
-        <select id="fixture-outcome" value={fixtureOutcome} disabled={processing} onChange={(event) => setFixtureOutcome(event.target.value as FixtureOutcome)}>
-          <option value="ready">Ready result</option>
-          <option value="low_quality">Low-quality reference</option>
-          <option value="failed">Provider failure</option>
-        </select>
-        <button className="primary-action" disabled={!songFile || processing} onClick={() => void runFixtureJob()}>{processing ? "Fixture job running…" : hasResult ? "Run fixture again" : "Start fixture analysis"}</button>
-        <p className="hint">The outcome selector is a development aid for testing success, warning and retry states.</p>
+  return <AppShell apiState={apiState} onNavigate={navigate} view={view}>
+    {view === "workspace" && <div className="workspace-view">
+      <section className="workspace-intro" aria-labelledby="workspace-heading">
+        <div><span className="eyebrow">YOUR WORKSPACE</span><h2 id="workspace-heading">Good to see you.</h2><p>Continue your tone match or start with a new song.</p></div>
+        <button onClick={() => navigate("tone-match")}><span aria-hidden="true">＋</span> New Tone Match</button>
       </section>
 
-      <section className="progress-panel" aria-labelledby="progress-title">
-        <span className="step">02 / PROGRESS</span><h2 id="progress-title">Analysis stages</h2>
-        <ol className="stage-list" aria-label="Fixture analysis progress">
-          {stages.map(([stage, label, description], index) => {
-            const complete = hasResult || currentStageIndex > index || jobStage === "failed";
-            const current = jobStage === stage;
-            return <li key={stage} className={current ? "is-current" : complete ? "is-complete" : ""} aria-current={current ? "step" : undefined}>
-              <span className="stage-marker" aria-hidden="true">{complete ? "✓" : index + 1}</span><span><strong>{label}</strong><small>{description}</small></span>
-            </li>;
-          })}
-        </ol>
-        {jobStage === "idle" && <p className="empty-state">Choose a song to preview the real job stages.</p>}
-        {processing && <p className="job-state" role="status">Fixture job · {stages[currentStageIndex][1].toLowerCase()}…</p>}
-        {jobStage === "failed" && <div className="failure-state"><strong>Fixture job failed</strong><p>No preset or analysis result was accepted.</p><button onClick={() => void runFixtureJob()}>Retry fixture job</button></div>}
-        {hasResult && <p className="success-state" role="status">Fixture result ready. Review the passage and preset below.</p>}
+      <section className="continue-section" aria-labelledby="continue-heading">
+        <div className="section-heading"><div><span className="step">CONTINUE WORKING</span><h2 id="continue-heading">Your latest project</h2></div><span className="local-chip">Saved in this tab</span></div>
+        <article className="project-card">
+          <div className="amp-preview" aria-hidden="true"><div className="amp-grille" /><div className="amp-panel"><span /><span /><span /><span /></div></div>
+          <div className="project-copy">
+            <span className="project-kicker">LOCAL PROJECT</span>
+            <h3>Untitled Tone Match</h3>
+            <p>{preset.name} · Custom amp preset</p>
+            <div className="project-meta"><span className={hasResult ? "state-dot complete" : "state-dot"} />{hasResult ? "Tone ready to preview" : processing ? "Building your demo tone" : songFile ? "Song added — ready to continue" : "No reference song added yet"}</div>
+          </div>
+          <div className="project-song"><span>Reference</span><strong>{songFile?.name ?? "Add a song"}</strong></div>
+          <button onClick={() => navigate("tone-match")}>Continue <span aria-hidden="true">→</span></button>
+        </article>
       </section>
-    </div>
 
-    {hasResult && <section className="result-panel" aria-labelledby="result-title">
-      <div className="result-heading"><div><span className="step">03 / REFERENCE</span><h2 id="result-title">Review the selected passage</h2></div><span className={fixtureOutcome === "low_quality" ? "quality-badge warning" : "quality-badge"}>{fixtureOutcome === "low_quality" ? "Low-quality fixture" : "Fixture result"}</span></div>
-      {fixtureOutcome === "low_quality" && <p className="warning-message" role="status"><strong>Reference may be unreliable.</strong> The fixture represents heavy bleed and unstable tone. A real result should offer another passage or a new upload.</p>}
-      <div className="players">
-        <div><h3>Mixed-song preview</h3><p>Original local file.</p><audio ref={mixPlayer} controls preload="metadata" src={songUrl} onPlay={() => playSource("mix")}>Your browser does not support audio playback.</audio></div>
-        <div><h3>Guitar stem / reference layout</h3><p>Fixture placeholder · 00:42–00:57 · currently replays the original file.</p><audio ref={referencePlayer} controls preload="metadata" src={songUrl} onPlay={() => playSource("reference")}>Your browser does not support audio playback.</audio></div>
+      <section className="projects-section" aria-labelledby="projects-heading">
+        <div className="section-heading"><div><span className="step">YOUR PROJECTS</span><h2 id="projects-heading">Recently updated</h2></div></div>
+        <div className="empty-projects"><div className="empty-art" aria-hidden="true"><span className="accent-coral" /><span className="accent-lavender" /><span className="accent-mint" /></div><div><h3>Your next tone starts here</h3><p>Create another project when you’re ready to match a song’s guitar tone.</p></div><button className="secondary" onClick={() => navigate("tone-match")}>Start a project</button></div>
+      </section>
+    </div>}
+
+    {view === "tone-match" && <div className="tone-match-view">
+      <header className="hero">
+        <div><span className="eyebrow">TONE MATCH</span><h2 className="display-title">Find the sound.<br /><em>Make it yours.</em></h2><p>Choose a song, review the reference and shape a playable preset.</p></div>
+        <div className="mode-badge"><strong>Demo Mode</strong><span>Your audio stays on this device</span></div>
+      </header>
+      <p className="notice"><strong>Guided demo.</strong> The analysis steps and result below are examples. Your selected song stays in this browser and is not separated or analysed.</p>
+
+      <div className="workflow-grid">
+        <section className="upload-panel" aria-labelledby="upload-title">
+          <span className="step">01 / SONG</span><h2 id="upload-title">Choose a mixed song</h2><p>Use a rights-cleared WAV or MP3. This fixture flow keeps the file in your browser.</p>
+          <label className="file-label" htmlFor="song-file">Mixed-song audio</label><input id="song-file" type="file" accept="audio/wav,audio/mpeg,.wav,.mp3" disabled={processing} onChange={(event) => selectSong(event.target.files?.[0])} />
+          {songFile && <div className="file-summary"><strong>{songFile.name}</strong><span>{(songFile.size / (1024 * 1024)).toFixed(1)} MB · local only</span></div>}
+          <label className="select-label" htmlFor="fixture-outcome">Demo result</label><select id="fixture-outcome" value={fixtureOutcome} disabled={processing} onChange={(event) => setFixtureOutcome(event.target.value as FixtureOutcome)}><option value="ready">Tone ready</option><option value="low_quality">Unclear reference</option><option value="failed">Couldn’t finish</option></select>
+          <button className="primary-action" disabled={!songFile || processing} onClick={() => void runFixtureJob()}>{processing ? "Building your demo tone…" : hasResult ? "Run demo again" : "Start tone match"}</button><p className="hint">Choose a result to preview the ready, warning and retry screens.</p>
+        </section>
+        <section className="progress-panel" aria-labelledby="progress-title"><span className="step">02 / PROGRESS</span><h2 id="progress-title">Analysis stages</h2>
+          <ol className="stage-list" aria-label="Fixture analysis progress">{stages.map(([stage, label, description], index) => { const complete = hasResult || currentStageIndex > index || jobStage === "failed"; const current = jobStage === stage; return <li key={stage} className={current ? "is-current" : complete ? "is-complete" : ""} aria-current={current ? "step" : undefined}><span className="stage-marker" aria-hidden="true">{complete ? "✓" : index + 1}</span><span><strong>{label}</strong><small>{description}</small></span></li>; })}</ol>
+          {jobStage === "idle" && <p className="empty-state">Add a song when you’re ready to begin.</p>}{processing && <p className="job-state" role="status">{stages[currentStageIndex][1]}…</p>}{jobStage === "failed" && <div className="failure-state"><strong>We couldn’t finish this demo</strong><p>Try again or choose a different result above.</p><button onClick={() => void runFixtureJob()}>Try again</button></div>}{hasResult && <p className="success-state" role="status">Your demo tone is ready to review.</p>}
+        </section>
       </div>
-      <div className="explanation"><span>Why this passage</span><p>Fixture explanation: stable energy and a clear sustained phrase made this 15-second window the strongest candidate. No measurements were performed in this browser flow.</p></div>
-    </section>}
 
-    <div className="grid">
-      <section aria-labelledby="amp-title"><span className="step">04 / PRESET</span><h2 id="amp-title">{preset.name}</h2><p>{preset.description}</p>
-        <div className="provenance"><strong>Manual fixture preset</strong><span>Not AI-generated · not tone-matched</span></div>
-        <div className="controls">{controls.map(([key, label, min, max, step, unit]) => <label key={key} htmlFor={key}><span>{label}<output>{preset.parameters[key]} {unit}</output></span><input id={key} type="range" min={min} max={max} step={step} value={preset.parameters[key]} onChange={(event) => changeControl(key, Number(event.target.value))} /></label>)}</div>
-        <button className="secondary" onClick={() => void loadApiExample()}>Load API example</button>
-      </section>
-      <section aria-labelledby="audition-title"><span className="step">05 / AUDITION</span><h2 id="audition-title">Hear the browser amp</h2><p>Working gain, drive and EQ. Start at a comfortable listening level.</p><button disabled={busy} onClick={() => void play(false)}>Play test signal</button><p className="hint">A two-second synthesized pluck, not an isolated guitar or AI result.</p>
-        <label className="file-label" htmlFor="dry-file">Dry guitar recording · local audition only</label><input id="dry-file" type="file" accept="audio/*" onChange={(event) => setDryFile(event.target.files?.[0])} /><button className="secondary" disabled={!dryFile || busy} onClick={() => void play(true)}>Play dry recording</button>
-        <label className="toggle"><input type="checkbox" checked={bypass} onChange={(event) => { setBypass(event.target.checked); engine.current?.setBypass(event.target.checked); }} />Bypass drive and EQ</label>
-        <button className="stop" onClick={() => { engine.current?.stop(); setAudioState("Stopped"); }}>Stop audio</button><p role="status">{audioState}</p>
-      </section>
-      <section aria-labelledby="live-title"><span className="step">06 / LIVE INPUT</span><h2 id="live-title">Connect your guitar</h2><p>Device and channel controls will use Dinnie’s agreed audio-engine lifecycle.</p>
-        <label className="select-label" htmlFor="device">Input device</label><select id="device" disabled><option>Live input not implemented</option></select>
-        <label className="select-label" htmlFor="channel">Channel</label><select id="channel" disabled><option>Channel selection pending</option></select>
-        <button disabled>Start live input</button><button className="stop" disabled>Mute / stop</button>
-        <p className="hint">No microphone permission is requested by this fixture. Live interface capture, device recovery and measured latency remain unimplemented.</p>
-      </section>
-    </div>
-    {error && <p className="error" role="alert">{error}</p>}
-    <footer>Draft contract v1 · fixture data stays visibly labelled · no audio is uploaded by this frontend increment</footer>
-  </main>;
+      {hasResult && <section className="result-panel" aria-labelledby="result-title"><div className="result-heading"><div><span className="step">03 / REFERENCE</span><h2 id="result-title">Review the selected passage</h2></div><span className={fixtureOutcome === "low_quality" ? "quality-badge warning" : "quality-badge"}>{fixtureOutcome === "low_quality" ? "Needs another listen" : "Demo result"}</span></div>{fixtureOutcome === "low_quality" && <p className="warning-message" role="status"><strong>This section may be hard to match.</strong> In the finished flow, you’ll be able to choose another passage or upload a different song.</p>}<div className="players"><div><h3>Your song</h3><p>The original file from this browser.</p><audio ref={mixPlayer} controls preload="metadata" src={songUrl} onPlay={() => playSource("mix")}>Your browser does not support audio playback.</audio></div><div><h3>Guitar reference</h3><p>Demo passage · 00:42–00:57 · currently plays the original file.</p><audio ref={referencePlayer} controls preload="metadata" src={songUrl} onPlay={() => playSource("reference")}>Your browser does not support audio playback.</audio></div></div><div className="explanation"><span>Why this passage</span><p>This demo highlights a clear, sustained 15-second phrase. No audio measurements are performed yet.</p></div></section>}
+
+      <div className="grid">
+        <section aria-labelledby="amp-title"><span className="step">04 / PRESET</span><h2 id="amp-title">{preset.name}</h2><p>{preset.description}</p><div className="provenance"><strong>Demo preset</strong><span>Manually made · not generated from your song</span></div><div className="controls">{controls.map(([key, label, min, max, step, unit]) => <label key={key} htmlFor={key}><span>{label}<output>{preset.parameters[key]} {unit}</output></span><input id={key} type="range" min={min} max={max} step={step} value={preset.parameters[key]} onChange={(event) => changeControl(key, Number(event.target.value))} /></label>)}</div><button className="secondary" onClick={() => void loadApiExample()}>Load demo preset</button></section>
+        <section aria-labelledby="audition-title"><span className="step">05 / AUDITION</span><h2 id="audition-title">Hear the browser amp</h2><p>Working gain, drive and EQ. Start at a comfortable listening level.</p><button disabled={busy} onClick={() => void play(false)}>Play test signal</button><p className="hint">A two-second synthesized pluck, not an isolated guitar or AI result.</p><label className="file-label" htmlFor="dry-file">Dry guitar recording · local audition only</label><input id="dry-file" type="file" accept="audio/*" onChange={(event) => setDryFile(event.target.files?.[0])} /><button className="secondary" disabled={!dryFile || busy} onClick={() => void play(true)}>Play dry recording</button><label className="toggle"><input type="checkbox" checked={bypass} onChange={(event) => { setBypass(event.target.checked); engine.current?.setBypass(event.target.checked); }} />Bypass drive and EQ</label><button className="stop" onClick={() => { engine.current?.stop(); setAudioState("Stopped"); }}>Stop audio</button><p role="status">{audioState}</p></section>
+        <section aria-labelledby="live-title"><span className="step">06 / LIVE INPUT</span><h2 id="live-title">Connect your guitar</h2><p>Guitar interface controls are coming next.</p><label className="select-label" htmlFor="device">Input device</label><select id="device" disabled><option>Not available in Demo Mode</option></select><label className="select-label" htmlFor="channel">Channel</label><select id="channel" disabled><option>Choose a device first</option></select><button disabled>Start live input</button><button className="stop" disabled>Mute / stop</button><p className="hint">Modulo won’t ask for microphone access until these controls are ready.</p></section>
+      </div>
+      {error && <p className="error" role="alert">{error}</p>}
+      <footer>Demo Mode · selected audio stays in this browser · analysis results are examples</footer>
+    </div>}
+
+    {view === "presets" && <section className="library-panel" aria-labelledby="preset-library-title"><div className="section-heading"><div><span className="step">CURRENT TONE</span><h2 id="preset-library-title">Ready to play</h2></div><span className="quality-badge">1 demo preset</span></div><p>This demo keeps one preset in your current tab. Saving a library comes later.</p><article className="preset-row"><div className="preset-thumbnail" aria-hidden="true"><span>MOD</span></div><div><strong>{preset.name}</strong><span>{preset.description}</span></div><span className="manual-tag">Demo preset</span><button className="secondary" onClick={() => navigate("tone-match")}>Open controls</button></article></section>}
+
+    {view === "recordings" && <section className="availability-panel" aria-labelledby="recordings-title"><span className="availability-icon coral" aria-hidden="true">●</span><span className="step">COMING SOON</span><h2 id="recordings-title">No recordings yet</h2><p>Recording isn’t available in Demo Mode, so you won’t see placeholder takes here.</p><button disabled>Start a recording</button><button className="secondary" onClick={() => navigate("tone-match")}>Return to Tone Match</button></section>}
+
+    {view === "settings" && <section className="availability-panel" aria-labelledby="settings-title"><span className="availability-icon lavender" aria-hidden="true">⚙</span><span className="step">DEMO MODE</span><h2 id="settings-title">Nothing to configure yet</h2><p>There are no accounts or cloud settings in this demo. Your selected audio stays in this browser.</p><button className="secondary" onClick={() => navigate("workspace")}>Return to Workspace</button></section>}
+  </AppShell>;
 }
