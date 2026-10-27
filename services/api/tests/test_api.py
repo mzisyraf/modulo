@@ -8,12 +8,13 @@ import pytest
 from app.contracts import ROOT, example_preset, validate_preset
 from app.main import app
 
-client = TestClient(app)
+client = TestClient(app, base_url="http://127.0.0.1")
 
 
 def test_health_and_example_are_explicitly_scaffolded():
     assert client.get("/api/health").json() == {
         "status": "ok", "mode": "scaffold", "analysis_available": False,
+        "separation_available": True, "preset_generation_available": False,
     }
     response = client.get("/api/presets/example")
     assert response.status_code == 200
@@ -21,10 +22,10 @@ def test_health_and_example_are_explicitly_scaffolded():
     validate_preset(response.json())
 
 
-def test_analysis_does_not_fake_a_successful_job():
+def test_job_requires_an_audio_upload():
     response = client.post("/api/jobs")
-    assert response.status_code == 501
-    assert response.json()["error"]["code"] == "analysis_not_implemented"
+    assert response.status_code == 415
+    assert response.json()["error"]["code"] == "invalid_upload"
     assert "job_id" not in response.json()
 
 

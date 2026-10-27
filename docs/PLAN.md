@@ -148,7 +148,7 @@ Use simple semantic controls first. Show stage names instead of fabricated progr
 
 ## 6. Shared contract to freeze first
 
-This section describes the target contract. A runnable starter now implements only `GET /api/health`, `GET /api/presets/example`, and an explicit HTTP 501 response for `POST /api/jobs`. `contracts/preset.schema.json` is a shared draft covering only the currently implemented gain/drive/EQ/master controls. It still needs team review in issue #1. See DEVELOPMENT.md for setup and current limits.
+This section describes the target contract. The [local separation checkpoint](LOCAL_SEPARATION.md) implements a proposed separation-only upload/job/audio/reference boundary, without tone features or a preset result. The table below remains the fuller target and is not an implemented/frozen contract. `contracts/preset.schema.json` covers only implemented gain/drive/EQ/master controls and still needs team review in issue #1. See DEVELOPMENT.md for setup and current limits.
 
 | Interface | Initial shape |
 |---|---|

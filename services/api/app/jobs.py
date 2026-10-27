@@ -1,0 +1,263 @@
+"""Bounded, single-process local separation jobs; no provider or preset generation."""
+
+from concurrent.futures import ThreadPoolExecutor
+from copy import deepcopy
+import json
+import logging
+import math
+import os
+from pathlib import Path
+import shutil
+import subprocess
+from threading import RLock
+import time
+from uuid import UUID, uuid4
+import wave
+
+from .contracts import ROOT
+from .job_lock import exclusive_lock
+from .reference import select_reference
+
+MAX_UPLOAD_BYTES = 50 * 1024 * 1024
+MAX_JOBS = 4
+RETENTION_SECONDS = 24 * 60 * 60
+ARTIFACTS = {"mix", "guitar", "backing"}
+logger = logging.getLogger(__name__)
+
+
+class JobError(Exception):
+    def __init__(self, code, message, status=400, retryable=False):
+        super().__init__(message)
+        self.code, self.message, self.status, self.retryable = code, message, status, retryable
+
+    def public(self):
+        return {"code": self.code, "message": self.message, "retryable": self.retryable}
+
+
+def canonical_id(value):
+    try:
+        if str(UUID(value)) == value:
+            return value
+    except (ValueError, TypeError, AttributeError):
+        pass
+    raise JobError("invalid_id", "Use a valid job or idempotency UUID.")
+
+
+class JobStore:
+    def __init__(self, root=ROOT / "data" / "jobs", timeout=600):
+        self.root = Path(root).resolve()
+        self.timeout = timeout
+        self.lock = RLock()
+        self.jobs = {}
+
+    def start(self):
+        self.root.mkdir(parents=True, exist_ok=True)
+        self.service_lock = exclusive_lock(self.root / ".service.lock")
+        try:
+            self.service_lock.__enter__()
+        except OSError as failure:
+            raise RuntimeError("Another local API owns this job directory; run one API worker.") from failure
+        self.pool = ThreadPoolExecutor(max_workers=1, thread_name_prefix="separation")
+        try:
+            self.recover()
+        except BaseException:
+            self.close()
+            raise
+
+    def recover(self):
+        for directory in self.root.iterdir():
+            if not directory.is_dir():
+                continue
+            try:
+                job_id = canonical_id(directory.name)
+                self.directory(job_id)
+            except JobError:
+                continue
+            try:
+                if (directory / "state.json").stat().st_size > 65536:
+                    raise ValueError("Oversized job metadata.")
+                job = json.loads((directory / "state.json").read_text(encoding="utf-8"))
+                if job["job_id"] != job_id or job["status"] not in {"queued", "running", "ready", "failed"}:
+                    raise ValueError("Invalid job identity or state.")
+                canonical_id(job["idempotency_key"])
+                if any(type(job[key]) not in (int, float) or not math.isfinite(job[key]) for key in ("created_at", "expires_at")):
+                    raise ValueError("Invalid job lifetime.")
+            except (JobError, OSError, ValueError, KeyError, TypeError):
+                logger.warning("Removing interrupted/corrupt local job directory %s", job_id)
+                shutil.rmtree(self.directory(job_id))
+                continue
+            self.jobs[job_id] = job
+            if job["status"] in {"queued", "running"}:
+                self.fail(job_id, JobError("interrupted", "The API restarted during this job. Submit the song again.", retryable=True))
+        self.prune()
+        with self.lock:
+            while len(self.jobs) > MAX_JOBS:
+                self.remove(min(self.jobs, key=lambda item: self.jobs[item]["created_at"]))
+
+    def close(self):
+        self.pool.shutdown(wait=True)
+        self.service_lock.__exit__(None, None, None)
+
+    def directory(self, job_id):
+        path = self.root / canonical_id(job_id)
+        if path.is_symlink() or path.resolve().parent != self.root:
+            raise JobError("invalid_id", "Invalid job directory.")
+        return path
+
+    def save(self, job):
+        directory = self.directory(job["job_id"])
+        temporary = directory / "state.tmp"
+        temporary.write_text(json.dumps(job, allow_nan=False), encoding="utf-8")
+        temporary.replace(directory / "state.json")
+
+    def prune(self):
+        with self.lock:
+            for job_id, job in list(self.jobs.items()):
+                if time.time() >= job["expires_at"] and job["status"] in {"ready", "failed"}:
+                    try:
+                        self.remove(job_id)
+                    except JobError:
+                        logger.warning("Expired job %s is still in use; cleanup will retry", job_id)
+
+    def remove(self, job_id):
+        try:
+            shutil.rmtree(self.directory(job_id))
+        except OSError as failure:
+            raise JobError("storage_busy", "An older audio job is still in use. Close its player and retry.", 503, True) from failure
+        del self.jobs[job_id]
+
+    def reserve(self, key):
+        canonical_id(key)
+        with self.lock:
+            self.prune()
+            for job in self.jobs.values():
+                if job["idempotency_key"] == key:
+                    return deepcopy(job), False
+            if any(job["status"] in {"queued", "running"} for job in self.jobs.values()):
+                raise JobError("worker_busy", "One local song is already processing. Wait for it to finish.", 429, True)
+            while len(self.jobs) >= MAX_JOBS:
+                self.remove(min(self.jobs, key=lambda item: self.jobs[item]["created_at"]))
+            created = time.time()
+            job_id = str(uuid4())
+            self.directory(job_id).mkdir()
+            job = {"job_id": job_id, "idempotency_key": key, "status": "queued", "stage": "uploading",
+                   "created_at": created, "expires_at": created + RETENTION_SECONDS}
+            self.jobs[job_id] = job
+            self.save(job)
+            return deepcopy(job), True
+
+    def get(self, job_id):
+        canonical_id(job_id)
+        with self.lock:
+            self.prune()
+            if job_id not in self.jobs or time.time() >= self.jobs[job_id]["expires_at"]:
+                raise JobError("job_not_found", "This job is missing or expired. Submit the song again.", 404, True)
+            job = deepcopy(self.jobs[job_id])
+            del job["idempotency_key"]
+            return job
+
+    def submit(self, job_id):
+        with self.lock:
+            self.jobs[job_id]["stage"] = "separating"
+            self.save(self.jobs[job_id])
+        self.pool.submit(self.execute, job_id)
+
+    def fail(self, job_id, failure):
+        with self.lock:
+            job = self.jobs[job_id]
+            job.update(status="failed", stage="failed", error=failure.public())
+            job.pop("result", None)
+            self.save(job)
+            directory = self.directory(job_id)
+            for name in ("source.bin", "mix.wav", "guitar.wav", "backing.wav", "result.json"):
+                try:
+                    (directory / name).unlink(missing_ok=True)
+                except OSError:
+                    logger.warning("Failed job %s still has an open %s; retained until cleanup", job_id, name)
+
+    def run_worker(self, directory):
+        python = ROOT / "tools" / "demucs" / ".venv" / ("python.exe" if os.name == "nt" else "bin/python")
+        if not python.is_file():
+            raise JobError("separator_unavailable", "Set up the isolated local Demucs environment in docs/DEMUCS.md.", 503)
+        env = os.environ.copy()
+        env["TORCH_HOME"] = str(ROOT / "models" / "torch")
+        env["PATH"] = str(python.parent / "Library" / "bin") + os.pathsep + env.get("PATH", "")
+        try:
+            with (directory / "worker.log").open("w", encoding="utf-8") as log:
+                process = subprocess.run([str(python), str(ROOT / "tools" / "demucs" / "worker.py"), str(directory)],
+                                         cwd=ROOT, env=env, stdout=log, stderr=subprocess.STDOUT, timeout=self.timeout)
+        except subprocess.TimeoutExpired as failure:
+            raise JobError("separation_timeout", "Separation exceeded ten minutes. Retry a shorter song.", retryable=True) from failure
+        errors = {
+            2: JobError("invalid_audio", "Use a decodable mono/stereo WAV or MP3, 10–295 seconds at 8–192 kHz."),
+            3: JobError("separator_unavailable", "Local CUDA, cached model or FFmpeg is unavailable. Check docs/DEMUCS.md.", 503),
+            4: JobError("gpu_busy", "An earlier local separation process still owns the GPU. Wait, then retry.", 409, True),
+        }
+        if process.returncode:
+            raise errors.get(process.returncode, JobError("separation_failed", "Local separation failed. Inspect this job's worker.log and retry.", retryable=True))
+
+    def execute(self, job_id):
+        directory = self.directory(job_id)
+        try:
+            with self.lock:
+                self.jobs[job_id].update(status="running", stage="separating")
+                self.save(self.jobs[job_id])
+            self.run_worker(directory)
+            report = json.loads((directory / "result.json").read_text(encoding="utf-8"))
+            formats = []
+            for name in ARTIFACTS:
+                with wave.open(str(directory / f"{name}.wav"), "rb") as audio:
+                    formats.append((audio.getnframes(), audio.getframerate(), audio.getnchannels(), audio.getsampwidth(), audio.getcomptype()))
+                    if len(audio.readframes(audio.getnframes())) != audio.getnframes() * audio.getnchannels() * audio.getsampwidth():
+                        raise ValueError("Truncated worker artifact.")
+            frames, rate, channels, width, compression = formats[0]
+            if len(set(formats)) != 1 or (rate, channels, width, compression) != (44100, 2, 2, "NONE") or not 10 <= frames / rate <= 295:
+                raise ValueError("Invalid worker artifacts.")
+            if (not isinstance(report["device"], str) or not 1 <= len(report["device"]) <= 200
+                    or type(report["common_gain_linear"]) not in (float, int)
+                    or not math.isfinite(report["common_gain_linear"]) or not 0 < report["common_gain_linear"] <= 1):
+                raise ValueError("Invalid worker provenance.")
+            result = {"duration_seconds": frames / rate, "sample_rate": rate,
+                      "artifacts": {name: f"/api/jobs/{job_id}/audio/{name}" for name in sorted(ARTIFACTS)},
+                      "provenance": {"kind": "local_separation", "model": "htdemucs_6s", "device": report["device"]},
+                      "common_gain_linear": report["common_gain_linear"],
+                      "quality_flags": ["separation_quality_unverified"], "reference": None, "suggestion": None}
+            try:
+                result["suggestion"] = select_reference(directory / "guitar.wav", directory / "mix.wav")
+            except ValueError:
+                result["quality_flags"].append("no_usable_reference_suggested")
+            with self.lock:
+                self.jobs[job_id].update(status="ready", stage="ready", result=result)
+                self.save(self.jobs[job_id])
+            (directory / "source.bin").unlink(missing_ok=True)
+        except JobError as failure:
+            self.fail(job_id, failure)
+        except Exception:
+            logger.exception("Local separation job %s failed", job_id)
+            self.fail(job_id, JobError("separation_failed", "Separation did not produce valid artifacts. Inspect worker.log and retry.", retryable=True))
+
+    def confirm(self, job_id, start, end):
+        with self.lock:
+            job = self.get(job_id)
+            if job["status"] != "ready":
+                raise JobError("job_not_ready", "Wait for separation to finish before selecting a passage.", 409)
+            directory = self.directory(job_id)
+            try:
+                reference = select_reference(directory / "guitar.wav", directory / "mix.wav", start_seconds=start, end_seconds=end)
+            except ValueError as failure:
+                raise JobError("invalid_reference", str(failure), 422) from failure
+            self.jobs[job_id]["result"]["reference"] = reference
+            self.save(self.jobs[job_id])
+            return reference
+
+    def artifact(self, job_id, name):
+        if name not in ARTIFACTS:
+            raise JobError("artifact_not_found", "Unknown audio artifact.", 404)
+        job = self.get(job_id)
+        if job["status"] != "ready":
+            raise JobError("job_not_ready", "Audio is available only after separation succeeds.", 409)
+        directory = self.directory(job_id)
+        path = directory / f"{name}.wav"
+        if path.is_symlink() or path.resolve().parent != directory or not path.is_file():
+            raise JobError("artifact_not_found", "Audio is missing. Submit the song again.", 404, True)
+        return path

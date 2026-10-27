@@ -1,6 +1,6 @@
 # modulo — team setup and handoffs
 
-Read [DEVELOPMENT.md](DEVELOPMENT.md) for the runnable scaffold and [PLAN.md](PLAN.md) for the full requirements. The scaffold provides sample audio processing and a manual preset API; analysis, NVIDIA/Nebius generation and live input remain unimplemented. Deadline: **31 October 2026, 01:00 MYT**; submission target **30 October, 22:00 MYT**.
+Read [DEVELOPMENT.md](DEVELOPMENT.md) for setup and [PLAN.md](PLAN.md) for the full requirements. Browser amp/live capture, fixture presets and the separate [local separation checkpoint](LOCAL_SEPARATION.md) are implemented increments. Source/target tone features, NVIDIA/Nebius presets and physical-rig acceptance remain incomplete. Check live issues for unpublished teammate work before integrating. Deadline: **31 October 2026, 01:00 MYT**; submission target **30 October, 22:00 MYT**.
 
 ## Everyone
 
