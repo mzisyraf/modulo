@@ -1,5 +1,7 @@
 import { parsePreset, type Preset } from "@modulo/contracts";
 import { driveCurve, pluckSamples } from "./dsp.ts";
+import { CalibrationBuffer, calibrationFrameLimit, inputLevel, type CalibrationAudio, type InputLevel } from "./calibration.ts";
+export type { CalibrationAudio, CalibrationFlag, InputLevel } from "./calibration.ts";
 
 export interface LiveInputInfo {
   /** Zero-based hardware input channel. */
@@ -10,6 +12,10 @@ export interface LiveInputInfo {
   /** Browser estimates in seconds, not measured round-trip latency. */
   baseLatencySeconds?: number;
   outputLatencySeconds?: number;
+}
+
+export interface CalibrationTake extends CalibrationAudio {
+  input: LiveInputInfo;
 }
 
 export class AudioEngine {
@@ -27,6 +33,11 @@ export class AudioEngine {
   private liveSplitter?: ChannelSplitterNode;
   private liveStream?: MediaStream;
   private liveEnded?: () => void;
+  private liveInfo?: LiveInputInfo;
+  private meter?: AnalyserNode;
+  private meterSamples = new Float32Array(2048);
+  private calibration?: { finish: () => void; cancel: () => void };
+  private calibrationModule?: Promise<void>;
   private preset: Preset;
   private request = 0;
   private disposed = false;
@@ -174,7 +185,7 @@ export class AudioEngine {
       this.liveSplitter = splitter;
       this.liveEnded = ended;
       track.addEventListener("ended", ended);
-      return {
+      const info: LiveInputInfo = {
         channel,
         trackLabel: track.label,
         settings,
@@ -182,6 +193,8 @@ export class AudioEngine {
         baseLatencySeconds: context.baseLatency,
         outputLatencySeconds: context.outputLatency,
       };
+      this.liveInfo = info;
+      return structuredClone(info);
     } catch (error) {
       source?.disconnect();
       splitter?.disconnect();
@@ -191,8 +204,103 @@ export class AudioEngine {
     }
   }
 
+  /** Poll from the UI (e.g. requestAnimationFrame); null means no live input. */
+  getInputLevel(): InputLevel | null {
+    if (!this.context || !this.liveSplitter || !this.liveInfo) return null;
+    if (!this.meter) {
+      this.meter = this.context.createAnalyser();
+      this.meter.fftSize = this.meterSamples.length;
+      this.liveSplitter.connect(this.meter, this.liveInfo.channel, 0);
+    }
+    this.meter.getFloatTimeDomainData(this.meterSamples);
+    return inputLevel(this.meterSamples);
+  }
+
+  /** Capture an already-started live input; does not request permission or upload audio. */
+  async startCalibration(maxSeconds = 10): Promise<CalibrationTake> {
+    const context = this.context;
+    const splitter = this.liveSplitter;
+    const info = this.liveInfo;
+    if (!context || !splitter || !info) throw new Error("Start live input before calibration.");
+    const maxFrames = calibrationFrameLimit(context.sampleRate, maxSeconds);
+    if (this.calibration) throw new Error("Calibration is already running.");
+    if (!context.audioWorklet || typeof AudioWorkletNode === "undefined") {
+      throw new Error("Calibration requires AudioWorklet support in HTTPS or localhost.");
+    }
+    // Reserve the session before asynchronous module loading so stop/cancel also wins here.
+    return new Promise<CalibrationTake>((resolve, reject) => {
+      let node: AudioWorkletNode | undefined;
+      let connected = false;
+      let settled = false;
+      let finishRequested = false;
+      let timer: ReturnType<typeof setTimeout> | undefined;
+      const cleanup = () => {
+        clearTimeout(timer);
+        if (node) {
+          if (connected) splitter.disconnect(node);
+          node.disconnect();
+          node.port.onmessage = null;
+          node.onprocessorerror = null;
+          node.port.close();
+        }
+        if (this.calibration === session) this.calibration = undefined;
+      };
+      const fail = (error: unknown) => {
+        if (settled) return;
+        settled = true;
+        cleanup();
+        reject(error);
+      };
+      const session = {
+        finish: () => {
+          finishRequested = true;
+          node?.port.postMessage("finish");
+        },
+        cancel: () => fail(new DOMException("Calibration canceled; retry with live input active.", "AbortError")),
+      };
+      this.calibration = session;
+      // A suspended/stalled context cannot leave a pending capture indefinitely.
+      timer = setTimeout(() => fail(new Error("Calibration stalled. Check audio input and retry.")), (maxSeconds + 5) * 1000);
+      this.calibrationModule ??= context.audioWorklet.addModule(new URL("./calibration-worklet.js", import.meta.url).href)
+        .catch((error) => { this.calibrationModule = undefined; throw error; });
+      void this.calibrationModule.then(() => {
+        if (settled) return;
+        if (finishRequested) { session.cancel(); return; }
+        const buffer = new CalibrationBuffer(context.sampleRate, maxSeconds);
+        node = new AudioWorkletNode(context, "modulo-calibration", {
+          numberOfInputs: 1, numberOfOutputs: 1, outputChannelCount: [1],
+          channelCount: 1, channelCountMode: "explicit", processorOptions: { maxFrames },
+        });
+        node.onprocessorerror = () => fail(new Error("Calibration processor failed. Retry capture."));
+        node.port.onmessage = ({ data }: MessageEvent<{ samples?: Float32Array; done?: boolean }>) => {
+          if (settled) return;
+          if (data.samples) buffer.append(data.samples);
+          if (data.done) {
+            settled = true;
+            cleanup();
+            resolve({ ...buffer.finish(), input: structuredClone(info) });
+          }
+        };
+        splitter.connect(node, info.channel, 0);
+        connected = true;
+        // The worklet emits silence; connecting it keeps processing scheduled, without a dry echo.
+        node.connect(context.destination);
+      }).catch(fail);
+    });
+  }
+
+  /** Finish the take without stopping live monitoring. Await the startCalibration promise. */
+  finishCalibration(): void { this.calibration?.finish(); }
+
+  /** Discard a pending take; its start promise rejects with AbortError. */
+  cancelCalibration(): void { this.calibration?.cancel(); }
+
   stop(): void {
     this.request++;
+    this.cancelCalibration();
+    this.meter?.disconnect();
+    this.meter = undefined;
+    this.liveInfo = undefined;
     if (this.source) {
       this.source.onended = null;
       this.source.stop();
@@ -218,5 +326,6 @@ export class AudioEngine {
     this.stop();
     await this.context?.close();
     this.context = undefined;
+    this.calibrationModule = undefined;
   }
 }
