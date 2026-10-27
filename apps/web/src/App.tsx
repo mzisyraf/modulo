@@ -7,6 +7,8 @@ import { ChoiceMenu } from "./ChoiceMenu";
 import { audioInputOptions, DEFAULT_AUDIO_INPUT, LiveRequestGate, liveInputErrorMessage, type AudioInputOption } from "./liveInput";
 import { encodeMonoWav } from "./localAudio";
 import { projectTitle, upsertProject } from "./projectSessions";
+import { RecordingLibrary } from "./RecordingLibrary";
+import type { PerformanceRecording } from "./performanceRecordings";
 
 const initialPreset = parsePreset(example);
 const controls = [
@@ -81,6 +83,7 @@ export function App() {
   const [calibrationPlaybackState, setCalibrationPlaybackState] = useState<CalibrationPlaybackState>("stopped");
   const [activeProjectId, setActiveProjectId] = useState<string>(() => crypto.randomUUID());
   const [savedProjects, setSavedProjects] = useState<StoredProject[]>([]);
+  const [recordings, setRecordings] = useState<PerformanceRecording[]>([]);
   const [sessionKey, setSessionKey] = useState(0);
   const engine = useRef<AudioEngine | null>(null);
   const jobRun = useRef(0);
@@ -595,7 +598,7 @@ export function App() {
 
     {view === "presets" && <section className="library-panel" aria-labelledby="preset-library-title"><div className="section-heading"><div><span className="step">CURRENT TONE</span><h2 id="preset-library-title">Ready to play</h2></div><span className="quality-badge">1 demo preset</span></div><p>This demo keeps one preset in your current tab. Saving a library comes later.</p><article className="preset-row"><div className="preset-thumbnail" aria-hidden="true"><span>MOD</span></div><div><strong>{preset.name}</strong><span>{preset.description}</span></div><span className="manual-tag">Demo preset</span><button className="secondary" onClick={() => navigate("tone-match")}>Open controls</button></article></section>}
 
-    {view === "recordings" && <section className="availability-panel" aria-labelledby="recordings-title"><span className="availability-icon coral" aria-hidden="true">●</span><span className="step">COMING SOON</span><h2 id="recordings-title">No recordings yet</h2><p>Recording isn’t available in Demo Mode, so you won’t see placeholder takes here.</p><button disabled>Start a recording</button><button className="secondary" onClick={() => navigate("tone-match")}>Return to Tone Match</button></section>}
+    {view === "recordings" && <RecordingLibrary recordings={recordings} onDelete={(recordingId) => setRecordings((current) => current.filter((recording) => recording.id !== recordingId))} onOpenToneMatch={() => navigate("tone-match")} />}
 
     {view === "settings" && <section className="availability-panel" aria-labelledby="settings-title"><span className="availability-icon lavender" aria-hidden="true">⚙</span><span className="step">DEMO MODE</span><h2 id="settings-title">Nothing to configure yet</h2><p>There are no accounts or cloud settings in this demo. Your selected audio stays in this browser.</p><button className="secondary" onClick={() => navigate("workspace")}>Return to Workspace</button></section>}
   </AppShell>;

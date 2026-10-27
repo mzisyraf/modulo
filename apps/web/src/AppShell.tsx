@@ -43,7 +43,7 @@ export function AppShell({ apiState, children, onNavigate, view }: AppShellProps
       <nav className="primary-nav" aria-label="Workspace">
         {navigation.map((item) => <button key={item.view} className={view === item.view ? "nav-item active" : "nav-item"} aria-label={item.label} aria-current={view === item.view ? "page" : undefined} onClick={() => onNavigate(item.view)}>
           <span className="nav-icon" aria-hidden="true">{item.icon}</span><span>{item.label}</span>
-          {(item.view === "recordings" || item.view === "settings") && <span className="nav-status">Later</span>}
+          {item.view === "settings" && <span className="nav-status">Later</span>}
         </button>)}
       </nav>
       <p className="sidebar-signoff">Make some noise.</p>
