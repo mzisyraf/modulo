@@ -5,6 +5,8 @@ import example from "../../../fixtures/preset.example.json";
 import { AppShell, type AppView } from "./AppShell";
 import { ChoiceMenu } from "./ChoiceMenu";
 import { audioInputOptions, DEFAULT_AUDIO_INPUT, LiveRequestGate, liveInputErrorMessage, type AudioInputOption } from "./liveInput";
+import { encodeMonoWav } from "./localAudio";
+import { projectTitle, upsertProject } from "./projectSessions";
 
 const initialPreset = parsePreset(example);
 const controls = [
@@ -28,7 +30,20 @@ type JobStage = "idle" | ActiveStage | "ready" | "failed";
 type FixtureOutcome = "ready" | "low_quality" | "failed";
 type LiveState = "stopped" | "starting" | "live" | "error";
 type CalibrationState = "idle" | "recording" | "complete" | "error";
+type CalibrationPlaybackState = "stopped" | "starting" | "playing" | "error";
 type EngineSource = "none" | "sample" | "live";
+
+interface StoredProject {
+  id: string;
+  updatedAt: number;
+  songFile?: File;
+  dryFile?: File;
+  jobStage: JobStage;
+  fixtureOutcome: FixtureOutcome;
+  preset: Preset;
+  bypass: boolean;
+  calibrationTake?: CalibrationTake;
+}
 
 const wait = (milliseconds: number) => new Promise((resolve) => window.setTimeout(resolve, milliseconds));
 const levelDb = (value: number) => 20 * Math.log10(Math.max(value, 1e-8));
@@ -63,6 +78,9 @@ export function App() {
   const [calibrationState, setCalibrationState] = useState<CalibrationState>("idle");
   const [calibrationTake, setCalibrationTake] = useState<CalibrationTake>();
   const [calibrationMessage, setCalibrationMessage] = useState("Start live input, then record a clean dry chord for up to 10 seconds.");
+  const [calibrationPlaybackState, setCalibrationPlaybackState] = useState<CalibrationPlaybackState>("stopped");
+  const [activeProjectId, setActiveProjectId] = useState<string>(() => crypto.randomUUID());
+  const [savedProjects, setSavedProjects] = useState<StoredProject[]>([]);
   const [sessionKey, setSessionKey] = useState(0);
   const engine = useRef<AudioEngine | null>(null);
   const jobRun = useRef(0);
@@ -72,10 +90,13 @@ export function App() {
   const engineSource = useRef<EngineSource>("none");
   const mixPlayer = useRef<HTMLAudioElement>(null);
   const referencePlayer = useRef<HTMLAudioElement>(null);
+  const calibrationPlayer = useRef<HTMLAudioElement>(null);
   const songUrl = useMemo(() => songFile ? URL.createObjectURL(songFile) : "", [songFile]);
+  const calibrationPlaybackUrl = useMemo(() => calibrationTake ? URL.createObjectURL(encodeMonoWav(calibrationTake.samples, calibrationTake.sampleRate)) : "", [calibrationTake]);
   const processing = stages.some(([stage]) => stage === jobStage);
   const hasResult = jobStage === "ready";
   const currentStageIndex = stages.findIndex(([stage]) => stage === jobStage);
+  const inactiveProjects = savedProjects.filter((project) => project.id !== activeProjectId);
 
   const refreshInputDevices = useCallback(async () => {
     if (!navigator.mediaDevices?.enumerateDevices) {
@@ -143,6 +164,7 @@ export function App() {
   }, [refreshInputDevices]);
 
   useEffect(() => () => { if (songUrl) URL.revokeObjectURL(songUrl); }, [songUrl]);
+  useEffect(() => () => { if (calibrationPlaybackUrl) URL.revokeObjectURL(calibrationPlaybackUrl); }, [calibrationPlaybackUrl]);
 
   useEffect(() => {
     if (view !== "tone-match" || liveState !== "live") {
@@ -162,6 +184,73 @@ export function App() {
     return () => window.cancelAnimationFrame(frame);
   }, [liveState, view]);
 
+  function stopCalibrationPlayback() {
+    const player = calibrationPlayer.current;
+    if (player) {
+      player.pause();
+      player.currentTime = 0;
+    }
+    setCalibrationPlaybackState("stopped");
+  }
+
+  function snapshotActiveProject(): StoredProject {
+    return {
+      id: activeProjectId,
+      updatedAt: Date.now(),
+      songFile,
+      dryFile,
+      jobStage: processing ? "idle" : jobStage,
+      fixtureOutcome,
+      preset,
+      bypass,
+      calibrationTake,
+    };
+  }
+
+  function projectHasProgress(project: StoredProject): boolean {
+    return Boolean(
+      project.songFile
+      || project.dryFile
+      || project.jobStage !== "idle"
+      || project.calibrationTake
+      || project.bypass
+      || project.preset.name !== initialPreset.name
+      || controls.some(([key]) => project.preset.parameters[key] !== initialPreset.parameters[key]),
+    );
+  }
+
+  function openProject(projectId: string) {
+    const project = savedProjects.find((candidate) => candidate.id === projectId);
+    if (!project) return;
+    const current = snapshotActiveProject();
+    if (projectHasProgress(current)) setSavedProjects((projects) => upsertProject(projects, current));
+
+    jobRun.current++;
+    jobRunning.current = false;
+    stopEngineAudio();
+    mixPlayer.current?.pause();
+    referencePlayer.current?.pause();
+    setActiveProjectId(project.id);
+    setSongFile(project.songFile);
+    setDryFile(project.dryFile);
+    setJobStage(project.jobStage);
+    setFixtureOutcome(project.fixtureOutcome);
+    setPreset(project.preset);
+    engine.current?.applyPreset(project.preset);
+    setBypass(project.bypass);
+    engine.current?.setBypass(project.bypass);
+    setCalibrationTake(project.calibrationTake);
+    setCalibrationState(project.calibrationTake ? "complete" : "idle");
+    setCalibrationMessage(project.calibrationTake
+      ? project.calibrationTake.usable ? "Saved calibration sample ready to review." : "Saved sample needs another try."
+      : "Start live input, then record a clean dry chord for up to 10 seconds.");
+    setLiveInfo(undefined);
+    setInputLevel(null);
+    setError("");
+    setSessionKey((currentKey) => currentKey + 1);
+    setView("tone-match");
+  }
+
   function changeControl(key: keyof Preset["parameters"], value: number) {
     const next = parsePreset({ ...preset, parameters: { ...preset.parameters, [key]: value } });
     engine.current?.applyPreset(next);
@@ -174,6 +263,7 @@ export function App() {
     const wasRecording = calibrationState === "recording";
     engineSource.current = "none";
     engine.current?.stop();
+    stopCalibrationPlayback();
     setInputLevel(null);
     if (wasRecording) {
       setCalibrationState("idle");
@@ -221,6 +311,7 @@ export function App() {
 
   async function play(useFile: boolean) {
     liveRequests.current.cancel();
+    stopCalibrationPlayback();
     engineSource.current = "sample";
     setLiveState("stopped");
     setLiveMessage("Stopped — local audition took over the audio engine.");
@@ -246,6 +337,7 @@ export function App() {
     const request = liveRequests.current.begin();
     if (request === undefined) return;
     engineSource.current = "live";
+    stopCalibrationPlayback();
     mixPlayer.current?.pause();
     referencePlayer.current?.pause();
     setAudioState("Stopped");
@@ -282,6 +374,7 @@ export function App() {
 
   async function recordCalibration() {
     if (liveState !== "live" || !engine.current || calibrationState === "recording") return;
+    stopCalibrationPlayback();
     const run = ++calibrationRun.current;
     setCalibrationTake(undefined);
     setCalibrationState("recording");
@@ -315,9 +408,32 @@ export function App() {
   function discardCalibration(message = "Take discarded. Record again when you’re ready.") {
     calibrationRun.current++;
     engine.current?.cancelCalibration();
+    stopCalibrationPlayback();
     setCalibrationTake(undefined);
     setCalibrationState("idle");
     setCalibrationMessage(message);
+  }
+
+  async function playCalibrationTake() {
+    const player = calibrationPlayer.current;
+    if (!player || !calibrationPlaybackUrl) return;
+    if (calibrationPlaybackState === "playing") {
+      stopCalibrationPlayback();
+      return;
+    }
+
+    stopEngineAudio("Stopped — calibration review took over the audio output.");
+    mixPlayer.current?.pause();
+    referencePlayer.current?.pause();
+    player.currentTime = 0;
+    setCalibrationPlaybackState("starting");
+    try {
+      await player.play();
+      setCalibrationPlaybackState("playing");
+    } catch (failure) {
+      setCalibrationPlaybackState("error");
+      setCalibrationMessage(failure instanceof Error ? failure.message : "The calibration sample could not play.");
+    }
   }
 
   function changeLiveDevice(deviceId: string) {
@@ -358,6 +474,9 @@ export function App() {
   }
 
   function startNewToneMatch() {
+    const currentProject = snapshotActiveProject();
+    if (projectHasProgress(currentProject)) setSavedProjects((projects) => upsertProject(projects, currentProject));
+
     jobRun.current++;
     jobRunning.current = false;
     stopEngineAudio();
@@ -375,6 +494,7 @@ export function App() {
     setLiveInfo(undefined);
     setInputLevel(null);
     discardCalibration("Start live input, then record a clean dry chord for up to 10 seconds.");
+    setActiveProjectId(crypto.randomUUID());
     setSessionKey((current) => current + 1);
     setView("tone-match");
   }
@@ -392,7 +512,7 @@ export function App() {
           <div className="amp-preview" aria-hidden="true"><div className="amp-grille" /><div className="amp-panel"><span /><span /><span /><span /></div></div>
           <div className="project-copy">
             <span className="project-kicker">LOCAL PROJECT</span>
-            <h3>Untitled Tone Match</h3>
+            <h3>{projectTitle(songFile?.name)}</h3>
             <p>{preset.name} · Custom amp preset</p>
             <div className="project-meta"><span className={hasResult ? "state-dot complete" : "state-dot"} />{hasResult ? "Tone ready to preview" : processing ? "Building your demo tone" : songFile ? "Song added — ready to continue" : "No reference song added yet"}</div>
           </div>
@@ -403,7 +523,8 @@ export function App() {
 
       <section className="projects-section" aria-labelledby="projects-heading">
         <div className="section-heading"><div><span className="step">YOUR PROJECTS</span><h2 id="projects-heading">Recently updated</h2></div></div>
-        <div className="empty-projects"><div className="empty-art" aria-hidden="true"><span className="accent-coral" /><span className="accent-lavender" /><span className="accent-mint" /></div><div><h3>Your next tone starts here</h3><p>Create another project when you’re ready to match a song’s guitar tone.</p></div><button className="secondary" onClick={startNewToneMatch}>Start a project</button></div>
+        {inactiveProjects.length > 0 && <div className="project-list">{inactiveProjects.map((project) => <article className="saved-project" key={project.id}><div className="saved-project-art" aria-hidden="true"><span>MOD</span></div><div><span className="project-kicker">SAVED IN THIS TAB</span><h3>{projectTitle(project.songFile?.name)}</h3><p>{project.songFile?.name ?? "No reference song"} · {project.jobStage === "ready" ? "Tone ready" : project.jobStage === "failed" ? "Needs attention" : project.calibrationTake ? "Calibration captured" : "In progress"}</p></div><button className="secondary" onClick={() => openProject(project.id)}>Open project</button></article>)}</div>}
+        <div className="empty-projects"><div className="empty-art" aria-hidden="true"><span className="accent-coral" /><span className="accent-lavender" /><span className="accent-mint" /></div><div><h3>{inactiveProjects.length ? "Start another tone" : "Your next tone starts here"}</h3><p>{inactiveProjects.length ? "Your earlier projects stay available above while this tab remains open." : "Create another project when you’re ready to match a song’s guitar tone."}</p></div><button className="secondary" onClick={startNewToneMatch}>Start a project</button></div>
       </section>
     </div>}
 
@@ -453,15 +574,16 @@ export function App() {
               <div className="meter-track" role="meter" aria-label="Dry guitar input level" aria-valuemin={-60} aria-valuemax={0} aria-valuenow={inputLevel ? Math.round(levelDb(inputLevel.rms)) : undefined} aria-valuetext={inputLevel ? `${levelDb(inputLevel.rms).toFixed(1)} decibels full scale` : "No active input"}><span className="meter-zone" /><span className="meter-fill" style={{ width: `${inputLevel ? meterPercent(inputLevel.rms) : 0}%` }} /><span className="meter-peak" style={{ left: `${inputLevel ? meterPercent(inputLevel.peak) : 0}%` }} /></div>
               <div className="meter-scale"><span>−60</span><span>Good level</span><span>0</span></div>
             </div>
+            {calibrationTake && <audio className="calibration-audio" ref={calibrationPlayer} src={calibrationPlaybackUrl} preload="metadata" onEnded={() => setCalibrationPlaybackState("stopped")} />}
             <div className="calibration-actions">
               {calibrationState === "idle" && <button disabled={liveState !== "live"} onClick={() => void recordCalibration()}>Record</button>}
               {calibrationState === "recording" && <><button onClick={finishCalibration}>Finish</button><button className="secondary" onClick={() => discardCalibration()}>Discard</button></>}
-              {calibrationState === "complete" && <><button onClick={() => void recordCalibration()}>{calibrationTake?.usable ? "Record again" : "Retry"}</button><button className="secondary" onClick={() => discardCalibration()}>Discard</button></>}
+              {calibrationState === "complete" && <><button className="review-action" disabled={calibrationPlaybackState === "starting"} onClick={() => void playCalibrationTake()}>{calibrationPlaybackState === "playing" ? "Stop sample" : calibrationPlaybackState === "starting" ? "Starting…" : "Play sample"}</button><button disabled={liveState !== "live"} onClick={() => void recordCalibration()}>{liveState === "live" ? calibrationTake?.usable ? "Record again" : "Retry" : "Start live to record again"}</button><button className="secondary" onClick={() => discardCalibration()}>Discard</button></>}
               {calibrationState === "error" && <><button disabled={liveState !== "live"} onClick={() => void recordCalibration()}>Retry</button><button className="secondary" onClick={() => discardCalibration()}>Discard</button></>}
             </div>
             <p className={`calibration-status ${calibrationState}`} role="status">{calibrationMessage}</p>
             {calibrationTake && <div className={`take-summary ${calibrationTake.usable ? "usable" : "needs-retry"}`}><div><strong>{calibrationTake.durationSeconds.toFixed(1)} s take</strong><span>{calibrationTake.sampleRate} Hz · peak {levelDb(calibrationTake.level.peak).toFixed(1)} dBFS · RMS {levelDb(calibrationTake.level.rms).toFixed(1)} dBFS</span></div>{calibrationTake.usable ? <p>Input level looks usable for the next local calibration step.</p> : <ul>{calibrationTake.qualityFlags.map((flag) => <li key={flag}>{qualityFlagLabels[flag]}</li>)}</ul>}</div>}
-            <p className="hint">If you change the interface gain, guitar or pickup, discard this take and calibrate again.</p>
+            <p className="hint">This temporary sample stays in browser memory only. If you change the interface gain, guitar or pickup, discard it and calibrate again.</p>
           </div>
 
           {liveInfo && <dl className="capture-info"><div><dt>Capture sample rate</dt><dd>{liveInfo.settings.sampleRate ?? "unknown"}</dd></div><div><dt>Capture channels</dt><dd>{liveInfo.settings.channelCount ?? "unknown"}</dd></div><div><dt>Audio-context rate</dt><dd>{liveInfo.contextSampleRate}</dd></div><div><dt>Echo cancellation</dt><dd>{liveInfo.settings.echoCancellation === undefined ? "unknown" : liveInfo.settings.echoCancellation ? "on" : "off"}</dd></div><div><dt>Noise suppression</dt><dd>{liveInfo.settings.noiseSuppression === undefined ? "unknown" : liveInfo.settings.noiseSuppression ? "on" : "off"}</dd></div><div><dt>Automatic gain</dt><dd>{liveInfo.settings.autoGainControl === undefined ? "unknown" : liveInfo.settings.autoGainControl ? "on" : "off"}</dd></div>{liveInfo.baseLatencySeconds !== undefined && <div><dt>Browser base estimate</dt><dd>{(liveInfo.baseLatencySeconds * 1000).toFixed(1)} ms</dd></div>}{liveInfo.outputLatencySeconds !== undefined && <div><dt>Browser output estimate</dt><dd>{(liveInfo.outputLatencySeconds * 1000).toFixed(1)} ms</dd></div>}</dl>}
