@@ -1,12 +1,24 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { parseSeparationJob, referenceBounds } from "../src/separation.ts";
+import { parsePresetGeneration, parseSeparationJob, referenceBounds } from "../src/separation.ts";
+import fixture from "../../../fixtures/preset.example.json" with { type: "json" };
 
 test("reference confirmation rejects blank, fractional, short and out-of-song bounds", () => {
   assert.deepEqual(referenceBounds("30", "45", 145.4), { start_seconds: 30, end_seconds: 45 });
   for (const [start, end] of [["", "15"], ["0.5", "15"], ["0", "9"], ["0", "21"], ["135", "146"]]) {
     assert.throws(() => referenceBounds(start, end, 145.4));
   }
+});
+
+test("starting presets require matching passage revision and trusted missing-calibration flags", () => {
+  const preset = { ...structuredClone(fixture), provenance: { kind: "generated", provider: "nebius", model: "test model" }, quality_flags: ["source_calibration_missing", "target_energy_only", "tone_matching_unverified"] };
+  const generation = { request_id: "11111111-1111-4111-8111-111111111111", reference_revision: 2, status: "ready", preset };
+  assert.equal(parsePresetGeneration(generation, 2).preset?.parameters.drive, fixture.parameters.drive);
+  assert.throws(() => parsePresetGeneration(generation, 3));
+  assert.throws(() => parsePresetGeneration({ ...generation, preset: { ...preset, quality_flags: [] } }, 2));
+  assert.throws(() => parsePresetGeneration({ ...generation, preset: fixture }, 2));
+  assert.throws(() => parsePresetGeneration({ ...generation, status: "generating" }, 2));
+  assert.throws(() => parsePresetGeneration({ ...generation, preset: { ...preset, parameters: { ...preset.parameters, drive: 99 } } }, 2));
 });
 
 test("job parser rejects invented preset success and foreign artifact URLs", () => {

@@ -1,0 +1,163 @@
+"""Local-only target-energy starting presets; no source calibration or tone matching."""
+
+from decimal import Decimal, InvalidOperation
+import json
+import math
+import os
+from pathlib import Path
+import urllib.error
+import urllib.request
+
+from app.contracts import ROOT, SCHEMA, validate_preset
+from app.job_lock import exclusive_lock
+
+MODEL = "nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B"
+BASE_URL = "https://api.tokenfactory.nebius.com/v1"
+# shortcut: Nano-only reservation uses published rates/context; recheck before changing the model or rates.
+RESERVATION_USD = Decimal("0.01608864")  # Full 262144-token input plus 1500 output at $0.06/$0.24 per million.
+FLAGS = ["source_calibration_missing", "target_energy_only", "tone_matching_unverified"]
+
+
+class PresetError(Exception):
+    def __init__(self, code, message, status=503):
+        super().__init__(message)
+        self.code, self.message, self.status = code, message, status
+
+
+def strict_json(text):
+    def pairs(items):
+        value = {}
+        for key, item in items:
+            if key in value:
+                raise ValueError("Duplicate JSON key.")
+            value[key] = item
+        return value
+
+    def invalid(_value):
+        raise ValueError("Nonfinite JSON number.")
+
+    return json.loads(text, object_pairs_hook=pairs, parse_constant=invalid)
+
+
+class NoRedirect(urllib.request.HTTPRedirectHandler):
+    def redirect_request(self, *args, **kwargs):
+        return None
+
+
+def post_completion(key, payload):
+    request = urllib.request.Request(BASE_URL + "/chat/completions", method="POST",
+        headers={"Authorization": "Bearer " + key, "Content-Type": "application/json"},
+        data=json.dumps(payload, allow_nan=False).encode("utf-8"))
+    try:
+        with urllib.request.build_opener(NoRedirect()).open(request, timeout=30) as response:
+            content = response.read(65537)
+        if len(content) > 65536:
+            raise ValueError("Oversized provider response.")
+        return strict_json(content.decode("utf-8"))
+    except urllib.error.HTTPError as failure:
+        messages = {401: "The backend Nebius key was rejected.", 402: "Nebius credits are unavailable.",
+                    403: "This Nebius account cannot use the configured model.", 429: "Nebius is rate limited. Try later."}
+        raise PresetError("provider_unavailable", messages.get(failure.code, "Nebius could not generate a preset.")) from None
+    except (OSError, ValueError, UnicodeError):
+        raise PresetError("provider_unavailable", "Nebius timed out or returned an unreadable response. The attempt may still be billed.") from None
+
+
+class PresetGenerator:
+    def __init__(self, directory, *, key="", budget_usd="0", max_requests=0, transport=post_completion):
+        self.directory = Path(directory)
+        self.key = key
+        self.transport = transport
+        try:
+            self.budget = Decimal(str(budget_usd))
+            if not self.budget.is_finite() or not 0 <= self.budget <= Decimal("1") or type(max_requests) is not int or not 0 <= max_requests <= 100:
+                raise ValueError()
+        except (ValueError, InvalidOperation):
+            raise PresetError("provider_configuration", "Use a finite local budget of US$0–1 and 0–100 requests.") from None
+        self.max_requests = max_requests
+
+    @classmethod
+    def from_env(cls, directory=ROOT / "data" / "preset-inference"):
+        settings = {}
+        names = {"NEBIUS_API_KEY", "NEBIUS_MODEL", "NEBIUS_BASE_URL", "NEBIUS_BUDGET_USD", "NEBIUS_MAX_REQUESTS"}
+        path = ROOT / "services" / "api" / ".env"
+        if path.is_file():
+            for line in path.read_text(encoding="utf-8-sig").splitlines():
+                name, separator, value = line.strip().partition("=")
+                if separator and name in names:
+                    settings[name] = value.strip().strip('"').strip("'")
+        settings.update({name: os.environ[name] for name in names if name in os.environ})
+        if settings.get("NEBIUS_BASE_URL", BASE_URL).rstrip("/") != BASE_URL or settings.get("NEBIUS_MODEL", MODEL) != MODEL:
+            raise PresetError("provider_configuration", "This local starter supports only the official Nebius Nano endpoint.")
+        try:
+            count = int(settings.get("NEBIUS_MAX_REQUESTS", "0"))
+        except ValueError:
+            raise PresetError("provider_configuration", "NEBIUS_MAX_REQUESTS must be a whole number.") from None
+        return cls(directory, key=settings.get("NEBIUS_API_KEY", ""),
+                   budget_usd=settings.get("NEBIUS_BUDGET_USD", "0"), max_requests=count)
+
+    @property
+    def available(self):
+        return bool(self.key and self.max_requests and self.budget >= RESERVATION_USD)
+
+    def reserve(self):
+        if not self.available:
+            raise PresetError("generation_disabled", "Set a backend Nebius key and an approved request/budget allowance before generating.")
+        self.directory.mkdir(parents=True, exist_ok=True)
+        try:
+            with exclusive_lock(self.directory / ".budget.lock"):
+                path = self.directory / "budget.json"
+                ledger = strict_json(path.read_text(encoding="utf-8")) if path.is_file() else {"attempts": 0, "reserved_usd": "0"}
+                attempts, spent = ledger["attempts"], Decimal(ledger["reserved_usd"])
+                if type(attempts) is not int or attempts < 0 or not spent.is_finite() or spent < 0:
+                    raise ValueError()
+                if attempts >= self.max_requests or spent + RESERVATION_USD > self.budget:
+                    raise PresetError("budget_exhausted", "The local preset-generation allowance is used. Ask the operator to review the budget.", 429)
+                temporary = self.directory / "budget.tmp"
+                temporary.write_text(json.dumps({"attempts": attempts + 1, "reserved_usd": str(spent + RESERVATION_USD)}), encoding="utf-8")
+                temporary.replace(path)
+        except PresetError:
+            raise
+        except (OSError, ValueError, KeyError, TypeError, InvalidOperation):
+            raise PresetError("budget_unavailable", "The generation budget is busy or unreadable. No provider request was sent.") from None
+
+    def generate(self, reference):
+        """Caller must pass the confirmed server-side selection, never request-body metrics."""
+        try:
+            start, end = reference["start_seconds"], reference["end_seconds"]
+            if type(start) is not int or type(end) is not int or start < 0 or not 10 <= end - start <= 20:
+                raise ValueError()
+            metrics = {name: reference["metrics"][name] for name in (
+                "guitar_rms_dbfs", "stem_to_mix_energy_ratio", "quiet_second_fraction", "clipped_sample_fraction")}
+            if any(type(value) not in (int, float) or not math.isfinite(value) for value in metrics.values()):
+                raise ValueError()
+            if metrics["guitar_rms_dbfs"] > 0 or metrics["stem_to_mix_energy_ratio"] < 0 or any(not 0 <= metrics[name] <= 1 for name in ("quiet_second_fraction", "clipped_sample_fraction")):
+                raise ValueError()
+            flags = reference["quality_flags"]
+            if not isinstance(flags, list) or len(flags) > 15 or any(not isinstance(flag, str) or len(flag) > 100 for flag in flags):
+                raise ValueError()
+        except (KeyError, TypeError, ValueError, OverflowError):
+            raise PresetError("invalid_reference", "Confirm a valid passage before generating a preset.", 422) from None
+        payload = {"model": MODEL, "n": 1, "store": False, "stream": False, "max_completion_tokens": 1500,
+            "messages": [{"role": "system", "content": (
+                "Return one JSON object with exactly name, description and parameters. No Markdown. "
+                "Propose a conservative starting preset using only the supplied six-control schema. "
+                "Only target-energy measurements are available; no dry source calibration, spectral measurements "
+                "or audible matching is available. Do not identify equipment, add effects or claim tone similarity.")},
+                {"role": "user", "content": json.dumps({"input_kind": "measured_target_energy_only",
+                    "target_metrics": metrics, "supported_parameters_schema": SCHEMA["properties"]["parameters"]}, allow_nan=False)}]}
+        self.reserve()
+        response = self.transport(self.key, payload)
+        try:
+            if response["model"] != MODEL or len(response["choices"]) != 1 or response["choices"][0]["finish_reason"] != "stop":
+                raise ValueError()
+            value = strict_json(response["choices"][0]["message"]["content"])
+            if not isinstance(value, dict) or set(value) != {"name", "description", "parameters"}:
+                raise ValueError()
+            preset = {**value, "schema_version": "1", "quality_flags": list(dict.fromkeys([*FLAGS, *flags])),
+                      "provenance": {"kind": "generated", "provider": "nebius", "model": MODEL}}
+            validate_preset(preset)
+            # Disclosures belong to trusted code, not an unreliable model description.
+            preset["description"] = "Uncalibrated AI starting preset from target energy only. Tone similarity is unverified."
+            return validate_preset(preset)
+        except Exception:
+            raise PresetError("invalid_provider_preset", "The model did not return a valid supported preset. No preset was applied.", 502) from None

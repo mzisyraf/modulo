@@ -2,7 +2,7 @@
 
 Turn a guitar sound in a mixed song into a browser preset you can play through.
 
-**Status:** browser amp/live capture and a fixture preset API work. A separate [local separation checkpoint](docs/LOCAL_SEPARATION.md) now connects real upload, CUDA guitar/backing separation and reference confirmation. Tone features, AI preset generation and physical-rig acceptance remain incomplete.
+**Status:** browser amp/live capture and a fixture preset API work. The separate [local workflow](docs/LOCAL_SEPARATION.md) connects real upload, CUDA guitar/backing separation, reference confirmation and budget-gated starting presets with editable Apply/Play. Generation is disabled by default; source calibration, tone-match quality and physical-rig acceptance remain incomplete.
 
 - **Team:** Isyraf — AI/backend/integration; Dinnie — browser audio/DSP; Shazlin — frontend/UX.
 - **Deadline:** 31 October 2026, 01:00 MYT (30 October, 17:00 UTC).
@@ -46,7 +46,7 @@ npm run dev
 
 Open **http://127.0.0.1:5173**. Run `npm run check` for TypeScript, unit checks and the production build. The existing app can audition a synthetic test signal or your own dry recording without a backend. For real local song upload/separation, open **/separation.html** with the API and isolated separator running; see [the checkpoint setup and limits](docs/LOCAL_SEPARATION.md).
 
-Python 3.12 API setup and tests are in [DEVELOPMENT.md](docs/DEVELOPMENT.md). The API exposes health, a manual example preset, and bounded separation-only jobs. A separated song does not imply tone analysis or a generated preset. The shared preset schema remains a reviewable draft with implemented controls only.
+Python 3.12 API setup and tests are in [DEVELOPMENT.md](docs/DEVELOPMENT.md). The API exposes health, a manual example preset, bounded separation jobs and a separate confirmed-reference [starting-preset action](docs/PRESET_GENERATION.md). A separated song does not imply a generated preset or calibrated matching. The shared preset schema remains a reviewable draft with implemented controls only.
 
 ## Working agreement
 

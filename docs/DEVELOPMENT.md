@@ -10,7 +10,7 @@ This starter connects a React page, a TypeScript audio package, a shared preset 
 - FastAPI health and manual-example preset endpoints. The frontend remains usable if the API is stopped.
 - One JSON Schema used by Ajv in JavaScript and jsonschema in Python. The preset and its ranges are a draft for Isyraf/Dinnie/Shazlin to review.
 
-The existing main page keeps its labelled fixture analysis and local amp/live-input UI. The separate [local separation checkpoint](LOCAL_SEPARATION.md) implements bounded mixed-song upload, one isolated CUDA worker, retained job/audio artifacts, reference suggestions and manual confirmation. It requires the local separator setup; the main fixture page still needs no GPU/cloud credentials. NVIDIA/Nebius presets, source/target tone features, full calibration integration, recording, live play-along and physical-interface acceptance remain incomplete.
+The existing main page keeps its labelled fixture analysis and local amp/live-input UI. The separate [local workflow](LOCAL_SEPARATION.md) implements bounded mixed-song upload, one isolated CUDA worker, retained job/audio artifacts, reference confirmation and [budget-gated Nano starting presets](PRESET_GENERATION.md) with editable Apply/Play. It requires the local separator setup; the main fixture page still needs no GPU/cloud credentials. Generation is disabled by default. Calibrated source/target tone matching, performance recording, live play-along and physical-interface acceptance remain incomplete.
 
 The [reference selector](ANALYSIS.md) accepts already-isolated PCM16 guitar WAVs and aligned mix, and is reused by the local separation API. The [issue #1 contract review](CONTRACT_REVIEW.md) records controls, methods and pending team decisions; the separation-only job boundary is proposed for Shazlin's review.
 
@@ -66,7 +66,7 @@ Open `services/api/.env` in your editor and fill in `NEBIUS_API_KEY` with your T
 
 Commit only the example with its empty key. The real `.env` is already Git-ignored; keep credentials out of chat, issue comments and frontend files, including `VITE_` variables. Frontend/audio contributors do not need a Nebius key for the scaffold.
 
-This template reserves the names for backend provider integration. The current fixture API does **not** automatically load `.env`, read these variables or call Nebius; normal development still needs no cloud credentials. Adding a key does not enable inference or spend credits.
+The API now reads these provider settings at startup from the existing private `.env`, with process environment variables taking precedence. `NEBIUS_BUDGET_USD=0` and `NEBIUS_MAX_REQUESTS=0` keep generation disabled; adding only a key does not enable inference. A separate runtime request/budget allowance must be explicitly approved before activation; the earlier three-request smoke allowance is consumed. Integration tests inject provider transport and send no paid requests. See [PRESET_GENERATION.md](PRESET_GENERATION.md) for persistent reservations, no automatic retries and missing-calibration disclosures. Do not modify/reset the real `.env` or budget ledger as part of tests.
 
 ## Checks
 
@@ -104,4 +104,4 @@ Synthetic browser media can verify these UI/lifecycle paths without microphone p
 - **Dinnie:** review issue #1's controls and `packages/audio`; prove live interface input in #4, then extend the engine in #5. The current native-node distortion is a starter, not a model of a particular amplifier.
 - **Shazlin:** extend `apps/web` for #6 using agreed job fixtures and the audio package's public API. Keep example state visible until real analysis is connected.
 
-Do not close those issues merely because the scaffold exists. No model prompts, cloud calls, secrets or paid infrastructure are configured here.
+Do not close those issues merely because the flow is connected. Starting-preset wiring does not establish calibrated tone quality, real source features, rig/latency acceptance or approval for additional paid calls.

@@ -9,6 +9,7 @@ from starlette.middleware.trustedhost import TrustedHostMiddleware
 
 from .contracts import example_preset
 from .jobs import JobError, JobStore, MAX_UPLOAD_BYTES
+from .preset_generation import PresetError, PresetGenerator
 
 
 class ReferenceInterval(BaseModel):
@@ -17,12 +18,23 @@ class ReferenceInterval(BaseModel):
     end_seconds: int
 
 
-def create_app(store=None):
+class PresetRequest(BaseModel):
+    model_config = ConfigDict(strict=True, extra="forbid")
+    reference_revision: int
+
+
+def create_app(store=None, generator=None):
     @asynccontextmanager
     async def lifespan(app):
         jobs = store if store is not None else JobStore()
         jobs.start()
         app.state.jobs = jobs
+        app.state.preset_error = None
+        try:
+            app.state.generator = generator if generator is not None else PresetGenerator.from_env()
+        except PresetError as failure:
+            app.state.generator = None
+            app.state.preset_error = failure
 
         async def expire_jobs():
             while True:
@@ -59,15 +71,26 @@ def create_app(store=None):
         return JSONResponse(status_code=failure.status, content={"error": failure.public()})
 
     @app.exception_handler(RequestValidationError)
-    async def validation_error(_request, _failure):
+    async def validation_error(request, _failure):
+        if request.url.path.endswith("/preset"):
+            return JSONResponse(status_code=422, content={"error": {
+                "code": "invalid_generation_request", "message": "Supply only the confirmed reference_revision as a whole number.", "retryable": False,
+            }})
         return JSONResponse(status_code=422, content={"error": {
             "code": "invalid_reference", "message": "Supply only whole-second start_seconds and end_seconds.", "retryable": False,
         }})
 
+    @app.exception_handler(PresetError)
+    async def preset_error(_request, failure):
+        return JSONResponse(status_code=failure.status, content={"error": {
+            "code": failure.code, "message": failure.message, "retryable": False,
+        }})
+
     @app.get("/api/health")
-    def health():
+    def health(request: Request):
+        provider = getattr(request.app.state, "generator", None)
         return {"status": "ok", "mode": "scaffold", "analysis_available": False,
-                "separation_available": True, "preset_generation_available": False}
+                "separation_available": True, "preset_generation_available": bool(provider and provider.available)}
 
     @app.get("/api/presets/example")
     def preset_example():
@@ -119,6 +142,14 @@ def create_app(store=None):
     @app.post("/api/jobs/{job_id}/reference")
     def confirm_reference(job_id: str, interval: ReferenceInterval, request: Request):
         return request.app.state.jobs.confirm(job_id, interval.start_seconds, interval.end_seconds)
+
+    @app.post("/api/jobs/{job_id}/preset", status_code=202)
+    def generate_preset(job_id: str, selection: PresetRequest, request: Request):
+        jobs = request.app.state.jobs
+        if request.app.state.preset_error:
+            jobs.get(job_id)
+            raise request.app.state.preset_error
+        return jobs.start_generation(job_id, selection.reference_revision, request.app.state.generator)
 
     @app.get("/api/jobs/{job_id}/audio/{name}")
     def audio_artifact(job_id: str, name: str, request: Request):

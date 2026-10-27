@@ -1,0 +1,68 @@
+# Barebone preset generation integration
+
+Status: integrated into the local `/separation.html` workflow. The provider uses the tested draft without AI quality tuning. Runtime generation remains disabled by default; this integration uses no additional paid calls. API/browser tests inject transport and are not evidence of new real inference or musical quality.
+
+## Scope
+
+Use the confirmed local guitar passage to request a six-control Nano starting preset. The existing selector supplies measured energy, stem/mix ratio, quiet fraction and clipping fraction. This phase has no source-guitar features or spectral analysis. It is not calibrated tone matching or equipment identification. Shared preset schema and audio engine stay unchanged.
+
+## Integrated files and ownership
+
+Isyraf's application-integration session incorporated the research chat's released provider/test/docs draft as the sole source writer. `main.py`/`jobs.py` now expose reference-scoped generation, and `StartingPresetPanel.tsx` provides generated controls and deliberate apply/play in the separate preview. Shazlin's main calibration/session UI and unpublished recordings-library work remain untouched by this increment; Tone Match integration is coordinated in issue #6.
+
+## Provider boundary
+
+```python
+from app.preset_generation import PresetGenerator, PresetError
+
+generator = PresetGenerator.from_env()
+generator.available  # key and a configured allowance; not live account verification
+preset = generator.generate(confirmed_reference)
+```
+
+`generate` is synchronous and performs blocking HTTPS. Run it in a worker/thread, not directly in an async route. `confirmed_reference` is the SERVER-LOADED result of `select_reference`, including its metrics/flags. Do not accept client-provided features, paths or provenance. `PresetError` exposes only sanitized `code`, `message` and `status` for the API's existing error envelope. A provider timeout may have been billed and is not retried.
+
+Return values pass `contracts/preset.schema.json` via the existing strict Python validator. Model candidates require exactly `name`, `description`, `parameters`; extra effects/metadata, malformed/nonfinite/duplicate JSON, truncation, wrong model and unsupported values fail with no manual-fixture fallback. Provider/model provenance and quality flags come from trusted code. The final description is a fixed uncalibrated/energy-only warning, so the observed smoke-test failure (model omitted its disclosure) cannot remove the product disclosure. The model's description is validated but is not shown to users.
+
+## App wiring acceptance
+
+1. The Generate action requires a ready, unexpired job and explicit confirmed passage. Read its metrics on the server. Missing provider configuration is an actionable disabled state.
+2. One generation action per job/reference may run at once. Cache a successful result for that exact reference; retries after ambiguous failures must be deliberate and consume a new allowance. Changing/reconfirming the interval invalidates old results and any late response. Do not hold the main job-store lock across the provider HTTP call.
+3. Show generating/ready/failed status independently of successful separation; a model failure must keep the valid separated audio/reference usable. Never invent a preset on failure.
+4. Show the generated starting preset with explicit missing-calibration/target-energy-only/uncertain-match labels. Require deliberate Apply; existing six controls stay editable. Preserve raw/backing players outside the guitar processing chain. No automatic loud playback.
+5. Cover ready/expired/missing reference, duplicate generation, provider disabled/error, invalid response, changed-reference late completion, successful apply and preserved editable controls in API/UI checks. Inject a fake transport only in tests; label test evidence as such. No additional paid model call is authorized by this integration request.
+
+The additive route/job fields below remain reviewable in #1/#6; this implementation does not silently freeze a shared contract.
+
+## Local route and UI flow
+
+- Confirm a passage using the existing reference endpoint. Each confirmation increments `result.reference_revision`, clears prior generation, and invalidates late responses even when the same bounds are reconfirmed.
+- `POST /api/jobs/{id}/preset` accepts ONLY `{reference_revision: <whole number>}`. The server loads the matching confirmed reference and returns HTTP 202 generation state. Missing/expired/unconfirmed/stale references fail before provider work; client metrics/paths are rejected.
+- `GET /api/jobs/{id}` keeps separation `status: ready`; its independent `generation` contains a request UUID, reference revision and `generating|ready|failed`, plus validated `preset` or sanitized `error`. Duplicate in-flight/successful requests reuse that attempt/result. A failed attempt is retried only by another deliberate action.
+- One preset thread runs independently of the separator. The store lock is released over provider I/O. Active generation pins its files; queued work rechecks expiry/revision before reserving budget. Restart fails in-flight generation without resetting the ledger. Provider/storage failures never convert a successful separation into failure or silently apply a fallback.
+- After generation, edit the existing six controls and press **Apply starting preset**. Apply does not start playback. **Play test signal** is explicitly synthetic; a selected dry recording is local-only and is not source calibration. Further edits update the applied amp; preview/backing playback stops amp audition. Changing the passage unmounts/disposes the old audition and clears its candidate.
+
+The panel owns its isolated AudioEngine. When Shazlin moves the flow into Tone Match, choose one engine owner and preserve its stop/dispose/device lifecycle; do not run two competing amp engines. Reuse the API client/parser and trusted warnings rather than rebuilding a separate job contract.
+
+## Runtime configuration
+
+The existing private `services/api/.env` stays unchanged. Environment variables override the same names in that file. Only the official fixed HTTPS Nano endpoint is accepted; redirects cannot forward the credential. No dependency is added.
+
+```dotenv
+NEBIUS_API_KEY=
+NEBIUS_BASE_URL=https://api.tokenfactory.nebius.com/v1
+NEBIUS_MODEL=nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B
+# Default disabled. Set only an explicitly approved separate runtime allowance.
+NEBIUS_BUDGET_USD=0
+NEBIUS_MAX_REQUESTS=0
+```
+
+The previous US$0.10 / three-request experiment is finished; do not reuse its unused dollars as authorization for more requests. Integrate without changing the real .env or making live calls. Add the two zero-default fields to .env.example and explain activation only when the split includes that file.
+
+The local starter accepts at most US$1 and 100 configured requests; these are software ceilings, not approved spending. The durable `data/preset-inference/budget.json` reserves US$0.01608864 BEFORE each call. This overcounts an entire 262144-token input context plus 1500 completion tokens at the public Nano rates US$0.06/US$0.24 per million checked 27 October 2026. Recheck rates/model context before enabling a new allowance. The request itself is much smaller. Limits are cumulative against that directory; restart does not reset them. Corrupt/busy budget data fails closed. Errors/timeouts retain the reservation; do not delete/reset this ledger to retry. Local reservation is not a provider-side billing cap or invoice. Cloud deployment needs its own access/rate/budget design.
+
+## Current evidence and remaining gaps
+
+Existing real Nano smoke: 3/3 responses satisfy the six-control preset schema, 2/3 satisfy all original checks, with inconsistent settings for identical synthetic inputs. That is access/format evidence only. The integrated provider/API/browser checks use injected transport; the browser harness uses synthetic separation input and a preset named TEST ONLY. They establish wiring, warnings, controls/lifecycle and cost guards, not hosted generation, real source calibration, listening quality or tone similarity. See `artifacts/nebius-model-access-20261027T143605Z/RESULTS.md` for the earlier real results. No additional paid request is authorized or performed by this integration.
+
+Official references: [chat completion limits](https://docs.tokenfactory.nebius.com/api-reference/inference/create-chat-completion), [public model/rate catalog](https://tokenfactory.nebius.com/api/public/models_info).

@@ -148,7 +148,7 @@ Use simple semantic controls first. Show stage names instead of fabricated progr
 
 ## 6. Shared contract to freeze first
 
-This section describes the target contract. The [local separation checkpoint](LOCAL_SEPARATION.md) implements a proposed separation-only upload/job/audio/reference boundary, without tone features or a preset result. The table below remains the fuller target and is not an implemented/frozen contract. `contracts/preset.schema.json` covers only implemented gain/drive/EQ/master controls and still needs team review in issue #1. See DEVELOPMENT.md for setup and current limits.
+This section describes the target contract. The [local workflow](LOCAL_SEPARATION.md) implements proposed upload/job/audio/reference and separate [starting-preset](PRESET_GENERATION.md) boundaries. The proposer uses target energy only, without source calibration or spectral tone matching; runtime generation is disabled by default. The table below remains the fuller target and is not an implemented/frozen contract. `contracts/preset.schema.json` covers implemented gain/drive/EQ/master controls and still needs team review in issue #1. See DEVELOPMENT.md for setup and current limits.
 
 | Interface | Initial shape |
 |---|---|

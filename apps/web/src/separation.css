@@ -11,4 +11,7 @@
 .separation-page .interval-fields input { width: 140px; padding: 12px; border: 1px solid #6b5548; border-radius: 8px; background: #1a1311; color: var(--text); }
 .separation-page code { overflow-wrap: anywhere; }
 .separation-page a { color: var(--accent); }
+.separation-page .starting-preset { margin-top: 20px; }
+.separation-page .preset-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; margin: 16px 0; }
+.separation-page .preset-actions button { margin: 0; }
 @media (max-width: 1000px) { .separation-page .players { grid-template-columns: 1fr; } }
