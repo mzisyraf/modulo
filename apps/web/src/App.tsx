@@ -1,10 +1,12 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { AudioEngine, type LiveInputInfo } from "@modulo/audio";
+import { AudioEngine, type CalibrationFlag, type CalibrationTake, type InputLevel, type LiveInputInfo } from "@modulo/audio";
 import { parsePreset, type Preset } from "@modulo/contracts";
 import example from "../../../fixtures/preset.example.json";
 import { AppShell, type AppView } from "./AppShell";
 import { ChoiceMenu } from "./ChoiceMenu";
 import { audioInputOptions, DEFAULT_AUDIO_INPUT, LiveRequestGate, liveInputErrorMessage, type AudioInputOption } from "./liveInput";
+import { encodeMonoWav } from "./localAudio";
+import { projectTitle, upsertProject } from "./projectSessions";
 
 const initialPreset = parsePreset(example);
 const controls = [
@@ -27,9 +29,31 @@ type ActiveStage = (typeof stages)[number][0];
 type JobStage = "idle" | ActiveStage | "ready" | "failed";
 type FixtureOutcome = "ready" | "low_quality" | "failed";
 type LiveState = "stopped" | "starting" | "live" | "error";
+type CalibrationState = "idle" | "recording" | "complete" | "error";
+type CalibrationPlaybackState = "stopped" | "starting" | "playing" | "error";
 type EngineSource = "none" | "sample" | "live";
 
+interface StoredProject {
+  id: string;
+  updatedAt: number;
+  songFile?: File;
+  dryFile?: File;
+  jobStage: JobStage;
+  fixtureOutcome: FixtureOutcome;
+  preset: Preset;
+  bypass: boolean;
+  calibrationTake?: CalibrationTake;
+}
+
 const wait = (milliseconds: number) => new Promise((resolve) => window.setTimeout(resolve, milliseconds));
+const levelDb = (value: number) => 20 * Math.log10(Math.max(value, 1e-8));
+const meterPercent = (value: number) => Math.max(0, Math.min(100, ((levelDb(value) + 60) / 60) * 100));
+const qualityFlagLabels: Record<CalibrationFlag, string> = {
+  too_short: "The take is under 2 seconds.",
+  silence: "The input is too quiet.",
+  clipping: "The input clipped. Lower the interface gain.",
+  invalid_samples: "The browser returned invalid audio samples.",
+};
 
 export function App() {
   const [view, setView] = useState<AppView>("workspace");
@@ -50,18 +74,29 @@ export function App() {
   const [liveState, setLiveState] = useState<LiveState>("stopped");
   const [liveMessage, setLiveMessage] = useState("Stopped");
   const [liveInfo, setLiveInfo] = useState<LiveInputInfo>();
+  const [inputLevel, setInputLevel] = useState<InputLevel | null>(null);
+  const [calibrationState, setCalibrationState] = useState<CalibrationState>("idle");
+  const [calibrationTake, setCalibrationTake] = useState<CalibrationTake>();
+  const [calibrationMessage, setCalibrationMessage] = useState("Start live input, then record a clean dry chord for up to 10 seconds.");
+  const [calibrationPlaybackState, setCalibrationPlaybackState] = useState<CalibrationPlaybackState>("stopped");
+  const [activeProjectId, setActiveProjectId] = useState<string>(() => crypto.randomUUID());
+  const [savedProjects, setSavedProjects] = useState<StoredProject[]>([]);
   const [sessionKey, setSessionKey] = useState(0);
   const engine = useRef<AudioEngine | null>(null);
   const jobRun = useRef(0);
   const jobRunning = useRef(false);
   const liveRequests = useRef(new LiveRequestGate());
+  const calibrationRun = useRef(0);
   const engineSource = useRef<EngineSource>("none");
   const mixPlayer = useRef<HTMLAudioElement>(null);
   const referencePlayer = useRef<HTMLAudioElement>(null);
+  const calibrationPlayer = useRef<HTMLAudioElement>(null);
   const songUrl = useMemo(() => songFile ? URL.createObjectURL(songFile) : "", [songFile]);
+  const calibrationPlaybackUrl = useMemo(() => calibrationTake ? URL.createObjectURL(encodeMonoWav(calibrationTake.samples, calibrationTake.sampleRate)) : "", [calibrationTake]);
   const processing = stages.some(([stage]) => stage === jobStage);
   const hasResult = jobStage === "ready";
   const currentStageIndex = stages.findIndex(([stage]) => stage === jobStage);
+  const inactiveProjects = savedProjects.filter((project) => project.id !== activeProjectId);
 
   const refreshInputDevices = useCallback(async () => {
     if (!navigator.mediaDevices?.enumerateDevices) {
@@ -87,6 +122,11 @@ export function App() {
     audio.onEnded = () => {
       if (engineSource.current === "live") {
         liveRequests.current.cancel();
+        calibrationRun.current++;
+        setInputLevel(null);
+        setCalibrationState("idle");
+        setCalibrationTake(undefined);
+        setCalibrationMessage("Input disconnected. Reconnect, start live input and record a new take.");
         setLiveState("stopped");
         setLiveMessage("Input disconnected. Refresh the list and start again after reconnecting.");
         void refreshInputDevices();
@@ -124,6 +164,92 @@ export function App() {
   }, [refreshInputDevices]);
 
   useEffect(() => () => { if (songUrl) URL.revokeObjectURL(songUrl); }, [songUrl]);
+  useEffect(() => () => { if (calibrationPlaybackUrl) URL.revokeObjectURL(calibrationPlaybackUrl); }, [calibrationPlaybackUrl]);
+
+  useEffect(() => {
+    if (view !== "tone-match" || liveState !== "live") {
+      setInputLevel(null);
+      return;
+    }
+    let frame = 0;
+    let lastUpdate = 0;
+    const readLevel = (time: number) => {
+      if (time - lastUpdate >= 80) {
+        setInputLevel(engine.current?.getInputLevel() ?? null);
+        lastUpdate = time;
+      }
+      frame = window.requestAnimationFrame(readLevel);
+    };
+    frame = window.requestAnimationFrame(readLevel);
+    return () => window.cancelAnimationFrame(frame);
+  }, [liveState, view]);
+
+  function stopCalibrationPlayback() {
+    const player = calibrationPlayer.current;
+    if (player) {
+      player.pause();
+      player.currentTime = 0;
+    }
+    setCalibrationPlaybackState("stopped");
+  }
+
+  function snapshotActiveProject(): StoredProject {
+    return {
+      id: activeProjectId,
+      updatedAt: Date.now(),
+      songFile,
+      dryFile,
+      jobStage: processing ? "idle" : jobStage,
+      fixtureOutcome,
+      preset,
+      bypass,
+      calibrationTake,
+    };
+  }
+
+  function projectHasProgress(project: StoredProject): boolean {
+    return Boolean(
+      project.songFile
+      || project.dryFile
+      || project.jobStage !== "idle"
+      || project.calibrationTake
+      || project.bypass
+      || project.preset.name !== initialPreset.name
+      || controls.some(([key]) => project.preset.parameters[key] !== initialPreset.parameters[key]),
+    );
+  }
+
+  function openProject(projectId: string) {
+    const project = savedProjects.find((candidate) => candidate.id === projectId);
+    if (!project) return;
+    const current = snapshotActiveProject();
+    if (projectHasProgress(current)) setSavedProjects((projects) => upsertProject(projects, current));
+
+    jobRun.current++;
+    jobRunning.current = false;
+    stopEngineAudio();
+    mixPlayer.current?.pause();
+    referencePlayer.current?.pause();
+    setActiveProjectId(project.id);
+    setSongFile(project.songFile);
+    setDryFile(project.dryFile);
+    setJobStage(project.jobStage);
+    setFixtureOutcome(project.fixtureOutcome);
+    setPreset(project.preset);
+    engine.current?.applyPreset(project.preset);
+    setBypass(project.bypass);
+    engine.current?.setBypass(project.bypass);
+    setCalibrationTake(project.calibrationTake);
+    setCalibrationState(project.calibrationTake ? "complete" : "idle");
+    setCalibrationMessage(project.calibrationTake
+      ? project.calibrationTake.usable ? "Saved calibration sample ready to review." : "Saved sample needs another try."
+      : "Start live input, then record a clean dry chord for up to 10 seconds.");
+    setLiveInfo(undefined);
+    setInputLevel(null);
+    setError("");
+    setSessionKey((currentKey) => currentKey + 1);
+    setView("tone-match");
+  }
 
   function changeControl(key: keyof Preset["parameters"], value: number) {
     const next = parsePreset({ ...preset, parameters: { ...preset.parameters, [key]: value } });
@@ -133,8 +259,16 @@ export function App() {
 
   function stopEngineAudio(message = "Stopped") {
     liveRequests.current.cancel();
+    calibrationRun.current++;
+    const wasRecording = calibrationState === "recording";
     engineSource.current = "none";
     engine.current?.stop();
+    stopCalibrationPlayback();
+    setInputLevel(null);
+    if (wasRecording) {
+      setCalibrationState("idle");
+      setCalibrationMessage("Capture stopped before finishing. Start live input to try again.");
+    }
     setAudioState("Stopped");
     setLiveState("stopped");
     setLiveMessage(message);
@@ -177,6 +311,7 @@ export function App() {
 
   async function play(useFile: boolean) {
     liveRequests.current.cancel();
+    stopCalibrationPlayback();
     engineSource.current = "sample";
     setLiveState("stopped");
     setLiveMessage("Stopped — local audition took over the audio engine.");
@@ -202,10 +337,15 @@ export function App() {
     const request = liveRequests.current.begin();
     if (request === undefined) return;
     engineSource.current = "live";
+    stopCalibrationPlayback();
     mixPlayer.current?.pause();
     referencePlayer.current?.pause();
     setAudioState("Stopped");
     setError("");
+    calibrationRun.current++;
+    setCalibrationState("idle");
+    setCalibrationTake(undefined);
+    setCalibrationMessage("Once the level looks healthy, record one clean dry chord.");
     setLiveInfo(undefined);
     setLiveState("starting");
     setLiveMessage("Starting… Allow microphone access if your browser asks.");
@@ -230,6 +370,80 @@ export function App() {
       setLiveMessage(liveInputErrorMessage(failure));
       await refreshInputDevices();
     }
+  }
+
+  async function recordCalibration() {
+    if (liveState !== "live" || !engine.current || calibrationState === "recording") return;
+    stopCalibrationPlayback();
+    const run = ++calibrationRun.current;
+    setCalibrationTake(undefined);
+    setCalibrationState("recording");
+    setCalibrationMessage("Recording dry input… Play one clean chord, then finish, or wait for 10 seconds.");
+    try {
+      const take = await engine.current.startCalibration(10);
+      if (run !== calibrationRun.current) return;
+      setCalibrationTake(take);
+      setCalibrationState("complete");
+      setCalibrationMessage(take.usable
+        ? "Take captured. The local level check passed."
+        : "This take needs another try. Review the notes below.");
+    } catch (failure) {
+      if (run !== calibrationRun.current) return;
+      if (failure instanceof DOMException && failure.name === "AbortError") {
+        setCalibrationState("idle");
+        setCalibrationMessage("Take discarded. Record again when you’re ready.");
+        return;
+      }
+      setCalibrationState("error");
+      setCalibrationMessage(failure instanceof Error ? failure.message : "Calibration capture failed. Try again.");
+    }
+  }
+
+  function finishCalibration() {
+    if (calibrationState !== "recording") return;
+    setCalibrationMessage("Finishing the take…");
+    engine.current?.finishCalibration();
+  }
+
+  function discardCalibration(message = "Take discarded. Record again when you’re ready.") {
+    calibrationRun.current++;
+    engine.current?.cancelCalibration();
+    stopCalibrationPlayback();
+    setCalibrationTake(undefined);
+    setCalibrationState("idle");
+    setCalibrationMessage(message);
+  }
+
+  async function playCalibrationTake() {
+    const player = calibrationPlayer.current;
+    if (!player || !calibrationPlaybackUrl) return;
+    if (calibrationPlaybackState === "playing") {
+      stopCalibrationPlayback();
+      return;
+    }
+
+    stopEngineAudio("Stopped — calibration review took over the audio output.");
+    mixPlayer.current?.pause();
+    referencePlayer.current?.pause();
+    player.currentTime = 0;
+    setCalibrationPlaybackState("starting");
+    try {
+      await player.play();
+      setCalibrationPlaybackState("playing");
+    } catch (failure) {
+      setCalibrationPlaybackState("error");
+      setCalibrationMessage(failure instanceof Error ? failure.message : "The calibration sample could not play.");
+    }
+  }
+
+  function changeLiveDevice(deviceId: string) {
+    discardCalibration("Input changed. Start live input and record a new take.");
+    setSelectedDeviceId(deviceId);
+  }
+
+  function changeLiveChannel(value: string) {
+    discardCalibration("Channel changed. Start live input and record a new take.");
+    setChannel(Number(value) as 0 | 1);
   }
 
   async function loadApiExample() {
@@ -260,6 +474,9 @@ export function App() {
   }
 
   function startNewToneMatch() {
+    const currentProject = snapshotActiveProject();
+    if (projectHasProgress(currentProject)) setSavedProjects((projects) => upsertProject(projects, currentProject));
+
     jobRun.current++;
     jobRunning.current = false;
     stopEngineAudio();
@@ -275,6 +492,9 @@ export function App() {
     engine.current?.setBypass(false);
     setError("");
     setLiveInfo(undefined);
+    setInputLevel(null);
+    discardCalibration("Start live input, then record a clean dry chord for up to 10 seconds.");
+    setActiveProjectId(crypto.randomUUID());
     setSessionKey((current) => current + 1);
     setView("tone-match");
   }
@@ -292,7 +512,7 @@ export function App() {
           <div className="amp-preview" aria-hidden="true"><div className="amp-grille" /><div className="amp-panel"><span /><span /><span /><span /></div></div>
           <div className="project-copy">
             <span className="project-kicker">LOCAL PROJECT</span>
-            <h3>Untitled Tone Match</h3>
+            <h3>{projectTitle(songFile?.name)}</h3>
             <p>{preset.name} · Custom amp preset</p>
             <div className="project-meta"><span className={hasResult ? "state-dot complete" : "state-dot"} />{hasResult ? "Tone ready to preview" : processing ? "Building your demo tone" : songFile ? "Song added — ready to continue" : "No reference song added yet"}</div>
           </div>
@@ -303,7 +523,8 @@ export function App() {
 
       <section className="projects-section" aria-labelledby="projects-heading">
         <div className="section-heading"><div><span className="step">YOUR PROJECTS</span><h2 id="projects-heading">Recently updated</h2></div></div>
-        <div className="empty-projects"><div className="empty-art" aria-hidden="true"><span className="accent-coral" /><span className="accent-lavender" /><span className="accent-mint" /></div><div><h3>Your next tone starts here</h3><p>Create another project when you’re ready to match a song’s guitar tone.</p></div><button className="secondary" onClick={startNewToneMatch}>Start a project</button></div>
+        {inactiveProjects.length > 0 && <div className="project-list">{inactiveProjects.map((project) => <article className="saved-project" key={project.id}><div className="saved-project-art" aria-hidden="true"><span>MOD</span></div><div><span className="project-kicker">SAVED IN THIS TAB</span><h3>{projectTitle(project.songFile?.name)}</h3><p>{project.songFile?.name ?? "No reference song"} · {project.jobStage === "ready" ? "Tone ready" : project.jobStage === "failed" ? "Needs attention" : project.calibrationTake ? "Calibration captured" : "In progress"}</p></div><button className="secondary" onClick={() => openProject(project.id)}>Open project</button></article>)}</div>}
+        <div className="empty-projects"><div className="empty-art" aria-hidden="true"><span className="accent-coral" /><span className="accent-lavender" /><span className="accent-mint" /></div><div><h3>{inactiveProjects.length ? "Start another tone" : "Your next tone starts here"}</h3><p>{inactiveProjects.length ? "Your earlier projects stay available above while this tab remains open." : "Create another project when you’re ready to match a song’s guitar tone."}</p></div><button className="secondary" onClick={startNewToneMatch}>Start a project</button></div>
       </section>
     </div>}
 
@@ -333,7 +554,40 @@ export function App() {
       <div className="grid">
         <section aria-labelledby="amp-title"><span className="step">04 / PRESET</span><h2 id="amp-title">{preset.name}</h2><p>{preset.description}</p><div className="provenance"><strong>Demo preset</strong><span>Manually made · not generated from your song</span></div><div className="controls">{controls.map(([key, label, min, max, step, unit]) => <label key={key} htmlFor={key}><span>{label}<output>{preset.parameters[key]} {unit}</output></span><input id={key} type="range" min={min} max={max} step={step} value={preset.parameters[key]} onChange={(event) => changeControl(key, Number(event.target.value))} /></label>)}</div><button className="secondary" onClick={() => void loadApiExample()}>Load demo preset</button></section>
         <section aria-labelledby="audition-title"><span className="step">05 / AUDITION</span><h2 id="audition-title">Hear the browser amp</h2><p>Working gain, drive and EQ. Start at a comfortable listening level.</p><button disabled={busy} onClick={() => void play(false)}>Play test signal</button><p className="hint">A two-second synthesized pluck, not an isolated guitar or AI result.</p><label className="file-label" htmlFor="dry-file">Dry guitar recording · local audition only</label><input key={`dry-${sessionKey}`} id="dry-file" type="file" accept="audio/*" onChange={(event) => setDryFile(event.target.files?.[0])} /><button className="secondary" disabled={!dryFile || busy} onClick={() => void play(true)}>Play dry recording</button><label className="toggle"><input type="checkbox" checked={bypass} onChange={(event) => { setBypass(event.target.checked); engine.current?.setBypass(event.target.checked); }} />Bypass drive and EQ</label><button className="stop" onClick={() => stopEngineAudio()}>Stop audio</button><p role="status">{audioState}</p></section>
-        <section aria-labelledby="live-title"><span className="step">06 / LIVE INPUT</span><h2 id="live-title">Connect your guitar</h2><p>Use a local audio interface to play through the same gain, drive, EQ and bypass controls. Song analysis above remains a guided demo.</p><label className="select-label" htmlFor="device">Input device</label><ChoiceMenu id="device" kind="device" searchable value={selectedDeviceId} disabled={!inputDevices.length || liveState === "starting" || liveState === "live"} onChange={setSelectedDeviceId} options={inputDevices.map((device) => ({ label: device.label, value: device.deviceId }))} placeholder="No audio inputs found" /><button className="secondary compact-action" disabled={liveState === "starting" || liveState === "live"} onClick={() => void refreshInputDevices()}>Refresh inputs</button><label className="select-label" htmlFor="channel">Channel</label><ChoiceMenu id="channel" value={String(channel)} disabled={!selectedDeviceId || liveState === "starting" || liveState === "live"} onChange={(value) => setChannel(Number(value) as 0 | 1)} options={[{ label: "Input 1", value: "0" }, { label: "Input 2", value: "1" }]} placeholder="Choose a channel" /><div className="live-actions"><button disabled={!selectedDeviceId || liveState === "starting" || liveState === "live"} onClick={() => void startLiveInput()}>Start live input</button><button className="stop" disabled={liveState !== "starting" && liveState !== "live"} onClick={() => stopEngineAudio()}>Stop</button></div><p className="hint">{deviceMessage} Device names may appear after the first permission grant.</p><p className={`live-status ${liveState}`} role="status"><strong>{liveState === "starting" ? "Starting" : liveState === "live" ? "Live" : liveState === "error" ? "Error" : "Stopped"}</strong><span>{liveMessage}</span></p>{liveInfo && <dl className="capture-info"><div><dt>Capture sample rate</dt><dd>{liveInfo.settings.sampleRate ?? "unknown"}</dd></div><div><dt>Capture channels</dt><dd>{liveInfo.settings.channelCount ?? "unknown"}</dd></div><div><dt>Audio-context rate</dt><dd>{liveInfo.contextSampleRate}</dd></div><div><dt>Echo cancellation</dt><dd>{liveInfo.settings.echoCancellation === undefined ? "unknown" : liveInfo.settings.echoCancellation ? "on" : "off"}</dd></div><div><dt>Noise suppression</dt><dd>{liveInfo.settings.noiseSuppression === undefined ? "unknown" : liveInfo.settings.noiseSuppression ? "on" : "off"}</dd></div><div><dt>Automatic gain</dt><dd>{liveInfo.settings.autoGainControl === undefined ? "unknown" : liveInfo.settings.autoGainControl ? "on" : "off"}</dd></div>{liveInfo.baseLatencySeconds !== undefined && <div><dt>Browser base estimate</dt><dd>{(liveInfo.baseLatencySeconds * 1000).toFixed(1)} ms</dd></div>}{liveInfo.outputLatencySeconds !== undefined && <div><dt>Browser output estimate</dt><dd>{(liveInfo.outputLatencySeconds * 1000).toFixed(1)} ms</dd></div>}</dl>}</section>
+        <section aria-labelledby="live-title" className="live-panel">
+          <span className="step">06 / LIVE INPUT</span><h2 id="live-title">Connect your guitar</h2>
+          <p>Use a local audio interface to play through the same gain, drive, EQ and bypass controls. Song analysis above remains a guided demo.</p>
+          <label className="select-label" htmlFor="device">Input device</label>
+          <ChoiceMenu id="device" kind="device" searchable value={selectedDeviceId} disabled={!inputDevices.length || liveState === "starting" || liveState === "live"} onChange={changeLiveDevice} options={inputDevices.map((device) => ({ label: device.label, value: device.deviceId }))} placeholder="No audio inputs found" />
+          <button className="secondary compact-action" disabled={liveState === "starting" || liveState === "live"} onClick={() => void refreshInputDevices()}>Refresh inputs</button>
+          <label className="select-label" htmlFor="channel">Channel</label>
+          <ChoiceMenu id="channel" value={String(channel)} disabled={!selectedDeviceId || liveState === "starting" || liveState === "live"} onChange={changeLiveChannel} options={[{ label: "Input 1", value: "0" }, { label: "Input 2", value: "1" }]} placeholder="Choose a channel" />
+          <div className="live-actions"><button disabled={!selectedDeviceId || liveState === "starting" || liveState === "live"} onClick={() => void startLiveInput()}>Start live input</button><button className="stop" disabled={liveState !== "starting" && liveState !== "live"} onClick={() => stopEngineAudio()}>Stop</button></div>
+          <p className="hint">{deviceMessage} Device names may appear after the first permission grant.</p>
+          <p className={`live-status ${liveState}`} role="status"><strong>{liveState === "starting" ? "Starting" : liveState === "live" ? "Live" : liveState === "error" ? "Error" : "Stopped"}</strong><span>{liveMessage}</span></p>
+
+          <div className="calibration" aria-labelledby="calibration-title">
+            <div className="calibration-heading"><div><span className="step">INPUT CHECK</span><h3 id="calibration-title">Set a clean dry level</h3></div><span className={`calibration-chip ${calibrationState}`}>{calibrationState === "recording" ? "Recording" : calibrationState === "complete" ? calibrationTake?.usable ? "Ready" : "Retry" : calibrationState === "error" ? "Error" : liveState === "live" ? "Ready" : "Waiting"}</span></div>
+            <p>Watch the meter while you play, then capture one chord. This checks local input quality only; it does not identify the chord or analyse tone.</p>
+            <div className={`input-meter ${inputLevel?.clipping ? "is-clipping" : ""}`}>
+              <div className="meter-label"><span>Dry input</span><output>{inputLevel ? `${levelDb(inputLevel.rms).toFixed(1)} dBFS` : "— dBFS"}</output></div>
+              <div className="meter-track" role="meter" aria-label="Dry guitar input level" aria-valuemin={-60} aria-valuemax={0} aria-valuenow={inputLevel ? Math.round(levelDb(inputLevel.rms)) : undefined} aria-valuetext={inputLevel ? `${levelDb(inputLevel.rms).toFixed(1)} decibels full scale` : "No active input"}><span className="meter-zone" /><span className="meter-fill" style={{ width: `${inputLevel ? meterPercent(inputLevel.rms) : 0}%` }} /><span className="meter-peak" style={{ left: `${inputLevel ? meterPercent(inputLevel.peak) : 0}%` }} /></div>
+              <div className="meter-scale"><span>−60</span><span>Good level</span><span>0</span></div>
+            </div>
+            {calibrationTake && <audio className="calibration-audio" ref={calibrationPlayer} src={calibrationPlaybackUrl} preload="metadata" onEnded={() => setCalibrationPlaybackState("stopped")} />}
+            <div className="calibration-actions">
+              {calibrationState === "idle" && <button disabled={liveState !== "live"} onClick={() => void recordCalibration()}>Record</button>}
+              {calibrationState === "recording" && <><button onClick={finishCalibration}>Finish</button><button className="secondary" onClick={() => discardCalibration()}>Discard</button></>}
+              {calibrationState === "complete" && <><button className="review-action" disabled={calibrationPlaybackState === "starting"} onClick={() => void playCalibrationTake()}>{calibrationPlaybackState === "playing" ? "Stop sample" : calibrationPlaybackState === "starting" ? "Starting…" : "Play sample"}</button><button disabled={liveState !== "live"} onClick={() => void recordCalibration()}>{liveState === "live" ? calibrationTake?.usable ? "Record again" : "Retry" : "Start live to record again"}</button><button className="secondary" onClick={() => discardCalibration()}>Discard</button></>}
+              {calibrationState === "error" && <><button disabled={liveState !== "live"} onClick={() => void recordCalibration()}>Retry</button><button className="secondary" onClick={() => discardCalibration()}>Discard</button></>}
+            </div>
+            <p className={`calibration-status ${calibrationState}`} role="status">{calibrationMessage}</p>
+            {calibrationTake && <div className={`take-summary ${calibrationTake.usable ? "usable" : "needs-retry"}`}><div><strong>{calibrationTake.durationSeconds.toFixed(1)} s take</strong><span>{calibrationTake.sampleRate} Hz · peak {levelDb(calibrationTake.level.peak).toFixed(1)} dBFS · RMS {levelDb(calibrationTake.level.rms).toFixed(1)} dBFS</span></div>{calibrationTake.usable ? <p>Input level looks usable for the next local calibration step.</p> : <ul>{calibrationTake.qualityFlags.map((flag) => <li key={flag}>{qualityFlagLabels[flag]}</li>)}</ul>}</div>}
+            <p className="hint">This temporary sample stays in browser memory only. If you change the interface gain, guitar or pickup, discard it and calibrate again.</p>
+          </div>
+
+          {liveInfo && <dl className="capture-info"><div><dt>Capture sample rate</dt><dd>{liveInfo.settings.sampleRate ?? "unknown"}</dd></div><div><dt>Capture channels</dt><dd>{liveInfo.settings.channelCount ?? "unknown"}</dd></div><div><dt>Audio-context rate</dt><dd>{liveInfo.contextSampleRate}</dd></div><div><dt>Echo cancellation</dt><dd>{liveInfo.settings.echoCancellation === undefined ? "unknown" : liveInfo.settings.echoCancellation ? "on" : "off"}</dd></div><div><dt>Noise suppression</dt><dd>{liveInfo.settings.noiseSuppression === undefined ? "unknown" : liveInfo.settings.noiseSuppression ? "on" : "off"}</dd></div><div><dt>Automatic gain</dt><dd>{liveInfo.settings.autoGainControl === undefined ? "unknown" : liveInfo.settings.autoGainControl ? "on" : "off"}</dd></div>{liveInfo.baseLatencySeconds !== undefined && <div><dt>Browser base estimate</dt><dd>{(liveInfo.baseLatencySeconds * 1000).toFixed(1)} ms</dd></div>}{liveInfo.outputLatencySeconds !== undefined && <div><dt>Browser output estimate</dt><dd>{(liveInfo.outputLatencySeconds * 1000).toFixed(1)} ms</dd></div>}</dl>}
+        </section>
       </div>
       {error && <p className="error" role="alert">{error}</p>}
       <footer>Song analysis is simulated · live guitar and audition audio run locally in this browser</footer>
