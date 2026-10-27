@@ -96,3 +96,87 @@ available, preferably on the actual Windows demo rig:
    any extra converters/routing included in the measurement.
 6. Post listening notes, errors, dropouts and blockers alongside the tested
    commit. Keep #4 open until the affected humans accept actual rig evidence.
+
+## Dry calibration capture (steps 1–3, proposed API)
+
+This audio-package addition is for Shazlin/Isyraf integration review. It does
+not add a calibration screen, identify chord names, extract source-tone
+features or upload audio. A completed take stays in caller-owned memory.
+Performance recording after the amp/effects remains separate future work.
+
+Start live input using the existing user-gesture path, then explicitly capture
+the selected channel:
+
+```ts
+// After a successful startLive(...), on a Record calibration click:
+try {
+  const take = await engine.startCalibration(10);
+  // Automatically resolves after 10 audio seconds, or after finishCalibration().
+  if (!take.usable) {
+    // Show take.qualityFlags and ask for another dry chord take.
+  } else {
+    // Retain take.samples + take.sampleRate for the agreed feature-analysis path.
+    // Do not upload automatically or log take.input.settings/device identifiers.
+  }
+} catch (error) {
+  // AbortError means discard/cancel (including live stop or disconnect).
+  // Other errors should offer a retry; attach this handler immediately.
+}
+
+// From a separate Finish button; leaves live monitoring active:
+engine.finishCalibration();
+// From Discard; rejects the pending startCalibration promise with AbortError:
+engine.cancelCalibration();
+```
+
+`startCalibration(maxSeconds = 10): Promise<CalibrationTake>` requires active
+live input and permits one pending take. Duration must be finite and between
+2 and 15 seconds. It loads a bundled AudioWorklet and records the chosen mono
+channel **before** the app's input gain, drive, EQ and output processing. This
+cannot undo processing already applied by hardware or the capture driver.
+The worklet outputs silence, so it adds no second dry monitoring path.
+
+The take contains:
+
+- `samples`: owned mono `Float32Array` PCM, with no gain normalization applied.
+- `sampleRate`: the audio-context rate (the browser may resample the interface).
+- `durationSeconds`: actual captured sample count divided by that rate.
+- `input`: snapshot of the live channel, capture settings and context/latency
+  diagnostics. Device identifiers in settings stay local.
+- `level`: linear full-scale `peak`, `rms` and `clipping` boolean.
+- `qualityFlags` and `usable`: local input-quality heuristics. `too_short`
+  means less than 2 seconds; `silence` means overall RMS below 0.001 (−60 dBFS);
+  `clipping` means any sample's magnitude is at least 0.99; `invalid_samples`
+  means non-finite input was detected (replaced by zero in returned PCM).
+  Any flag makes `usable` false. These are conservative draft thresholds for
+  rig review, not calibrated confidence, proof of a guitar, named chord
+  recognition, spectral features or proof that a full exercise was played.
+
+The frame count is capped on both the audio thread and main thread. Explicit
+finish flushes queued PCM before resolving; it may produce a flagged short
+take. Finishing before processor setup completes cancels with AbortError.
+Cancel works during module loading as well as capture. Live stop, replacing
+the source/channel, disconnect's `ended` event or engine disposal cancels the
+pending take. Completion/finish releases the recorder nodes/port and leaves
+live input running. If the context stalls, capture rejects after the requested
+duration plus five wall-clock seconds rather than waiting indefinitely.
+Cancellation and completion do not invoke `onEnded`; that callback still
+describes the source's lifecycle.
+
+For a visible level check, poll `engine.getInputLevel(): InputLevel | null`
+using `requestAnimationFrame` while the live view is visible. It reads the
+selected dry input's most recent 2048 samples; `null` means no active live
+input. Use `20 * Math.log10(Math.max(value, 1e-8))` if the UI needs dBFS.
+This meter is a recent snapshot, not a retained peak history or a level-setting
+control. It does not change the signal. Stop polling on view teardown.
+
+Shazlin should expose Record / Finish / Discard / Retry with separate recording
+state and catch the capture promise immediately. Clear old accepted takes when
+the device/channel or physical input gain changes; ask the user to recalibrate
+after guitar/pickup changes. The engine cannot detect physical gain or guitar
+changes. Since the engine does not retain completed takes, the caller owns
+discarding old arrays and deciding when a baseline is accepted. Existing Stop
+and navigation cleanup already call `engine.stop()` and will cancel capture.
+Isyraf should agree a versioned source-feature/transport contract before
+depending on this local PCM shape as a server API. No preset-schema changes
+are needed to use this capture API.
