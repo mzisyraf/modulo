@@ -14,6 +14,8 @@ Still unimplemented: mixed-song upload/separation, automatic reference selection
 
 An offline [reference-selection prototype](ANALYSIS.md) now accepts an already-isolated PCM16 guitar WAV and aligned mix. It is not connected to song analysis or the browser. The [issue #1 contract review](CONTRACT_REVIEW.md) records actual controls, methods and pending team decisions.
 
+For Isyraf's isolated local separator environment and generated-signal GPU check, see [local Demucs testing](DEMUCS.md). Its packages and model cache are separate from the API; the smoke check does not establish real guitar separation quality.
+
 ## Prerequisites
 
 Use Node.js **24.15.0** (see `.nvmrc`) and Python **3.12**. Other Node 24/Python 3.12 patches may work, but use the tested versions for the first team setup. Git is needed to clone/update the repository. All terminal examples below are PowerShell; frontend/audio contributors do not need to run the Python service.

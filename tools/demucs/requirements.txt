@@ -1,0 +1,6 @@
+--extra-index-url https://download.pytorch.org/whl/cu118
+demucs==4.0.1
+torch==2.0.1+cu118
+torchaudio==2.0.2+cu118
+numpy==1.26.4
+soundfile==0.13.1
