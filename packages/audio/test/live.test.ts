@@ -47,6 +47,10 @@ class Context {
   media: Node[] = [];
   samples: Node[] = [];
   splitters: Node[] = [];
+  audioWorklet = { addModule: async (_url: string) => {} };
+  createAnalyser() {
+    return Object.assign(new Node(), { fftSize: 2048, getFloatTimeDomainData: (data: Float32Array) => { data.fill(0.25); } });
+  }
   constructor() { Context.current = this; }
   createGain() { return new Node(); }
   createWaveShaper() { return new Node(); }
@@ -61,6 +65,22 @@ class Context {
   async close() { this.state = "closed"; }
 }
 
+class Worklet extends Node {
+  static current: Worklet;
+  onprocessorerror: (() => void) | null = null;
+  messages: unknown[] = [];
+  closed = false;
+  port = {
+    onmessage: null as ((event: { data: unknown }) => void) | null,
+    postMessage: (message: unknown) => { this.messages.push(message); },
+    close: () => { this.closed = true; },
+  };
+  constructor(_context: unknown, name: string, publicOptions: unknown) {
+    super(); assert.equal(name, "modulo-calibration"); Worklet.current = this;
+  }
+  send(data: unknown) { this.port.onmessage?.({ data }); }
+}
+
 function deferred<T>() {
   let resolve!: (value: T) => void;
   let reject!: (reason: unknown) => void;
@@ -69,11 +89,12 @@ function deferred<T>() {
 }
 
 async function withEngine(run: (engine: AudioEngine, setCapture: (capture: (constraints: MediaStreamConstraints) => Promise<Stream>) => void) => Promise<void>) {
-  const originals = Object.fromEntries(["AudioContext", "MediaStream", "navigator"].map((key) => [key, Object.getOwnPropertyDescriptor(globalThis, key)]));
+  const originals = Object.fromEntries(["AudioContext", "MediaStream", "navigator", "AudioWorkletNode"].map((key) => [key, Object.getOwnPropertyDescriptor(globalThis, key)]));
   let capture = async (_constraints: MediaStreamConstraints) => new Stream();
   Object.defineProperties(globalThis, {
     AudioContext: { configurable: true, value: Context },
     MediaStream: { configurable: true, value: Stream },
+    AudioWorkletNode: { configurable: true, value: Worklet },
     navigator: { configurable: true, value: { mediaDevices: { getUserMedia: (constraints: MediaStreamConstraints) => capture(constraints) } } },
   });
   const engine = new AudioEngine(parsePreset(example));
@@ -112,6 +133,103 @@ test("live capture requests exact device/unprocessed audio and routes only the s
   assert.equal(stream.tracks[0].stops, 1);
   assert.ok(Context.current.media[0].disconnected);
   assert.ok(Context.current.splitters[0].disconnected);
+}));
+
+test("calibration requires live input, meters the dry channel, captures PCM and leaves monitoring active", () => withEngine(async (engine) => {
+  await assert.rejects(engine.startCalibration(), /Start live input/);
+  assert.equal(engine.getInputLevel(), null);
+  await engine.startLive(undefined, 1);
+  const level = engine.getInputLevel();
+  assert.equal(level?.peak, 0.25);
+  const pending = engine.startCalibration(2);
+  await setImmediate();
+  const capture = Worklet.current;
+  const routes = Context.current.splitters[0].connections;
+  assert.equal(routes.at(-1)?.node, capture);
+  assert.equal(routes.at(-1)?.output, 1);
+  capture.send({ samples: new Float32Array(96000).fill(0.125) });
+  engine.finishCalibration();
+  assert.deepEqual(capture.messages, ["finish"]);
+  capture.send({ done: true });
+  const take = await pending;
+  assert.equal(take.usable, true);
+  assert.equal(take.input.channel, 1);
+  assert.equal(take.sampleRate, 48000);
+  assert.equal(take.level.peak, 0.125);
+  assert.ok(capture.closed && capture.disconnected);
+  assert.equal(Context.current.media[0].disconnected, false);
+}));
+
+test("stop, cancel and disconnect discard active calibration; retry is possible", async () => {
+  for (const action of ["stop", "cancel", "disconnect", "dispose"]) await withEngine(async (engine, setCapture) => {
+    const stream = new Stream(); setCapture(async () => stream);
+    await engine.startLive();
+    const pending = engine.startCalibration();
+    const rejection = assert.rejects(pending, { name: "AbortError" });
+    await setImmediate();
+    const capture = Worklet.current;
+    if (action === "stop") engine.stop();
+    if (action === "cancel") engine.cancelCalibration();
+    if (action === "disconnect") stream.tracks[0].end();
+    if (action === "dispose") await engine.dispose();
+    await rejection;
+    assert.ok(capture.closed && capture.disconnected);
+    if (action === "cancel") {
+      const retry = engine.startCalibration();
+      const rejected = assert.rejects(retry, { name: "AbortError" });
+      engine.cancelCalibration(); await rejected;
+    } else assert.equal(engine.getInputLevel(), null);
+  });
+});
+
+test("stop during module load cannot create a late recorder; duplicate capture is rejected", () => withEngine(async (engine) => {
+  await engine.startLive();
+  const loading = deferred<void>();
+  Context.current.audioWorklet.addModule = () => loading.promise;
+  const original = Worklet.current;
+  const pending = engine.startCalibration();
+  const rejection = assert.rejects(pending, { name: "AbortError" });
+  await assert.rejects(engine.startCalibration(), /already running/);
+  engine.stop(); loading.resolve(); await rejection; await setImmediate();
+  assert.equal(Worklet.current, original);
+}));
+
+test("module/processor errors and unsupported durations are actionable and allow retry", () => withEngine(async (engine) => {
+  await engine.startLive();
+  for (const seconds of [1, 16, NaN]) await assert.rejects(engine.startCalibration(seconds), /duration/);
+  Context.current.audioWorklet.addModule = async () => { throw new Error("Load failed"); };
+  await assert.rejects(engine.startCalibration(), /Load failed/);
+  Context.current.audioWorklet.addModule = async () => {};
+  const pending = engine.startCalibration();
+  const failure = assert.rejects(pending, /processor failed/);
+  await setImmediate(); Worklet.current.onprocessorerror!(); await failure;
+  assert.ok(Worklet.current.closed);
+}));
+
+test("stalled calibration times out and releases its processor", (t) => withEngine(async (engine) => {
+  await engine.startLive();
+  t.mock.timers.enable({ apis: ["setTimeout"] });
+  const pending = engine.startCalibration(2);
+  const failure = assert.rejects(pending, /stalled/);
+  await setImmediate();
+  t.mock.timers.tick(7000);
+  await failure;
+  assert.ok(Worklet.current.closed && Worklet.current.disconnected);
+  t.mock.timers.reset();
+}));
+
+test("finish before setup cancels and live-info mutation cannot change the selected capture channel", () => withEngine(async (engine) => {
+  const info = await engine.startLive(undefined, 1);
+  assert.ok(info); info.channel = 0; info.settings.sampleRate = 1;
+  const pending = engine.startCalibration();
+  const failure = assert.rejects(pending, { name: "AbortError" });
+  engine.finishCalibration(); await failure;
+  const next = engine.startCalibration(2); await setImmediate();
+  Worklet.current.send({ samples: new Float32Array(96000).fill(0.1) });
+  Worklet.current.send({ done: true });
+  const take = await next;
+  assert.equal(take.input.channel, 1);
+  assert.equal(take.input.settings.sampleRate, 48000);
 }));
 
 test("stop/dispose while permission is pending releases late capture without connecting it", async () => {
