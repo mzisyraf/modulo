@@ -76,7 +76,7 @@ From the root:
 npm run check
 ```
 
-This runs TypeScript checking, shared-contract/audio unit checks and the production frontend build.
+This runs TypeScript checking, shared-contract/audio/frontend-helper unit checks and the production frontend build. Frontend helpers cover device labels/filtering, duplicate/stale live requests and useful capture-error messages.
 
 For API tests:
 
@@ -86,6 +86,17 @@ cd services/api
 ```
 
 Tests cover unsafe/unknown preset values, fixture provenance, truthful unavailable-analysis behaviour, bounded synthetic audio/drive curves and playback cancellation/lifecycle. Unit tests use a fake audio context for lifecycle checks; they do not establish real interface latency, separation quality or hardware compatibility.
+
+The separate [Demucs checks](DEMUCS.md) cover output validation/failure handling without a GPU, followed by an explicit generated-signal CUDA smoke. They use the separator environment, not the API environment.
+
+For a browser integration check, run the fixture API and frontend, then verify:
+
+- Mixed-song selection enables the demo; a running job disables duplicate starts and file changes.
+- Ready results retain manual/demo provenance; the unclear-reference case shows a warning; failure shows no result and Try again can recover after selecting Tone ready.
+- Load demo preset works through the API proxy; real analysis remains unavailable (HTTP 501).
+- Device search and channel selection work; denial gives retry guidance. Live start/stop, disconnection, navigation and late permission grants release capture without reviving stale UI. Controls/bypass must not request capture again.
+
+Synthetic browser media can verify these UI/lifecycle paths without microphone permission. Actual interface capture, audible tone changes, physical disconnect and recorded round-trip latency require the real rig checklist in [the audio package](../packages/audio/README.md). Real clean/distorted/dense music separation, source/target feature quality and authenticated NVIDIA/Nebius presets are separate acceptance gates; fixture success does not satisfy them.
 
 ## First coding tasks by owner
 

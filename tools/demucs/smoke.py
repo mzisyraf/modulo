@@ -10,6 +10,26 @@ import tempfile
 import time
 from importlib.metadata import version
 
+import numpy as np
+import soundfile as sf
+
+
+def validate_stems(directory, frames, rate):
+    stems = {}
+    for stem in ("drums", "bass", "other", "vocals", "guitar", "piano"):
+        path = directory / f"{stem}.wav"
+        samples, output_rate = sf.read(path, dtype="float32", always_2d=True)
+        if output_rate != rate:
+            raise ValueError(f"Unexpected sample rate: {stem}")
+        if samples.shape != (frames, 2):
+            raise ValueError(f"Unexpected length/channels: {stem}")
+        if not np.isfinite(samples).all():
+            raise ValueError(f"Non-finite output: {stem}")
+        if sf.info(path).subtype != "PCM_16":
+            raise ValueError(f"Unexpected PCM format: {stem}")
+        stems[stem] = {"path": str(path), "peak": float(np.abs(samples).max())}
+    return stems
+
 
 def main():
     root = Path(__file__).resolve().parents[2]
@@ -20,8 +40,6 @@ def main():
     if not ffmpeg:
         raise RuntimeError("FFmpeg is missing from the isolated environment.")
 
-    import numpy as np
-    import soundfile as sf
     import torch
 
     if not torch.cuda.is_available():
@@ -47,15 +65,7 @@ def main():
         raise
     elapsed = time.perf_counter() - started
 
-    stems = {}
-    for stem in ("drums", "bass", "other", "vocals", "guitar", "piano"):
-        path = run / "separated" / "htdemucs_6s" / "synthetic" / f"{stem}.wav"
-        samples, output_rate = sf.read(path, dtype="float32", always_2d=True)
-        assert output_rate == rate, f"Unexpected sample rate: {stem}"
-        assert samples.shape == (len(t), 2), f"Unexpected length/channels: {stem}"
-        assert np.isfinite(samples).all(), f"Non-finite output: {stem}"
-        assert sf.info(path).subtype == "PCM_16", f"Unexpected PCM format: {stem}"
-        stems[stem] = {"path": str(path), "peak": float(np.abs(samples).max())}
+    stems = validate_stems(run / "separated" / "htdemucs_6s" / "synthetic", len(t), rate)
 
     result = {
         "status": "passed",

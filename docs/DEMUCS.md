@@ -20,6 +20,16 @@ Sources: [Demucs Windows setup](https://github.com/facebookresearch/demucs/blob/
 
 ## Run the synthetic GPU check
 
+Run the quick failure regressions first; they generate temporary WAVs and mock GPU/model execution, so they need no GPU or model download:
+
+```powershell
+.\tools\demucs\.venv\python.exe -m unittest discover -s tools/demucs -p 'test_*.py' -v
+```
+
+These cover valid outputs, missing/corrupt stems, wrong sample rate/length/channel count/PCM encoding, non-finite decoded samples, missing FFmpeg/CUDA, model failure/timeout, missing outputs after a zero exit, and truthful synthetic success metadata. Validation uses explicit errors and remains active under `python -O`.
+
+Then run the actual model/GPU check:
+
 ```powershell
 .\tools\demucs\.venv\python.exe tools/demucs/smoke.py
 ```
