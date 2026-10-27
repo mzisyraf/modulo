@@ -1,6 +1,6 @@
 # Local separation checkpoint
 
-The separate modulo page at **http://127.0.0.1:5173/separation.html** connects a real local upload to cached `htdemucs_6s` CUDA separation. It provides original mix, combined guitar and guitar-reduced backing players, plus explicit 10–20-second reference confirmation. It needs no guitar/interface. The existing Tone Match page retains its labelled fixture flow; Shazlin's unpublished calibration UI is not included or replaced.
+The separate modulo page at **http://127.0.0.1:5173/separation.html** connects a real local upload to cached `htdemucs_6s` CUDA separation. It provides original mix, combined guitar and guitar-reduced backing players, plus explicit 10–20-second reference confirmation. It needs no guitar/interface. The existing Tone Match page retains its labelled fixture flow and Shazlin's published calibration/session work without modification by this increment. Isyraf chose the separate page while that frontend work was still unpublished; it was subsequently merged from staging.
 
 This is an Isyraf integration preview for #2/#6, with the proposed job boundary in #1/#6 awaiting Shazlin's review. It does not freeze the shared contract or establish broad separation quality, calibration, tone features, NVIDIA/Nebius preset generation, recording or synchronized live play-along acceptance.
 
