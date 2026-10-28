@@ -2,6 +2,7 @@ import { useEffect, useImperativeHandle, useRef, useState, type Ref } from "reac
 import { AudioEngine } from "@modulo/audio";
 import { parsePreset, type Preset } from "@modulo/contracts";
 import schema from "../../../contracts/preset.schema.json";
+import { auditionPreset } from "./auditionPreset";
 import { apiJson, parsePresetGeneration, parseSeparationJob, type PresetGeneration } from "./separation";
 
 export interface PresetAudition { stop(): void }
@@ -120,7 +121,7 @@ export function StartingPresetPanel({ jobId, revision, onPlay, onReferenceChange
       audio.onEnded = () => { if (alive.current && engine.current === audio) setPlaying("Stopped"); };
       engine.current = audio;
     }
-    engine.current.applyPreset(draft); engine.current.setBypass(bypass);
+    engine.current.applyPreset(auditionPreset(draft, bypass)); engine.current.setBypass(bypass);
     setApplied(true); setError("");
   }
 
@@ -129,7 +130,14 @@ export function StartingPresetPanel({ jobId, revision, onPlay, onReferenceChange
     const next = parsePreset({ ...draft, parameters: { ...draft.parameters, [key]: value } });
     setDraft(next); setEdited(true);
     if (onApplyPreset) setApplied(false);
-    else if (applied) engine.current?.applyPreset(next);
+    else if (applied) engine.current?.applyPreset(auditionPreset(next, bypass));
+  }
+
+  function compare(original: boolean) {
+    if (!draft || !applied) return;
+    setBypass(original);
+    engine.current?.applyPreset(auditionPreset(draft, original));
+    engine.current?.setBypass(original);
   }
 
   async function play(useFile: boolean) {
@@ -155,7 +163,20 @@ export function StartingPresetPanel({ jobId, revision, onPlay, onReferenceChange
       <div className="controls">{controls.map(([key, label, step, unit]) => { const bounds = schema.properties.parameters.properties[key]; return <label key={key} htmlFor={`starting-${key}`}><span>{label}<output>{draft.parameters[key]} {unit}</output></span><input id={`starting-${key}`} type="range" min={bounds.minimum} max={bounds.maximum} step={step} value={draft.parameters[key]} onChange={(event) => edit(key, Number(event.target.value))} /></label>; })}</div>
       <button onClick={apply}>Apply starting preset</button><p role="status">{applied ? onApplyPreset ? "Applied to the shared browser amp below. Use its controls, audition or live input; playback remains a separate action." : "Applied to the browser amp. Further edits update the amp; playback remains a separate action." : "Review or edit the controls, then Apply. Nothing is playing automatically."}</p>
       {!onApplyPreset && <>
-      <div className="preset-actions"><button disabled={!applied || startingAudio} onClick={() => void play(false)}>Play test signal</button><button className="stop" disabled={!applied} onClick={stop}>Stop preset audio</button></div><p className="hint">The test signal is synthetic, not a real guitar or a tone-match demonstration.</p><label className="file-label" htmlFor="preset-dry-file">Dry guitar recording · local audition only</label><input id="preset-dry-file" type="file" accept="audio/*" onChange={(event) => { stop(); setDryFile(event.target.files?.[0]); }} /><button className="secondary" disabled={!applied || !dryFile || startingAudio} onClick={() => void play(true)}>Play dry recording</button><p className="hint">A dry file stays in this browser and does not provide source calibration to the model. Reference and backing tracks are never amp inputs.</p><label className="toggle"><input type="checkbox" checked={bypass} disabled={!applied} onChange={(event) => { setBypass(event.target.checked); engine.current?.setBypass(event.target.checked); }} />Bypass drive and EQ</label><p role="status">{playing}</p></>}
+      <div className="guitar-comparison" aria-labelledby="guitar-comparison-title">
+        <span className="step">06 / YOUR GUITAR</span><h2 id="guitar-comparison-title">Compare original and rig</h2>
+        <p>Choose your guitar recording, press Play, and switch modes while it continues from the same position.</p>
+        <label className="file-label" htmlFor="preset-dry-file">Your guitar recording · local audition only</label><input id="preset-dry-file" type="file" accept="audio/*,.wav,.mp3,.m4a" onChange={(event) => { stop(); setDryFile(event.target.files?.[0]); }} />
+        {dryFile && <p className="hint">Selected: {dryFile.name}</p>}
+        <div className="preset-actions" role="group" aria-label="Guitar comparison mode">
+          <button className={bypass ? "selected" : "secondary"} aria-pressed={bypass} disabled={!applied} onClick={() => compare(true)}>Original guitar</button>
+          <button className={!bypass ? "selected" : "secondary"} aria-pressed={!bypass} disabled={!applied} onClick={() => compare(false)}>Rig applied</button>
+        </div>
+        <div className="preset-actions"><button disabled={!applied || !dryFile || startingAudio} onClick={() => void play(true)}>Play guitar recording</button><button className="stop" disabled={!applied} onClick={stop}>Stop preset audio</button><button className="secondary" disabled={!applied || startingAudio} onClick={() => void play(false)}>Play test signal</button></div>
+        <p role="status">{playing} · {bypass ? "Original guitar — input boost, drive and EQ off" : "Rig applied — current preset effects"}</p>
+        <p className="hint">Both modes keep the preset’s output level and output protection; loudness may differ. WAV/MP3 recommended, up to 20 MiB. Playback restarts only when you press Play.</p>
+        <p className="hint">Your recording stays in this browser and is not analysed for source calibration. The extracted song guitar above is the target; it is never fed through this rig. The test signal is synthetic.</p>
+      </div></>}
     </>}
     {error && <p className="error" role="alert">{error}</p>}
   </section>;

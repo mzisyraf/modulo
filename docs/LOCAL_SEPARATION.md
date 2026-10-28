@@ -56,6 +56,14 @@ The repeatable browser regression is `tools/verification/tone-match.browser.js`,
 The waveform/suggestion details and limitations are in [ANALYSIS.md](ANALYSIS.md). Reproduce synthetic UI interactions with `tools/verification/reference-waveform.browser.js` through the Playwright browser runner, against the isolated dev server on port 5174. It intercepts every API request and does not establish listening quality. The existing `tone-match.browser.js` also checks the new selector alongside shared-amp generation behavior.
 
 
+## Recorded-guitar comparison
+
+Open `http://127.0.0.1:5173/separation.html` for the complete local workflow and its four-step guide. Choose/separate a target song, confirm a suggested or manual passage, generate a starting preset, then deliberately Apply. Existing jobs reconnect in the same tab without another separation or generation.
+
+Under **06 / Your guitar**, choose a locally recorded guitar WAV/MP3 (up to 20 MiB), press **Play guitar recording**, and switch **Original guitar / Rig applied** while playback continues from the same position. Original neutralizes preset input gain and bypasses drive/EQ; both modes retain the preset output level and engine output protection. They are not loudness matched, and Original is not a bit-exact export. Edits preserve the selected mode; switching back restores the current rig settings. Stop stops playback; Play restarts it. Video files may need their audio extracted to WAV first.
+
+The separated song guitar is the target, not the input to this comparison. The user's recording stays in the browser; it is still not analysed or supplied to the provider as source calibration. This UI does not establish tone similarity, physical-interface latency or processed-audio export.
+
 ## Windows cleanup and upload recovery
 
 Changing songs or leaving a project releases the native audio source (`pause`, remove `src`, `load`) so old range streams do not retain files. If Windows/OneDrive leaves an empty directory behind after all its files were deleted, retention drops that job from memory and defers the empty-folder cleanup; it cannot occupy a job slot indefinitely. A directory that still contains locked audio continues to return `storage_busy` and requires its player to be closed. The same empty-directory handling applies when recovering jobs at API startup. No arbitrary folder or nonempty locked artifact is silently discarded.
