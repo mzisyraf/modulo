@@ -10,6 +10,7 @@ from starlette.middleware.trustedhost import TrustedHostMiddleware
 from .contracts import example_preset
 from .jobs import JobError, JobStore, MAX_UPLOAD_BYTES
 from .preset_generation import PresetError, PresetGenerator
+from .source_calibration import SourceCalibration
 
 
 class ReferenceInterval(BaseModel):
@@ -21,6 +22,7 @@ class ReferenceInterval(BaseModel):
 class PresetRequest(BaseModel):
     model_config = ConfigDict(strict=True, extra="forbid")
     reference_revision: int
+    source_calibration: SourceCalibration | None = None
 
 
 def create_app(store=None, generator=None):
@@ -74,7 +76,7 @@ def create_app(store=None, generator=None):
     async def validation_error(request, _failure):
         if request.url.path.endswith("/preset"):
             return JSONResponse(status_code=422, content={"error": {
-                "code": "invalid_generation_request", "message": "Supply only the confirmed reference_revision as a whole number.", "retryable": False,
+                "code": "invalid_generation_request", "message": "Supply a whole-number reference_revision and optional valid numeric source_calibration.", "retryable": False,
             }})
         return JSONResponse(status_code=422, content={"error": {
             "code": "invalid_reference", "message": "Supply only whole-second start_seconds and end_seconds.", "retryable": False,
@@ -154,7 +156,8 @@ def create_app(store=None, generator=None):
         if request.app.state.preset_error:
             jobs.get(job_id)
             raise request.app.state.preset_error
-        return jobs.start_generation(job_id, selection.reference_revision, request.app.state.generator)
+        source = selection.source_calibration.model_dump() if selection.source_calibration else None
+        return jobs.start_generation(job_id, selection.reference_revision, request.app.state.generator, source)
 
     @app.get("/api/jobs/{job_id}/audio/{name}")
     def audio_artifact(job_id: str, name: str, request: Request):

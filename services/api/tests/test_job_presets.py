@@ -12,6 +12,52 @@ from app.main import create_app
 from app.preset_generation import PresetError, PresetGenerator
 from test_jobs import success, terminal, upload
 from test_preset_generation import REFERENCE, response
+from test_source_calibration import SOURCE
+
+
+def test_source_identity_scopes_cached_presets_and_rejects_invalid_levels(preset_api):
+    client, store, generator, calls = preset_api
+    job_id, revision = confirmed_job(client)
+    route = f"/api/jobs/{job_id}/preset"
+    payload = {"reference_revision": revision, "source_calibration": SOURCE}
+    assert client.post(route, json=payload).status_code == 202
+    first = wait_generation(client, job_id)["generation"]
+    assert first["source_calibration"] == SOURCE
+    assert first["preset"]["parameters"]["input_gain_db"] == -2
+    assert client.post(route, json=payload).json()["request_id"] == first["request_id"]
+    assert len(calls) == 1
+    changed = {**SOURCE, "id": "b" * 64, "rms_dbfs": -30.0, "peak_dbfs": -12.0}
+    assert client.post(route, json={**payload, "source_calibration": changed}).status_code == 202
+    second = wait_generation(client, job_id)["generation"]
+    assert second["request_id"] != first["request_id"]
+    assert second["preset"]["parameters"]["input_gain_db"] == 6
+    assert len(calls) == 2
+    assert client.post(route, json={**payload, "source_calibration": {**SOURCE, "clipped_fraction": .1}}).status_code == 422
+    assert len(calls) == 2
+    persisted = json.loads((store.directory(job_id) / "state.json").read_text())
+    assert persisted["generation"]["source_calibration"] == changed
+
+
+def test_changed_source_cannot_start_another_inflight_request(preset_api):
+    client, store, generator, calls = preset_api
+    job_id, revision = confirmed_job(client)
+    entered, release = Event(), Event()
+    def delayed(_key, payload):
+        calls.append(payload); entered.set()
+        assert release.wait(10)
+        return response()
+    generator.transport = delayed
+    route = f"/api/jobs/{job_id}/preset"
+    payload = {"reference_revision": revision, "source_calibration": SOURCE}
+    try:
+        first = client.post(route, json=payload).json()
+        assert entered.wait(1)
+        assert client.post(route, json=payload).json()["request_id"] == first["request_id"]
+        assert client.post(route, json={**payload, "source_calibration": {**SOURCE, "id": "b" * 64}}).status_code == 409
+        assert len(calls) == 1
+    finally:
+        release.set()
+    assert wait_generation(client, job_id)["generation"]["source_calibration"] == SOURCE
 
 
 @pytest.fixture

@@ -1,10 +1,12 @@
 // Local separation and reference-scoped starting-preset boundary.
 import { parsePreset, type Preset } from "@modulo/contracts";
+import type { SourceCalibration } from "./recordingCalibration";
 
 export interface PresetGeneration {
   request_id: string;
   reference_revision: number;
   status: "generating" | "ready" | "failed";
+  source_calibration?: SourceCalibration;
   preset?: Preset;
   error?: { code: string; message: string; retryable: boolean };
 }
@@ -51,8 +53,14 @@ export function parsePresetGeneration(value: unknown, revision: number): PresetG
     || !["generating", "ready", "failed"].includes(generation.status)) throw new Error("The preset belongs to an invalid or outdated passage.");
   if (generation.status === "ready") {
     const preset = parsePreset(generation.preset);
+    const source = generation.source_calibration;
+    const flags = source ? ["source_level_calibrated", "spectral_calibration_missing", "target_energy_only", "tone_matching_unverified"] : ["source_calibration_missing", "target_energy_only", "tone_matching_unverified"];
+    if (source && (!/^[0-9a-f]{64}$/.test(source.id) || source.method !== "browser_level_v1"
+      || ![source.rms_dbfs, source.peak_dbfs, source.duration_seconds, source.clipped_fraction].every(Number.isFinite)
+      || source.rms_dbfs < -50 || source.rms_dbfs > source.peak_dbfs || source.peak_dbfs > 0
+      || source.duration_seconds < 3 || source.duration_seconds > 90 || source.clipped_fraction < 0 || source.clipped_fraction >= 0.01)) throw new Error("Invalid source-level calibration.");
     if (preset.provenance.kind !== "generated" || preset.provenance.provider !== "nebius"
-      || !["source_calibration_missing", "target_energy_only", "tone_matching_unverified"].every((flag) => preset.quality_flags.includes(flag))) throw new Error("The starting preset is missing its required provenance or calibration warnings.");
+      || !flags.every((flag) => preset.quality_flags.includes(flag))) throw new Error("The starting preset is missing its required provenance or calibration warnings.");
     return { ...generation, preset };
   }
   if (generation.preset !== undefined || (generation.status === "failed" && typeof generation.error?.message !== "string")) throw new Error("Unsuccessful generation must not contain a preset.");

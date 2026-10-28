@@ -18,6 +18,7 @@ from .contracts import ROOT, validate_preset
 from .job_lock import exclusive_lock
 from .preset_generation import PresetError
 from .reference import reference_options, select_reference
+from .source_calibration import SourceCalibration
 
 MAX_UPLOAD_BYTES = 50 * 1024 * 1024
 MAX_JOBS = 4
@@ -310,7 +311,12 @@ class JobStore:
             self.save(self.jobs[job_id])
             return reference
 
-    def start_generation(self, job_id, revision, generator):
+    def start_generation(self, job_id, revision, generator, source_calibration=None):
+        if source_calibration is not None:
+            try:
+                source_calibration = SourceCalibration.model_validate(source_calibration).model_dump()
+            except ValueError:
+                raise PresetError("invalid_source_calibration", "Choose and calibrate a usable guitar recording first.", 422) from None
         with self.lock:
             job = self.get(job_id)
             result = job.get("result", {})
@@ -319,7 +325,7 @@ class JobStore:
             if revision != result.get("reference_revision", 0):
                 raise JobError("reference_changed", "The confirmed passage changed. Review and confirm it again.", 409)
             previous = job.get("generation")
-            if previous and previous["reference_revision"] == revision and previous["status"] in {"generating", "ready"}:
+            if previous and previous["reference_revision"] == revision and previous.get("source_calibration") == source_calibration and previous["status"] in {"generating", "ready"}:
                 return previous
             if job_id in self.preset_running:
                 raise JobError("generation_busy", "The previous attempt is finishing. Wait before generating for the new passage.", 409, True)
@@ -327,13 +333,15 @@ class JobStore:
                 raise PresetError("generation_disabled", "Starting-preset generation is disabled. A separate approved backend request/budget allowance is required.")
             request_id = str(uuid4())
             generation = {"request_id": request_id, "reference_revision": revision, "status": "generating"}
+            if source_calibration is not None:
+                generation["source_calibration"] = source_calibration
             self.jobs[job_id]["generation"] = generation
             self.save(self.jobs[job_id])
             self.preset_running[job_id] = request_id
-            self.preset_pool.submit(self.generate_preset, job_id, request_id, revision, result["reference"], generator)
+            self.preset_pool.submit(self.generate_preset, job_id, request_id, revision, result["reference"], generator, source_calibration)
             return deepcopy(generation)
 
-    def generate_preset(self, job_id, request_id, revision, reference, generator):
+    def generate_preset(self, job_id, request_id, revision, reference, generator, source_calibration=None):
         with self.lock:
             job = self.jobs.get(job_id)
             if (not job or time.time() >= job["expires_at"] or job.get("generation", {}).get("request_id") != request_id
@@ -341,7 +349,7 @@ class JobStore:
                 self.preset_running.pop(job_id, None)
                 return
         try:
-            preset = validate_preset(generator.generate(reference))
+            preset = validate_preset(generator.generate(reference, source_calibration) if source_calibration is not None else generator.generate(reference))
             outcome = {"status": "ready", "preset": preset}
         except PresetError as failure:
             outcome = {"status": "failed", "error": {"code": failure.code, "message": failure.message, "retryable": True}}

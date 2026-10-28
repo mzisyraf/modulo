@@ -36,3 +36,12 @@ test("job parser rejects invented preset success and foreign artifact URLs", () 
   assert.throws(() => parseSeparationJob({ ...pending, status: "ready", result: { ...result, artifacts: { ...result.artifacts, guitar: "https://other.example/audio" } } }));
   assert.throws(() => parseSeparationJob({ ...pending, status: "ready", result: { ...result, provenance: { ...result.provenance, kind: "generated" } } }));
 });
+
+test("level-calibrated presets require source metadata and honest spectral warnings", () => {
+  const source = { id: "a".repeat(64), method: "browser_level_v1", duration_seconds: 20, rms_dbfs: -27, peak_dbfs: -4, clipped_fraction: 0 };
+  const preset = { ...structuredClone(fixture), provenance: { kind: "generated", provider: "nebius", model: "test model" }, quality_flags: ["source_level_calibrated", "spectral_calibration_missing", "target_energy_only", "tone_matching_unverified"] };
+  const generation = { request_id: "11111111-1111-4111-8111-111111111111", reference_revision: 2, status: "ready", source_calibration: source, preset };
+  assert.ok(parsePresetGeneration(generation, 2).source_calibration);
+  assert.throws(() => parsePresetGeneration({ ...generation, source_calibration: { ...source, rms_dbfs: Infinity } }, 2));
+  assert.throws(() => parsePresetGeneration({ ...generation, preset: { ...preset, quality_flags: ["source_level_calibrated"] } }, 2));
+});

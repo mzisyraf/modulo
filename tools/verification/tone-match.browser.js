@@ -59,8 +59,11 @@ async (page) => {
     }
     if (action === "preset" && method === "POST") {
       generations++;
+      const source = request.postDataJSON().source_calibration;
+      const calibrated = source ? { ...preset, quality_flags: ["source_level_calibrated", "spectral_calibration_missing", "target_energy_only", "tone_matching_unverified"], parameters: { ...preset.parameters, input_gain_db: Math.round(Math.max(-24, Math.min(12, -24 - source.rms_dbfs, -6 - source.peak_dbfs)) * 10) / 10 } } : preset;
       job.generation = { request_id: `22222222-2222-4222-8222-${String(generations).padStart(12, "0")}`, reference_revision: job.result.reference_revision,
-        status: failGeneration ? "failed" : "ready", ...(failGeneration ? { error: { code: "test_error", message: "TEST ONLY provider failure", retryable: false } } : { preset }) };
+        ...(source ? { source_calibration: source } : {}),
+        status: failGeneration ? "failed" : "ready", ...(failGeneration ? { error: { code: "test_error", message: "TEST ONLY provider failure", retryable: false } } : { preset: calibrated }) };
       return json(job.generation, 202);
     }
     return json(job);
@@ -69,6 +72,8 @@ async (page) => {
   await page.getByRole("button", { name: "Tone Match", exact: true }).click();
   check(await page.getByText("Real local separation", { exact: true }).isVisible(), "main Tone Match uses real API workflow");
   check(await page.getByLabel("Demo result").count() === 0, "fixture stage controls removed");
+  await page.locator("#calibration-file").setInputFiles({ name: "test-guitar.wav", mimeType: "audio/wav", buffer: wav });
+  await page.getByText("Input level calibrated:", { exact: false }).waitFor();
   await page.getByLabel("Mixed-song audio", { exact: true }).setInputFiles({ name: "test-only.wav", mimeType: "audio/wav", buffer: wav });
   await page.getByRole("button", { name: "Separate guitar", exact: true }).dblclick();
   await page.getByRole("heading", { name: "Compare the same passage" }).waitFor();
@@ -107,6 +112,8 @@ async (page) => {
   await page.locator("#reference-end").fill("11");
   check(await page.getByRole("button", { name: "Apply starting preset", exact: true }).count() === 0, "changed bounds remove stale proposal");
   check(await page.locator("#amp-title").innerText() !== preset.name, "changed bounds invalidate applied generated preset");
+  await page.locator("#calibration-file").setInputFiles({ name: "test-guitar.wav", mimeType: "audio/wav", buffer: wav });
+  await page.getByText("Input level calibrated:", { exact: false }).waitFor();
   await page.getByRole("button", { name: "Confirm reference", exact: true }).click();
   await page.getByRole("button", { name: "Generate starting preset", exact: true }).waitFor();
   failGeneration = true;
@@ -142,6 +149,8 @@ async (page) => {
   check(await page.getByRole("button", { name: "Generate starting preset", exact: true }).isDisabled(), "zero allowance keeps main generation disabled");
   await page.goto("http://127.0.0.1:5174/separation.html");
   check(await page.getByRole("main").count() === 1, "standalone preview retains main landmark");
+  await page.locator("#calibration-file").setInputFiles({ name: "test-guitar.wav", mimeType: "audio/wav", buffer: wav });
+  await page.getByText("Input level calibrated:", { exact: false }).waitFor();
   await page.getByLabel("Mixed-song audio", { exact: true }).setInputFiles({ name: "standalone-test.wav", mimeType: "audio/wav", buffer: wav });
   await page.getByRole("button", { name: "Separate guitar", exact: true }).click();
   await page.getByRole("heading", { name: "Compare the same passage" }).waitFor();
@@ -152,10 +161,22 @@ async (page) => {
   await page.waitForFunction(() => ![...document.querySelectorAll("button")].find((b) => b.textContent === "Generate starting preset").disabled);
   await page.getByRole("button", { name: "Generate starting preset", exact: true }).click();
   await page.getByRole("button", { name: "Apply starting preset", exact: true }).click();
-  await page.getByRole("button", { name: "Play test signal", exact: true }).click();
+  await page.getByRole("button", { name: "Play guitar recording", exact: true }).click();
   await page.waitForFunction(() => window.__contexts.length === 1);
+  await page.waitForFunction(() => document.querySelector('progress[aria-label="Guitar playback progress"]').value > .2);
+  check(await page.getByText("Playing your calibrated recording", { exact: false }).isVisible(), "standalone plays selected calibration recording with advancing progress");
+  await page.getByRole("button", { name: "Original guitar", exact: true }).click();
+  check(await page.getByRole("button", { name: "Original guitar", exact: true }).getAttribute("aria-pressed") === "true", "original comparison selects without restarting playback");
+  await page.getByRole("button", { name: "Rig applied", exact: true }).click();
   check(await page.getByRole("button", { name: "Stop preset audio", exact: true }).isVisible(), "standalone keeps its deliberate audition controls");
   await page.getByRole("button", { name: "Stop preset audio", exact: true }).click();
+  const beforeSourceChange = generations;
+  const changedWav = Buffer.from(wav); changedWav.writeInt16LE(500, 46);
+  await page.locator("#calibration-file").setInputFiles({ name: "different-guitar.wav", mimeType: "audio/wav", buffer: changedWav });
+  await page.getByText("Input level calibrated: different-guitar.wav", { exact: true }).waitFor();
+  check(await page.getByRole("button", { name: "Apply starting preset", exact: true }).count() === 0, "changing recording removes stale generated rig");
+  check(!await page.getByRole("button", { name: "Generate starting preset", exact: true }).isDisabled(), "new recording enables a fresh deliberate generation");
+  check(generations === beforeSourceChange, "changing recording never auto-generates");
   check(errors.length === 0, `no page errors: ${errors.join("; ")}`);
   await page.unroute("**/api/**");
   return { synthetic: true, checks, uploads, generations, errors };

@@ -1,4 +1,4 @@
-"""Local-only target-energy starting presets; no source calibration or tone matching."""
+"""Target-energy starting rigs with optional browser input-level calibration; no spectral matching."""
 
 from decimal import Decimal, InvalidOperation
 import json
@@ -10,6 +10,7 @@ import urllib.request
 
 from app.contracts import ROOT, SCHEMA, validate_preset
 from app.job_lock import exclusive_lock
+from app.source_calibration import SourceCalibration, baseline_gain
 
 MODEL = "nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B"
 BASE_URL = "https://api.tokenfactory.nebius.com/v1"
@@ -121,7 +122,7 @@ class PresetGenerator:
         except (OSError, ValueError, KeyError, TypeError, InvalidOperation):
             raise PresetError("budget_unavailable", "The generation budget is busy or unreadable. No provider request was sent.") from None
 
-    def generate(self, reference):
+    def generate(self, reference, source_calibration=None):
         """Caller must pass the confirmed server-side selection, never request-body metrics."""
         try:
             start, end = reference["start_seconds"], reference["end_seconds"]
@@ -138,6 +139,11 @@ class PresetGenerator:
                 raise ValueError()
         except (KeyError, TypeError, ValueError, OverflowError):
             raise PresetError("invalid_reference", "Confirm a valid passage before generating a preset.", 422) from None
+        if source_calibration is not None:
+            try:
+                source_calibration = SourceCalibration.model_validate(source_calibration).model_dump()
+            except ValueError:
+                raise PresetError("invalid_source_calibration", "Calibrate a usable recording before generating.", 422) from None
         payload = {"model": MODEL, "n": 1, "store": False, "stream": False, "max_completion_tokens": 1500,
             "messages": [{"role": "system", "content": (
                 "Return one JSON object with exactly name, description and parameters. No Markdown. "
@@ -146,6 +152,17 @@ class PresetGenerator:
                 "or audible matching is available. Do not identify equipment, add effects or claim tone similarity.")},
                 {"role": "user", "content": json.dumps({"input_kind": "measured_target_energy_only",
                     "target_metrics": metrics, "supported_parameters_schema": SCHEMA["properties"]["parameters"]}, allow_nan=False)}]}
+        if source_calibration is not None:
+            baseline = {"input_gain_db": baseline_gain(source_calibration), "drive": 0, "bass_db": 0, "mid_db": 0, "treble_db": 0, "master_gain_db": -12}
+            payload["messages"][0]["content"] = (
+                "Return exactly name, description and parameters as one JSON object. Use the supplied six-control schema. "
+                "Start from the neutral preset calibrated to the user's browser-measured input level, then propose conservative drive, EQ and output settings from target energy. "
+                "Keep the baseline input_gain_db unchanged. Only level calibration exists; no source/target spectral analysis or audible matching. "
+                "Do not identify equipment or claim tone similarity. Do not add effects.")
+            payload["messages"][1]["content"] = json.dumps({"input_kind": "browser_level_calibration_and_target_energy",
+                "source_features": {key: value for key, value in source_calibration.items() if key != "id"},
+                "baseline_parameters": baseline, "target_metrics": metrics,
+                "supported_parameters_schema": SCHEMA["properties"]["parameters"]}, allow_nan=False)
         self.reserve()
         response = self.transport(self.key, payload)
         try:
@@ -154,11 +171,15 @@ class PresetGenerator:
             value = strict_json(response["choices"][0]["message"]["content"])
             if not isinstance(value, dict) or set(value) != {"name", "description", "parameters"}:
                 raise ValueError()
-            preset = {**value, "schema_version": "1", "quality_flags": list(dict.fromkeys([*FLAGS, *flags])),
+            disclosure_flags = FLAGS if source_calibration is None else ["source_level_calibrated", "spectral_calibration_missing", "target_energy_only", "tone_matching_unverified"]
+            preset = {**value, "schema_version": "1", "quality_flags": list(dict.fromkeys([*disclosure_flags, *flags])),
                       "provenance": {"kind": "generated", "provider": "nebius", "model": MODEL}}
             validate_preset(preset)
             # Disclosures belong to trusted code, not an unreliable model description.
             preset["description"] = "Uncalibrated AI starting preset from target energy only. Tone similarity is unverified."
+            if source_calibration is not None:
+                preset["parameters"]["input_gain_db"] = baseline_gain(source_calibration)
+                preset["description"] = "AI starting rig over your input-level calibration. Spectral tone and audible similarity remain unverified."
             return validate_preset(preset)
         except Exception:
             raise PresetError("invalid_provider_preset", "The model did not return a valid supported preset. No preset was applied.", 502) from None

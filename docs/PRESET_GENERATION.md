@@ -4,7 +4,17 @@ Status: integrated into main Tone Match and the standalone `/separation.html` wo
 
 ## Scope
 
-Use the confirmed local guitar passage to request a six-control Nano starting preset. The existing selector supplies measured energy, stem/mix ratio, quiet fraction and clipping fraction. This phase has no source-guitar features or spectral analysis. It is not calibrated tone matching or equipment identification. Shared preset schema and audio engine stay unchanged.
+Use the confirmed local guitar passage to request a six-control Nano starting preset. The selector supplies server-measured energy, stem/mix ratio, quiet fraction and clipping fraction. A selected recording now supplies browser-measured input levels and a neutral gain baseline before generation. Source/target spectral analysis, calibrated tone matching and equipment identification remain incomplete. Shared preset schema and audio engine stay unchanged.
+
+## Recording-first level calibration
+
+Choose a 3–90 second, <=20 MiB guitar WAV/MP3 before generating. OfflineAudioContext decodes it without audible playback; the stronger mono/stereo channel avoids silent/opposite-polarity channels. Trim 50 ms blocks below -50 dBFS from the ends, require >=3 seconds of active-span audio, reject silence/nonfinite/clipped/overlong input. The original file is unchanged. Both comparison modes use the same prepared mono PCM WAV, with visible skipped-time and playback elapsed indicators.
+
+The browser sends only `{id, method, duration_seconds, rms_dbfs, peak_dbfs, clipped_fraction}` as optional `source_calibration` beside `reference_revision`. `id` is SHA-256 of the prepared WAV, method is `browser_level_v1`; names, paths and audio are excluded. These are bounded **browser measurements**, not independently server-measured source features. Pydantic rejects unexpected fields, invalid types, NaN/infinity, inconsistent RMS/peak and unusable ranges before reservation. Target metrics still come exclusively from the server's confirmed reference.
+
+Trusted baseline input gain is `round(clamp(min(-24 - RMS, -6 - peak), -24, 12), 1)` dB, with neutral drive/EQ and -12 dB initial output. The prompt receives this baseline plus source levels and server target energy, proposing final drive/EQ/output settings. After strict model validation, trusted code preserves the baseline input gain. Calibrated results carry `source_level_calibrated`, `spectral_calibration_missing`, `target_energy_only`, `tone_matching_unverified`; their description does not claim audible matching. Original mode bypasses calibration input gain and effects but retains final output gain/protection; modes are not loudness matched.
+
+Generation caches include the full calibration object and reference revision. Different source measurements cannot reuse a previous result; concurrent replacement waits for the active attempt. Snapshots persist with generation, so restart does not lose source identity. The selected File stays in browser memory and must be selected again after refresh/leaving the page. Selecting/reconfirming references still invalidates old presets. Legacy requests without `source_calibration` retain their original uncalibrated behavior and warnings; new UI generations require a usable recording. No automatic paid request or retry is introduced.
 
 ## Integrated files and ownership
 
@@ -20,9 +30,9 @@ generator.available  # key and a configured allowance; not live account verifica
 preset = generator.generate(confirmed_reference)
 ```
 
-`generate` is synchronous and performs blocking HTTPS. Run it in a worker/thread, not directly in an async route. `confirmed_reference` is the SERVER-LOADED result of `select_reference`, including its metrics/flags. Do not accept client-provided features, paths or provenance. `PresetError` exposes only sanitized `code`, `message` and `status` for the API's existing error envelope. A provider timeout may have been billed and is not retried.
+`generate` is synchronous and performs blocking HTTPS. Run it in a worker/thread, not directly in an async route. `confirmed_reference` is the SERVER-LOADED result of `select_reference`, including its metrics/flags. Optional source levels use only the strict `SourceCalibration` boundary above; client target features, paths and provenance remain rejected. `PresetError` exposes only sanitized `code`, `message` and `status` for the API's existing error envelope. A provider timeout may have been billed and is not retried.
 
-Return values pass `contracts/preset.schema.json` via the existing strict Python validator. Model candidates require exactly `name`, `description`, `parameters`; extra effects/metadata, malformed/nonfinite/duplicate JSON, truncation, wrong model and unsupported values fail with no manual-fixture fallback. Provider/model provenance and quality flags come from trusted code. The final description is a fixed uncalibrated/energy-only warning, so the observed smoke-test failure (model omitted its disclosure) cannot remove the product disclosure. The model's description is validated but is not shown to users.
+Return values pass `contracts/preset.schema.json` via the existing strict Python validator. Model candidates require exactly `name`, `description`, `parameters`; extra effects/metadata, malformed/nonfinite/duplicate JSON, truncation, wrong model and unsupported values fail with no manual-fixture fallback. Provider/model provenance, quality flags and final descriptions come from trusted code. Legacy results disclose missing calibration; calibrated results disclose level-only calibration and unverified spectral tone/similarity. The model's description is validated but is not shown to users.
 
 ## App wiring acceptance
 
@@ -37,7 +47,7 @@ The additive route/job fields below remain reviewable in #1/#6; this implementat
 ## Local route and UI flow
 
 - Confirm a passage using the existing reference endpoint. Each confirmation increments `result.reference_revision`, clears prior generation, and invalidates late responses even when the same bounds are reconfirmed.
-- `POST /api/jobs/{id}/preset` accepts ONLY `{reference_revision: <whole number>}`. The server loads the matching confirmed reference and returns HTTP 202 generation state. Missing/expired/unconfirmed/stale references fail before provider work; client metrics/paths are rejected.
+- `POST /api/jobs/{id}/preset` accepts `{reference_revision: <whole number>, source_calibration?: <bounded numeric source object>}`. The server loads the matching confirmed reference and returns HTTP 202 generation state. Missing/expired/unconfirmed/stale references fail before provider work; client target metrics/paths are rejected. The full source snapshot is returned on calibrated generations.
 - `GET /api/jobs/{id}` keeps separation `status: ready`; its independent `generation` contains a request UUID, reference revision and `generating|ready|failed`, plus validated `preset` or sanitized `error`. Duplicate in-flight/successful requests reuse that attempt/result. A failed attempt is retried only by another deliberate action.
 - One preset thread runs independently of the separator. The store lock is released over provider I/O. Active generation pins its files; queued work rechecks expiry/revision before reserving budget. Restart fails in-flight generation without resetting the ledger. Provider/storage failures never convert a successful separation into failure or silently apply a fallback.
 - After generation, edit the existing six controls and press **Apply starting preset**. Apply does not start playback. **Play test signal** is explicitly synthetic; a selected dry recording is local-only and is not source calibration. Further edits update the applied amp; preview/backing playback stops amp audition. Changing the passage unmounts/disposes the old audition and clears its candidate.
