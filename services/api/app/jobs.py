@@ -26,6 +26,16 @@ ARTIFACTS = {"mix", "guitar", "backing"}
 logger = logging.getLogger(__name__)
 
 
+def _remove_job_directory(directory):
+    try:
+        shutil.rmtree(directory)
+    except OSError:
+        # Windows/OneDrive may keep the empty directory open after every file was removed.
+        if directory.exists() and any(directory.iterdir()):
+            raise
+        logger.warning("Empty job directory %s cleanup deferred until Windows releases it", directory.name)
+
+
 class JobError(Exception):
     def __init__(self, code, message, status=400, retryable=False):
         super().__init__(message)
@@ -89,7 +99,7 @@ class JobStore:
                     raise ValueError("Invalid job lifetime.")
             except (JobError, OSError, ValueError, KeyError, TypeError):
                 logger.warning("Removing interrupted/corrupt local job directory %s", job_id)
-                shutil.rmtree(self.directory(job_id))
+                _remove_job_directory(self.directory(job_id))
                 continue
             self.jobs[job_id] = job
             if job["status"] in {"queued", "running"}:
@@ -133,7 +143,7 @@ class JobStore:
 
     def remove(self, job_id):
         try:
-            shutil.rmtree(self.directory(job_id))
+            _remove_job_directory(self.directory(job_id))
         except OSError as failure:
             raise JobError("storage_busy", "An older audio job is still in use. Close its player and retry.", 503, True) from failure
         del self.jobs[job_id]

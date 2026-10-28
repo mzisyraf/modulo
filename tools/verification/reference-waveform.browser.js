@@ -89,8 +89,10 @@ async (page) => {
   await page.screenshot({ path: "data/verification/reference-waveform-narrow.png", fullPage: true });
   await page.setViewportSize({ width: 1440, height: 1000 });
   await page.screenshot({ path: "data/verification/reference-waveform-desktop.png", fullPage: true });
+  await page.evaluate(() => { window.__oldPlayers = [...document.querySelectorAll(".players audio")]; });
   empty = true;
   await upload();
+  check(await page.evaluate(() => window.__oldPlayers.length === 3 && window.__oldPlayers.every((audio) => !audio.hasAttribute("src") && audio.networkState === HTMLMediaElement.NETWORK_EMPTY)), "changing songs releases old audio streams");
   await page.getByText("No contrasting passage suggestions found.", { exact: false }).waitFor();
   check(await page.locator("#reference-start").isEnabled(), "no options falls back honestly to manual waveform");
   broken = true; await upload();

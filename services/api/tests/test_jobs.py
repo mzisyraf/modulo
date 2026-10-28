@@ -48,6 +48,33 @@ def test_reference_options_for_existing_job_cache_and_confirmation(local_api, mo
     assert client.get(f"/api/jobs/{job_id}/references").status_code == 404
 
 
+def test_empty_locked_directory_does_not_keep_an_evicted_job(local_api, monkeypatch):
+    client, store = local_api
+    job_id = upload(client).json()["job_id"]
+    assert terminal(client, job_id)["status"] == "ready"
+    directory = store.directory(job_id)
+    for path in directory.iterdir():
+        path.unlink()
+    monkeypatch.setattr("app.jobs.shutil.rmtree", lambda *_: (_ for _ in ()).throw(PermissionError("Windows directory lock")))
+    store.remove(job_id)
+    assert job_id not in store.jobs and directory.exists()
+    next_job, created = store.reserve(str(uuid4()))
+    assert created and next_job["job_id"] != job_id
+    store.recover()  # An empty locked remnant does not prevent API restart.
+    assert job_id not in store.jobs
+
+
+def test_locked_directory_with_audio_still_blocks_eviction(local_api, monkeypatch):
+    client, store = local_api
+    job_id = upload(client).json()["job_id"]
+    assert terminal(client, job_id)["status"] == "ready"
+    monkeypatch.setattr("app.jobs.shutil.rmtree", lambda *_: (_ for _ in ()).throw(PermissionError("Open audio")))
+    with pytest.raises(JobError) as failure:
+        store.remove(job_id)
+    assert failure.value.code == "storage_busy" and job_id in store.jobs
+    assert (store.directory(job_id) / "guitar.wav").exists()
+
+
 def test_reference_options_reject_pending_and_damaged_artifacts(local_api):
     client, store = local_api
     pending, _ = store.reserve(str(uuid4()))

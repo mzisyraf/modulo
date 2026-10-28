@@ -14,6 +14,11 @@ function rememberJob(jobId: string) {
 const message = (failure: unknown) => failure instanceof Error ? failure.message : "The local API could not complete this request.";
 const timestamp = (seconds: number) => `${Math.floor(seconds / 60).toString().padStart(2, "0")}:${Math.floor(seconds % 60).toString().padStart(2, "0")}`;
 
+function releasePlayer(player: HTMLAudioElement | null | undefined) {
+  if (!player) return;
+  player.pause(); player.removeAttribute("src"); player.load();
+}
+
 interface Props {
   embedded?: boolean;
   initialJobId?: string;
@@ -66,12 +71,12 @@ export function SeparationPage({ embedded = false, initialJobId = "", initialFil
   useEffect(() => () => {
     uploadController.current?.abort();
     selectionController.current?.abort();
-    Object.values(players.current).forEach((player) => player?.pause());
+    Object.values(players.current).forEach(releasePlayer);
   }, []);
 
   useEffect(() => {
     const audio = Object.values(players.current);
-    return () => audio.forEach((player) => player?.pause());
+    return () => audio.forEach(releasePlayer);
   }, [result?.artifacts.guitar]);
 
   useEffect(() => {
