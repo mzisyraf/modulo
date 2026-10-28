@@ -466,7 +466,7 @@ export function App() {
     {view === "workspace" && <div className="workspace-view">
       <section className="workspace-intro" aria-labelledby="workspace-heading">
         <div><span className="eyebrow">YOUR WORKSPACE</span><h2 id="workspace-heading">Good to see you.</h2><p>Continue your tone match or start with a new song.</p></div>
-        <button onClick={startNewToneMatch}><span aria-hidden="true">＋</span> New Tone Match</button>
+        <button onClick={startNewToneMatch}><span aria-hidden="true">ï¼‹</span> New Tone Match</button>
       </section>
 
       <section className="continue-section" aria-labelledby="continue-heading">
@@ -494,18 +494,18 @@ export function App() {
     <div className="tone-match-view" hidden={view !== "tone-match"}>
       <header className="hero">
         <div><span className="eyebrow">TONE MATCH</span><h2 className="display-title">Find the sound.<br /><em>Make it yours.</em></h2><p>Choose a song, confirm the reference and apply a starting preset to your browser amp.</p></div>
-        <div className="mode-badge"><strong>Real local separation</strong><span>Starting presets remain uncalibrated</span></div>
+        <div className="mode-badge"><strong>Real local separation</strong><span>Tone match remains unverified</span></div>
       </header>
       <SeparationPage key={activeProjectId} ref={workflow} embedded initialJobId={jobId} initialFile={songFile}
         onJobChange={(id, file, status) => { setJobId(id); setSongFile(file); setJobStage(status); }}
         onApplyPreset={applyStartingPreset} onStopAudio={() => stopEngineAudio("Stopped — song preview took over the audio output.", false)} onInvalidatePreset={invalidateStartingPreset} />
 
       <div className="grid">
-        <section aria-labelledby="amp-title"><span className="step">06 / AMP</span><h2 id="amp-title">{preset.name}</h2><p>{preset.description}</p><div className="provenance"><strong>{hasResult ? "AI starting preset · editable" : "Manual example preset"}</strong><span>{hasResult ? `${preset.provenance.provider} · ${preset.provenance.model} · uncalibrated` : "Manually made · not generated from your song"}</span></div><div className="controls">{controls.map(([key, label, min, max, step, unit]) => <label key={key} htmlFor={key}><span>{label}<output>{preset.parameters[key]} {unit}</output></span><input id={key} type="range" min={min} max={max} step={step} value={preset.parameters[key]} onChange={(event) => changeControl(key, Number(event.target.value))} /></label>)}</div><button className="secondary" onClick={() => void loadApiExample()}>Load demo preset</button></section>
+        <section aria-labelledby="amp-title"><span className="step">06 / AMP</span><h2 id="amp-title">{preset.name}</h2><p>{preset.description}</p><div className="provenance"><strong>{hasResult ? "AI starting preset · editable" : "Manual example preset"}</strong><span>{hasResult ? `${preset.provenance.provider} · ${preset.provenance.model} · tone unverified` : "Manually made · not generated from your song"}</span></div><div className="controls">{controls.map(([key, label, min, max, step, unit]) => <label key={key} htmlFor={key}><span>{label}<output>{preset.parameters[key]} {unit}</output></span><input id={key} type="range" min={min} max={max} step={step} value={preset.parameters[key]} onChange={(event) => changeControl(key, Number(event.target.value))} /></label>)}</div><button className="secondary" onClick={() => void loadApiExample()}>Load demo preset</button></section>
         <section aria-labelledby="audition-title"><span className="step">07 / AUDITION</span><h2 id="audition-title">Hear the browser amp</h2><p>Working gain, drive and EQ. Start at a comfortable listening level.</p><button disabled={busy} onClick={() => void play(false)}>Play test signal</button><p className="hint">A two-second synthesized pluck, not an isolated guitar or AI result.</p><label className="file-label" htmlFor="dry-file">Dry guitar recording · local audition only</label><input key={`dry-${sessionKey}`} id="dry-file" type="file" accept="audio/*" onChange={(event) => setDryFile(event.target.files?.[0])} /><button className="secondary" disabled={!dryFile || busy} onClick={() => void play(true)}>Play dry recording</button><label className="toggle"><input type="checkbox" checked={bypass} onChange={(event) => { setBypass(event.target.checked); engine.current?.setBypass(event.target.checked); }} />Bypass drive and EQ</label><button className="stop" onClick={() => stopEngineAudio()}>Stop audio</button><p role="status">{audioState}</p></section>
         <section aria-labelledby="live-title" className="live-panel">
           <span className="step">08 / LIVE INPUT</span><h2 id="live-title">Connect your guitar</h2>
-          <p>Use a local audio interface to play through the same gain, drive, EQ and bypass controls. Starting presets above remain uncalibrated.</p>
+          <p>Use a local audio interface to play through the same gain, drive, EQ and bypass controls. Starting rigs still require listening verification.</p>
           <label className="select-label" htmlFor="device">Input device</label>
           <ChoiceMenu id="device" kind="device" searchable value={selectedDeviceId} disabled={!inputDevices.length || liveState === "starting" || liveState === "live"} onChange={changeLiveDevice} options={inputDevices.map((device) => ({ label: device.label, value: device.deviceId }))} placeholder="No audio inputs found" />
           <button className="secondary compact-action" disabled={liveState === "starting" || liveState === "live"} onClick={() => void refreshInputDevices()}>Refresh inputs</button>
@@ -539,13 +539,13 @@ export function App() {
         </section>
       </div>
       {error && <p className="error" role="alert">{error}</p>}
-      <footer>Separation runs on the local API · source calibration is not sent to the model · tone similarity remains unverified</footer>
+      <footer>Separation runs on the local API · measured descriptors, not audio, go to the model on Generate · tone similarity remains unverified</footer>
     </div>
 
     {view === "presets" && <section className="library-panel" aria-labelledby="preset-library-title"><div className="section-heading"><div><span className="step">CURRENT TONE</span><h2 id="preset-library-title">Ready to play</h2></div><span className="quality-badge">1 current preset</span></div><p>Your current preset stays in this tab. Saving a library comes later.</p><article className="preset-row"><div className="preset-thumbnail" aria-hidden="true"><span>MOD</span></div><div><strong>{preset.name}</strong><span>{preset.description}</span></div><span className="manual-tag">{hasResult ? "AI starting preset" : "Manual example"}</span><button className="secondary" onClick={() => navigate("tone-match")}>Open controls</button></article></section>}
 
     {view === "recordings" && <RecordingLibrary recordings={recordings} onDelete={(recordingId) => setRecordings((current) => current.filter((recording) => recording.id !== recordingId))} onOpenToneMatch={() => navigate("tone-match")} />}
 
-    {view === "settings" && <section className="availability-panel" aria-labelledby="settings-title"><span className="availability-icon lavender" aria-hidden="true">⚙</span><span className="step">DEMO MODE</span><h2 id="settings-title">Nothing to configure yet</h2><p>There are no accounts or cloud settings in this demo. Dry recordings and calibration stay in this browser; mixed songs go to the local separation API.</p><button className="secondary" onClick={() => navigate("workspace")}>Return to Workspace</button></section>}
+    {view === "settings" && <section className="availability-panel" aria-labelledby="settings-title"><span className="availability-icon lavender" aria-hidden="true">⚙</span><span className="step">DEMO MODE</span><h2 id="settings-title">Nothing to configure yet</h2><p>There are no accounts or cloud settings in this demo. Guitar recording audio stays in this browser; numeric descriptors go to the provider on Generate. Mixed songs go to the local separation API.</p><button className="secondary" onClick={() => navigate("workspace")}>Return to Workspace</button></section>}
   </AppShell>;
 }

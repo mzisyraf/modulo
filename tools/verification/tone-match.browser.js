@@ -60,9 +60,10 @@ async (page) => {
     if (action === "preset" && method === "POST") {
       generations++;
       const source = request.postDataJSON().source_calibration;
-      const calibrated = source ? { ...preset, quality_flags: ["source_level_calibrated", "spectral_calibration_missing", "target_energy_only", "tone_matching_unverified"], parameters: { ...preset.parameters, input_gain_db: Math.round(Math.max(-24, Math.min(12, -24 - source.rms_dbfs, -6 - source.peak_dbfs)) * 10) / 10 } } : preset;
+      const calibrated = source ? { ...preset, quality_flags: source.tone_features?["source_level_calibrated","spectral_features_measured","tone_matching_unverified"]:["source_level_calibrated", "spectral_calibration_missing", "target_energy_only", "tone_matching_unverified"], parameters: { ...preset.parameters, input_gain_db: Math.round(Math.max(-24, Math.min(12, -24 - source.rms_dbfs, -6 - source.peak_dbfs)) * 10) / 10 } } : preset;
       job.generation = { request_id: `22222222-2222-4222-8222-${String(generations).padStart(12, "0")}`, reference_revision: job.result.reference_revision,
         ...(source ? { source_calibration: source } : {}),
+        ...(source?.tone_features?{target_tone_features:source.tone_features,target_rms_dbfs:source.rms_dbfs}:{}),
         status: failGeneration ? "failed" : "ready", ...(failGeneration ? { error: { code: "test_error", message: "TEST ONLY provider failure", retryable: false } } : { preset: calibrated }) };
       return json(job.generation, 202);
     }
@@ -84,6 +85,9 @@ async (page) => {
   await page.getByRole("button", { name: "Apply starting preset", exact: true }).waitFor();
   check(await page.locator("#amp-title").innerText() !== preset.name, "generation does not auto-apply");
   check(await page.evaluate(() => window.__contexts.length) === 0, "generation creates no audio graph or autoplay");
+  await page.getByRole("button",{name:"Check rendered tone",exact:true}).click();
+  await page.getByText("Feature difference: rig",{exact:false}).waitFor();
+  check(await page.evaluate(()=>window.__contexts.length)===0,"quality check renders offline without audible context");
   await page.getByRole("button", { name: "Apply starting preset", exact: true }).click();
   check(await page.locator("#amp-title").innerText() === preset.name, "Apply reaches shared amp");
   check(await page.locator("#drive").inputValue() === "0.2", "shared controls reflect generated values");
@@ -160,6 +164,15 @@ async (page) => {
   await page.getByRole("button", { name: "Reconnect preset status", exact: true }).click();
   await page.waitForFunction(() => ![...document.querySelectorAll("button")].find((b) => b.textContent === "Generate starting preset").disabled);
   await page.getByRole("button", { name: "Generate starting preset", exact: true }).click();
+  await page.getByRole("button", {name:"Refine locally",exact:true}).click();
+  await page.getByRole("button", {name:"Cancel refinement",exact:true}).click();
+  await page.waitForFunction(()=>![...document.querySelectorAll("button")].find(b=>b.textContent==="Refine locally").disabled);
+  check(await page.getByRole("button", {name:"Use refined controls",exact:true}).count()===0,"cancelled refinement discards its result");
+  await page.getByRole("button", {name:"Refine locally",exact:true}).click();
+  await page.getByRole("button", {name:"Use refined controls",exact:true}).waitFor({timeout:60000});
+  check(await page.evaluate(()=>window.__contexts.length)===0,"local refinement creates no audible context");
+  await page.getByRole("button", {name:"Use refined controls",exact:true}).click();
+  check(await page.getByText("Review or edit the controls, then Apply.",{exact:false}).isVisible(),"refined controls require a separate Apply");
   await page.getByRole("button", { name: "Apply starting preset", exact: true }).click();
   await page.getByRole("button", { name: "Play guitar recording", exact: true }).click();
   await page.waitForFunction(() => window.__contexts.length === 1);

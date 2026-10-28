@@ -1,6 +1,7 @@
 """Bounded browser-measured input levels, not server-verified spectral calibration."""
 from typing import Literal
 from pydantic import BaseModel, ConfigDict, Field, model_validator
+from .tone_features import ToneFeatures
 
 
 class SourceCalibration(BaseModel):
@@ -11,6 +12,7 @@ class SourceCalibration(BaseModel):
     rms_dbfs: float = Field(ge=-50, le=0)
     peak_dbfs: float = Field(ge=-50, le=0)
     clipped_fraction: float = Field(ge=0, lt=0.01)
+    tone_features: ToneFeatures | None = None
 
     @model_validator(mode="after")
     def check_levels(self):

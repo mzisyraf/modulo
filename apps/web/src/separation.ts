@@ -1,12 +1,15 @@
 // Local separation and reference-scoped starting-preset boundary.
 import { parsePreset, type Preset } from "@modulo/contracts";
 import type { SourceCalibration } from "./recordingCalibration";
+import { validToneFeatures, type ToneFeatures } from "./audioFeatures.ts";
 
 export interface PresetGeneration {
   request_id: string;
   reference_revision: number;
   status: "generating" | "ready" | "failed";
   source_calibration?: SourceCalibration;
+  target_tone_features?: ToneFeatures;
+  target_rms_dbfs?: number;
   preset?: Preset;
   error?: { code: string; message: string; retryable: boolean };
 }
@@ -54,7 +57,10 @@ export function parsePresetGeneration(value: unknown, revision: number): PresetG
   if (generation.status === "ready") {
     const preset = parsePreset(generation.preset);
     const source = generation.source_calibration;
-    const flags = source ? ["source_level_calibrated", "spectral_calibration_missing", "target_energy_only", "tone_matching_unverified"] : ["source_calibration_missing", "target_energy_only", "tone_matching_unverified"];
+    const spectral = Boolean(source?.tone_features);
+    const flags = spectral ? ["source_level_calibrated", "spectral_features_measured", "tone_matching_unverified"] : source ? ["source_level_calibrated", "spectral_calibration_missing", "target_energy_only", "tone_matching_unverified"] : ["source_calibration_missing", "target_energy_only", "tone_matching_unverified"];
+    if(spectral && (!validToneFeatures(source?.tone_features)||!validToneFeatures(generation.target_tone_features)))throw new Error("The preset is missing valid source/target spectral measurements.");
+    if(generation.target_rms_dbfs!==undefined&&(!Number.isFinite(generation.target_rms_dbfs)||generation.target_rms_dbfs>0||generation.target_rms_dbfs< -100))throw new Error("Invalid target level");
     if (source && (!/^[0-9a-f]{64}$/.test(source.id) || source.method !== "browser_level_v1"
       || ![source.rms_dbfs, source.peak_dbfs, source.duration_seconds, source.clipped_fraction].every(Number.isFinite)
       || source.rms_dbfs < -50 || source.rms_dbfs > source.peak_dbfs || source.peak_dbfs > 0

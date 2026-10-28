@@ -180,3 +180,9 @@ and navigation cleanup already call `engine.stop()` and will cancel capture.
 Isyraf should agree a versioned source-feature/transport contract before
 depending on this local PCM shape as a server API. No preset-schema changes
 are needed to use this capture API.
+
+## Offline preset evaluation
+
+`await AudioEngine.renderFile(file, preset)` renders the same initialized gain/drive/EQ/master/output-guard graph into an AudioBuffer without opening a speaker context or requesting capture. It is static and does not stop or mutate an existing live engine. Input must be nonempty, <=20MiB, mono/stereo and 0.1–90s; decode runs at 44.1kHz. Schema validation is unchanged. Offline disposal skips the realtime-only close method; playback/live initialization and smoothing retain their existing behavior. This API does not supply a separate amp/cab model or establish perceptual accuracy. The paired/held-out pipeline is documented in ../../docs/PRESET_EVALUATION.md.
+
+`setListeningGains(originalDb, processedDb)` sets transient dry/wet route gains in [-48,+48]dB, default0dB. Gain sits after effects/bypass split and before existing master/output protection, so independent fades avoid a shared-gain jump during A/B switching. It is for opt-in file audition only; no preset schema control is added. Default playback/live/rendered graph behavior is unchanged. `renderFile(file,preset,bypass=false)` also permits the true bypass route for measuring dry listening levels. Future recorder integration must deliberately decide whether monitoring compensation belongs in a recording; current shared live controls never set these gains.

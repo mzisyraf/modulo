@@ -13,6 +13,8 @@ from app.preset_generation import PresetError, PresetGenerator
 from test_jobs import success, terminal, upload
 from test_preset_generation import REFERENCE, response
 from test_source_calibration import SOURCE
+from app.tone_features import tone_features
+import math
 
 
 def test_source_identity_scopes_cached_presets_and_rejects_invalid_levels(preset_api):
@@ -36,6 +38,41 @@ def test_source_identity_scopes_cached_presets_and_rejects_invalid_levels(preset
     assert len(calls) == 2
     persisted = json.loads((store.directory(job_id) / "state.json").read_text())
     assert persisted["generation"]["source_calibration"] == changed
+
+
+def test_spectral_generation_measures_server_target_and_returns_snapshot(preset_api):
+    client, store, generator, calls = preset_api
+    job_id, revision = confirmed_job(client)
+    feature=tone_features([.1*math.sin(2*math.pi*440*i/44100) for i in range(44100*3)],44100)
+    source={**SOURCE,"tone_features":feature}
+    assert client.post(f"/api/jobs/{job_id}/preset",json={"reference_revision":revision,"source_calibration":source}).status_code==202
+    result=wait_generation(client,job_id)["generation"]
+    assert result["status"]=="ready"
+    assert "spectral_features_measured" in result["preset"]["quality_flags"]
+    assert result["target_tone_features"]!=feature
+    packet=json.loads(calls[0]["messages"][1]["content"])
+    assert packet["target_tone_features"]==result["target_tone_features"]
+    assert packet["source_features"]["tone_features"]==feature
+    assert result["target_rms_dbfs"]==store.get(job_id)["result"]["reference"]["metrics"]["guitar_rms_dbfs"]
+
+
+def test_reference_change_during_spectral_analysis_never_bills(preset_api,monkeypatch):
+    client,store,generator,calls=preset_api
+    job_id,revision=confirmed_job(client)
+    feature=tone_features([.1*math.sin(2*math.pi*440*i/44100) for i in range(44100*3)],44100)
+    entered,release=Event(),Event()
+    def delayed(*_):
+        entered.set();assert release.wait(10);return feature
+    monkeypatch.setattr("app.jobs.wav_tone_features",delayed)
+    try:
+        assert client.post(f"/api/jobs/{job_id}/preset",json={"reference_revision":revision,"source_calibration":{**SOURCE,"tone_features":feature}}).status_code==202
+        assert entered.wait(1)
+        assert client.post(f"/api/jobs/{job_id}/reference",json={"start_seconds":1,"end_seconds":11}).status_code==200
+    finally:release.set()
+    deadline=time.monotonic()+2
+    while store.preset_running and time.monotonic()<deadline:time.sleep(.01)
+    assert not store.preset_running and not calls
+    assert not (generator.directory/"budget.json").exists()
 
 
 def test_changed_source_cannot_start_another_inflight_request(preset_api):

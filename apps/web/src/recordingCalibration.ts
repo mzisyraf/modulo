@@ -1,4 +1,5 @@
 import { encodeMonoWav } from "./localAudio.ts";
+import { toneFeatures, type ToneFeatures } from "./audioFeatures.ts";
 
 export interface SourceCalibration {
   id: string;
@@ -7,6 +8,7 @@ export interface SourceCalibration {
   rms_dbfs: number;
   peak_dbfs: number;
   clipped_fraction: number;
+  tone_features?: ToneFeatures;
 }
 export interface CalibratedRecording {
   file: File;
@@ -14,6 +16,13 @@ export interface CalibratedRecording {
   skippedSeconds: number;
   measurements: SourceCalibration;
   inputGainDb: number;
+}
+
+export function calibrationKey(source?: SourceCalibration): string {
+  if(!source)return "";
+  const tone=source.tone_features;
+  return JSON.stringify([source.id,source.method,source.duration_seconds,source.rms_dbfs,source.peak_dbfs,source.clipped_fraction,
+    tone?[tone.method,...tone.bands,tone.centroid_hz,tone.flatness,tone.crest_db]:null]);
 }
 
 export function recordingLevels(samples: Float32Array, rate: number) {
@@ -62,5 +71,5 @@ export async function calibrateRecording(file: File): Promise<CalibratedRecordin
   const id = Array.from(new Uint8Array(digest), value => value.toString(16).padStart(2, "0")).join("");
   return { file: new File([prepared], "calibrated-guitar.wav", { type: "audio/wav" }), originalName: file.name,
     skippedSeconds: measured.skippedSeconds, inputGainDb: measured.inputGainDb,
-    measurements: { id, method: "browser_level_v1", ...measured.levels } };
+    measurements: { id, method: "browser_level_v1", ...measured.levels, tone_features: toneFeatures(measured.trimmed, audio.sampleRate) } };
 }

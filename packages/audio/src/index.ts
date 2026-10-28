@@ -19,7 +19,7 @@ export interface CalibrationTake extends CalibrationAudio {
 }
 
 export class AudioEngine {
-  private context?: AudioContext;
+  private context?: AudioContext | OfflineAudioContext;
   private input?: GainNode;
   private shaper?: WaveShaperNode;
   private bass?: BiquadFilterNode;
@@ -42,6 +42,8 @@ export class AudioEngine {
   private request = 0;
   private disposed = false;
   private bypass = false;
+  private dryListeningGain = 1;
+  private wetListeningGain = 1;
   onEnded?: () => void;
 
   constructor(preset: Preset) {
@@ -64,14 +66,23 @@ export class AudioEngine {
   setBypass(bypass: boolean): void {
     this.bypass = bypass;
     if (!this.context) return;
-    this.wet!.gain.setTargetAtTime(bypass ? 0 : 1, this.context.currentTime, 0.015);
-    this.dry!.gain.setTargetAtTime(bypass ? 1 : 0, this.context.currentTime, 0.015);
+    this.wet!.gain.setTargetAtTime(bypass ? 0 : this.wetListeningGain, this.context.currentTime, 0.015);
+    this.dry!.gain.setTargetAtTime(bypass ? this.dryListeningGain : 0, this.context.currentTime, 0.015);
   }
 
-  private async initialize(): Promise<AudioContext> {
+  /** Transient file-comparison levels after effects, before master/output protection; not preset parameters. */
+  setListeningGains(originalDb: number, processedDb: number): void {
+    if (![originalDb,processedDb].every(x=>Number.isFinite(x)&&x>=-48&&x<=48)) throw new Error("Listening gains must be between -48 and +48 dB.");
+    this.dryListeningGain=10**(originalDb/20);this.wetListeningGain=10**(processedDb/20);
+    this.setBypass(this.bypass);
+  }
+
+  private initialize(): Promise<AudioContext>;
+  private initialize(offline: OfflineAudioContext): Promise<OfflineAudioContext>;
+  private async initialize(offline?: OfflineAudioContext): Promise<AudioContext | OfflineAudioContext> {
     if (this.disposed) throw new Error("Audio engine is closed.");
     if (!this.context) {
-      const context = new AudioContext({ latencyHint: "interactive" });
+      const context = offline ?? new AudioContext({ latencyHint: "interactive" });
       this.context = context;
       this.input = context.createGain();
       this.shaper = context.createWaveShaper();
@@ -91,8 +102,8 @@ export class AudioEngine {
       this.master = context.createGain();
       this.input.gain.value = 10 ** (this.preset.parameters.input_gain_db / 20);
       this.master.gain.value = 10 ** (this.preset.parameters.master_gain_db / 20);
-      this.wet.gain.value = this.bypass ? 0 : 1;
-      this.dry.gain.value = this.bypass ? 1 : 0;
+      this.wet.gain.value = this.bypass ? 0 : this.wetListeningGain;
+      this.dry.gain.value = this.bypass ? this.dryListeningGain : 0;
       this.input.connect(this.shaper).connect(this.bass).connect(this.mid).connect(this.treble).connect(this.wet).connect(this.master);
       this.input.connect(this.dry).connect(this.master);
       // Bound the output even when stacked EQ boosts exceed full scale.
@@ -102,7 +113,7 @@ export class AudioEngine {
       this.applyPreset(this.preset);
       this.setBypass(this.bypass);
     }
-    if (this.context.state === "suspended") await this.context.resume();
+    if (!offline && this.context.state === "suspended") await this.context.resume();
     return this.context;
   }
 
@@ -132,6 +143,24 @@ export class AudioEngine {
   playFile(file: File): Promise<boolean> {
     if (file.size > 20 * 1024 * 1024) return Promise.reject(new Error("Use a dry recording under 20 MB."));
     return this.play(async (context) => context.decodeAudioData(await file.arrayBuffer()));
+  }
+
+  /** Render the same protected amp graph without a speaker/microphone context. */
+  static async renderFile(file: File, preset: Preset, bypass = false): Promise<AudioBuffer> {
+    if (!file.size || file.size > 20*1024*1024) throw new Error("Use a nonempty recording up to 20 MiB.");
+    const engine = new AudioEngine(preset);
+    engine.setBypass(bypass);
+    const decoded = await new OfflineAudioContext(1, 1, 44100).decodeAudioData(await file.arrayBuffer());
+    if (decoded.numberOfChannels > 2 || decoded.duration > 90 || decoded.duration < .1) throw new Error("Render mono/stereo audio lasting 0.1–90 seconds.");
+    const context = new OfflineAudioContext(decoded.numberOfChannels, decoded.length, decoded.sampleRate);
+    try {
+      await engine.initialize(context);
+      const source = context.createBufferSource(); source.buffer = decoded;
+      source.connect(engine.input!); source.start();
+      const rendered = await context.startRendering();
+      source.disconnect();
+      return rendered;
+    } finally { await engine.dispose(); }
   }
 
   /** Call from a user gesture. False means a newer start/stop canceled this request. */
@@ -324,7 +353,7 @@ export class AudioEngine {
   async dispose(): Promise<void> {
     this.disposed = true;
     this.stop();
-    await this.context?.close();
+    if (this.context && "close" in this.context) await this.context.close();
     this.context = undefined;
     this.calibrationModule = undefined;
   }

@@ -156,7 +156,7 @@ def create_app(store=None, generator=None):
         if request.app.state.preset_error:
             jobs.get(job_id)
             raise request.app.state.preset_error
-        source = selection.source_calibration.model_dump() if selection.source_calibration else None
+        source = selection.source_calibration.model_dump(exclude_none=True) if selection.source_calibration else None
         return jobs.start_generation(job_id, selection.reference_revision, request.app.state.generator, source)
 
     @app.get("/api/jobs/{job_id}/audio/{name}")

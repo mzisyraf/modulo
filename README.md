@@ -2,7 +2,7 @@
 
 Turn a guitar sound in a mixed song into a browser preset you can play through.
 
-**Status:** browser amp/live capture and a fixture preset API work. Tone Match and the standalone [local workflow](docs/LOCAL_SEPARATION.md) connect recorded-guitar input-level calibration, real upload, CUDA guitar/backing separation, reference confirmation and budget-gated starting rigs with editable Apply/Play. The standalone page compares the same calibrated recording with the rig on/off. Generation is disabled by default; spectral tone matching, audible quality and physical-rig acceptance remain incomplete.
+**Status:** browser amp/live capture and a fixture preset API work. Tone Match and the standalone [local workflow](docs/LOCAL_SEPARATION.md) connect recorded-guitar level/spectral measurements, real upload, CUDA guitar/backing separation, reference confirmation and budget-gated starting rigs with editable Apply/Play. The standalone page compares the same calibrated recording with the rig on/off. Generation is disabled by default; rendered checks/local refinement are available; broad audible tone-match and physical-rig acceptance remain incomplete.
 
 - **Team:** Isyraf — AI/backend/integration; Dinnie — browser audio/DSP; Shazlin — frontend/UX.
 - **Deadline:** 31 October 2026, 01:00 MYT (30 October, 17:00 UTC).
@@ -53,3 +53,5 @@ Python 3.12 API setup and tests are in [DEVELOPMENT.md](docs/DEVELOPMENT.md). Th
 Develop on your named branch: `Isyraf`, `Dinnie` or `Shazlin`. Isyraf coordinates direct merges into `staging`, where the combined code is tested before pushing. No PR is required for staging; keep scope, reviews, tested commits and handoffs in the work issue. Merge `staging` back into your personal branch regularly. `main` receives only an explicitly approved, tested staging release; creating these branches does not mean the MVP is finalized. See [COLLABORATION.md](docs/COLLABORATION.md) for the merge sequence. Preserve teammates' edits and keep API keys, uploads, model weights and unlicensed music out of Git.
 
 The repository is private during planning. The [event rules](https://nebiusglobalaihackathon.devpost.com/rules) require public source and an open-source licence for submission. The team must settle the licence and authorize publication before the deadline.
+
+Preset quality checks and the controlled same-performance/held-out benchmark are documented in [PRESET_EVALUATION.md](docs/PRESET_EVALUATION.md). Passing software tests alone does not establish a musical tone match.

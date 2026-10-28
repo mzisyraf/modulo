@@ -37,6 +37,9 @@ def test_uses_measured_reference_and_trusted_disclosure(tmp_path):
     assert "source_features" not in packet
     assert captured[0]["max_completion_tokens"] == 1500
     assert captured[0]["n"] == 1 and captured[0]["store"] is False
+    contract=captured[0]["response_format"]
+    assert contract["type"]=="json_schema" and contract["json_schema"]["strict"] is True
+    assert contract["json_schema"]["schema"]["properties"]["name"]["maxLength"]==80
 
 
 @pytest.mark.parametrize("bad", [True, "0.2", -0.1, 1.1, float("nan"), float("inf")])

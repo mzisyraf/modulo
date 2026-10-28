@@ -19,6 +19,7 @@ from .job_lock import exclusive_lock
 from .preset_generation import PresetError
 from .reference import reference_options, select_reference
 from .source_calibration import SourceCalibration
+from .tone_features import wav_tone_features
 
 MAX_UPLOAD_BYTES = 50 * 1024 * 1024
 MAX_JOBS = 4
@@ -314,7 +315,7 @@ class JobStore:
     def start_generation(self, job_id, revision, generator, source_calibration=None):
         if source_calibration is not None:
             try:
-                source_calibration = SourceCalibration.model_validate(source_calibration).model_dump()
+                source_calibration = SourceCalibration.model_validate(source_calibration).model_dump(exclude_none=True)
             except ValueError:
                 raise PresetError("invalid_source_calibration", "Choose and calibrate a usable guitar recording first.", 422) from None
         with self.lock:
@@ -349,8 +350,24 @@ class JobStore:
                 self.preset_running.pop(job_id, None)
                 return
         try:
+            if source_calibration and source_calibration.get("tone_features"):
+                reference = deepcopy(reference)
+                try:
+                    reference["tone_features"] = wav_tone_features(self.directory(job_id)/"guitar.wav", reference["start_seconds"], reference["end_seconds"])
+                except (OSError, ValueError, wave.Error):
+                    raise PresetError("target_spectral_unavailable", "The target spectrum could not be measured. Choose a clearer guitar passage.", 422) from None
+                # Analysis adds time before billing; recheck reference/expiry after it finishes.
+                with self.lock:
+                    current = self.jobs.get(job_id)
+                    if (not current or time.time() >= current["expires_at"] or current.get("generation", {}).get("request_id") != request_id
+                            or current["result"].get("reference_revision", 0) != revision):
+                        self.preset_running.pop(job_id, None)
+                        return
             preset = validate_preset(generator.generate(reference, source_calibration) if source_calibration is not None else generator.generate(reference))
             outcome = {"status": "ready", "preset": preset}
+            if source_calibration and source_calibration.get("tone_features"):
+                outcome["target_tone_features"] = reference["tone_features"]
+                outcome["target_rms_dbfs"] = reference["metrics"]["guitar_rms_dbfs"]
         except PresetError as failure:
             outcome = {"status": "failed", "error": {"code": failure.code, "message": failure.message, "retryable": True}}
         except Exception:
