@@ -1,6 +1,6 @@
 # Local separation checkpoint
 
-The separate modulo page at **http://127.0.0.1:5173/separation.html** connects a real local upload to cached `htdemucs_6s` CUDA separation. It provides original mix, combined guitar and guitar-reduced backing players, plus explicit 10â€“20-second reference confirmation. It needs no guitar/interface. The existing Tone Match page retains its labelled fixture flow and Shazlin's published calibration/session work without modification by this increment. Isyraf chose the separate page while that frontend work was still unpublished; it was subsequently merged from staging.
+The main **Tone Match** view at **http://127.0.0.1:5173** and standalone **/separation.html** connect real local upload to cached `htdemucs_6s` CUDA separation. Both provide original mix, guitar and guitar-reduced backing players, explicit 10–20-second reference confirmation and budget-gated starting presets. Neither needs a guitar/interface for sample audition. Tone Match preserves calibration, projects and recordings; generation still lacks source-guitar features and calibrated matching.
 
 This is an Isyraf integration preview for #2/#3/#6, with the proposed job boundary in #1/#6 awaiting Shazlin's review. The confirmed passage now connects to [budget-gated starting presets](PRESET_GENERATION.md), editable Apply and browser audition. It does not freeze the shared contract or establish broad separation quality, calibrated tone matching, real source features, recording or synchronized live play-along acceptance. No extra paid call is enabled by the integration.
 
@@ -10,10 +10,10 @@ Follow [DEVELOPMENT.md](DEVELOPMENT.md) for Node and the API venv, and [DEMUCS.m
 
 1. From the root, run `npm ci` and `npm run dev`.
 2. From `services/api`, run `.\.venv\Scripts\python.exe -m uvicorn app.main:app --host 127.0.0.1 --port 8000`. Use one API worker and no reload during a job.
-3. Open `/separation.html`, choose a rights-cleared WAV/MP3, and select **Separate guitar**.
+3. Open **Tone Match** (or `/separation.html`), choose a rights-cleared WAV/MP3, and select **Separate guitar**.
 4. Compare the tracks, enter whole-second bounds, preview the passage, and select **Confirm reference**. The starting-preset panel then exposes provider availability, Generate, editable controls, deliberate Apply and separate Play; generation stays disabled until a separately approved runtime allowance is configured.
 
-The page remembers its job ID in this tab's session storage and reconnects after refresh. Changing bounds clears the displayed confirmation; invalid selections never silently choose another passage. Native players can audition the entire tracks; the passage buttons start at the chosen time and stop near its end using browser time updates. Only one of this page's players plays at a time. Tracks go directly to the browser output, outside the guitar amp.
+The standalone page remembers its job ID in session storage and reconnects after refresh. Tone Match saves a job ID with each in-tab project; navigation keeps the current job, and reopening another project reconnects to its own job. Refresh clears these in-memory projects, files and calibration takes. Starting another project during an upload aborts the browser request; an already accepted server job may continue until expiry. Changing bounds clears the displayed confirmation; invalid selections never silently choose another passage. Native players can audition the entire tracks; the passage buttons start at the chosen time and stop near its end using browser time updates. Only one of this page's players plays at a time. Tracks go directly to the browser output, outside the guitar amp.
 
 ## Limits and storage
 
@@ -43,3 +43,10 @@ Run root `npm ci` / `npm run check`, then API-local `.\.venv\Scripts\python.exe 
 Automated HTTP checks cover raw/chunked bounds, duplicate/busy behavior, background progress, failure/timeout, unavailable/unsafe artifacts, retry, strict reference bounds, interrupted restart, single-service ownership, corruption cleanup and retention. Frontend helpers reject invalid passages, foreign artifact URLs and invented result provenance.
 
 The 27 October browser check uploaded the creator-provided **Exhilarate by Kevin MacLeod, CC BY 4.0**, through the actual API/RTX 4050 path. Source/credit are in ignored `data/bench/kevin-macleod-exhilarate/`; no audio is committed. All three players loaded 145.476-second distinct artifacts; duplicate click sent one POST; manual 00:30â€“00:45 confirmation, interval invalidation and reload recovery passed. A corrupt WAV exercised actual decoder failure without CUDA; a synthetic network interruption exercised reconnect. These are technical integration observations, not a human listening/bleed verdict or performance benchmark. Private user-provided music and converted samples stay in ignored local storage and must not be published.
+
+
+## Main Tone Match integration
+
+`App` owns the single amp engine for sample audition and live input. Embedded `StartingPresetPanel` delegates deliberate Apply to that owner and exposes no second audition graph. Proposal edits require Apply again; after Apply, the shared amp controls update its sound directly. Reference/backing players stay outside the amp. Source previews, navigation and project switches stop prior playback/capture; reference changes or known job expiry invalidate a generated preset. Calibration remains local and is not sent to generation. The standalone page retains its own deliberate Apply/Play controls.
+
+The repeatable browser regression is `tools/verification/tone-match.browser.js`, run through Playwright's `browser_run_code_unsafe` filename argument against a dev server on `127.0.0.1:5174`. It intercepts all API requests with labelled TEST ONLY data and uses real Web Audio for graph checks; it makes no GPU/model call or automatic microphone request. Run `npm ci` and `npm run check` as normal; use an isolated tracked-source copy when a running Windows dev server locks dependencies.

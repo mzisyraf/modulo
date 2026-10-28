@@ -10,7 +10,7 @@ This starter connects a React page, a TypeScript audio package, a shared preset 
 - FastAPI health and manual-example preset endpoints. The frontend remains usable if the API is stopped.
 - One JSON Schema used by Ajv in JavaScript and jsonschema in Python. The preset and its ranges are a draft for Isyraf/Dinnie/Shazlin to review.
 
-The existing main page keeps its labelled fixture analysis and local amp/live-input UI. The separate [local workflow](LOCAL_SEPARATION.md) implements bounded mixed-song upload, one isolated CUDA worker, retained job/audio artifacts, reference confirmation and [budget-gated Nano starting presets](PRESET_GENERATION.md) with editable Apply/Play. It requires the local separator setup; the main fixture page still needs no GPU/cloud credentials. Generation is disabled by default. Calibrated source/target tone matching, performance recording, live play-along and physical-interface acceptance remain incomplete.
+The main Tone Match page embeds real separation/reference/starting-preset controls alongside local amp/live-input UI. The standalone [local workflow](LOCAL_SEPARATION.md) implements bounded mixed-song upload, one isolated CUDA worker, retained job/audio artifacts, reference confirmation and [budget-gated Nano starting presets](PRESET_GENERATION.md) with editable Apply/Play. It requires the local separator setup; local amp audition still needs no GPU/cloud credentials. Generation is disabled by default. Calibrated source/target tone matching, performance recording, live play-along and physical-interface acceptance remain incomplete.
 
 The [reference selector](ANALYSIS.md) accepts already-isolated PCM16 guitar WAVs and aligned mix, and is reused by the local separation API. The [issue #1 contract review](CONTRACT_REVIEW.md) records controls, methods and pending team decisions; the separation-only job boundary is proposed for Shazlin's review.
 
@@ -89,11 +89,11 @@ Tests cover unsafe/unknown preset values, fixture provenance, truthful unavailab
 
 The separate [Demucs checks](DEMUCS.md) cover output validation/failure handling without a GPU, followed by an explicit generated-signal CUDA smoke. They use the separator environment, not the API environment.
 
-For a browser integration check, run the fixture API and frontend, then verify:
+For a browser integration check, run the local API and frontend, then verify:
 
-- Mixed-song selection enables the demo; a running job disables duplicate starts and file changes.
-- Ready results retain manual/demo provenance; the unclear-reference case shows a warning; failure shows no result and Try again can recover after selecting Tone ready.
-- Load demo preset works through the API proxy; this main-page fixture flow still does not submit song analysis. Verify the separate real upload/job/player/reference flow using [LOCAL_SEPARATION.md](LOCAL_SEPARATION.md).
+- Main Tone Match: upload a rights-cleared song to the local API, inspect job state and compare aligned original/guitar/backing audio. Confirm a 10–20 second reference; generation stays disabled without a separately approved allowance.
+- With offline injected responses, verify Generate does not Apply/play automatically, Apply reaches the one shared amp, proposal edits require reapply, and shared controls affect sample/live processing. Never enable paid calls merely to run a UI check.
+- Navigation stops audio while retaining the current job. New projects start with no previous job; reopening a saved in-tab project restores its job/preset. Changing a reference invalidates the generated preset. Confirm provider failure retains separated audio and allows deliberate retry. The standalone preview remains supported; see [LOCAL_SEPARATION.md](LOCAL_SEPARATION.md).
 - Device search and channel selection work; denial gives retry guidance. Live start/stop, disconnection, navigation and late permission grants release capture without reviving stale UI. Controls/bypass must not request capture again.
 
 Synthetic browser media can verify these UI/lifecycle paths without microphone permission. Actual interface capture, audible tone changes, physical disconnect and recorded round-trip latency require the real rig checklist in [the audio package](../packages/audio/README.md). Real clean/distorted/dense music separation, source/target feature quality and authenticated NVIDIA/Nebius presets are separate acceptance gates; fixture success does not satisfy them.

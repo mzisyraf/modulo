@@ -10,6 +10,7 @@ interface Props {
   revision: number;
   onPlay: () => void;
   onReferenceChanged: () => void;
+  onApplyPreset?: (preset: Preset) => void;
   ref?: Ref<PresetAudition>;
 }
 
@@ -21,7 +22,7 @@ const controls = [
 
 const errorMessage = (failure: unknown) => failure instanceof Error ? failure.message : "Starting-preset generation could not complete.";
 
-export function StartingPresetPanel({ jobId, revision, onPlay, onReferenceChanged, ref }: Props) {
+export function StartingPresetPanel({ jobId, revision, onPlay, onReferenceChanged, onApplyPreset, ref }: Props) {
   const [generation, setGeneration] = useState<PresetGeneration>();
   const [draft, setDraft] = useState<Preset>();
   const [available, setAvailable] = useState<boolean | null>(null);
@@ -79,7 +80,13 @@ export function StartingPresetPanel({ jobId, revision, onPlay, onReferenceChange
           currentCandidate.current = next.request_id;
         }
         if (next?.status === "generating") timer = window.setTimeout(() => void poll(), 1000);
-      } catch (failure) { if (!controller.signal.aborted) setError(`${errorMessage(failure)} Reconnect to check the existing attempt; it may still be running.`); }
+      } catch (failure) {
+        if (controller.signal.aborted) return;
+        if (failure instanceof Error && "status" in failure && failure.status === 404) {
+          referenceChanged.current(); return;
+        }
+        setError(`${errorMessage(failure)} Reconnect to check the existing attempt; it may still be running.`);
+      }
     }
     void poll();
     return () => { controller.abort(); window.clearTimeout(timer); };
@@ -99,6 +106,11 @@ export function StartingPresetPanel({ jobId, revision, onPlay, onReferenceChange
   function apply() {
     if (!draft) return;
     onPlay(); stop();
+    if (onApplyPreset) {
+      onApplyPreset(parsePreset(draft));
+      setApplied(true); setError("");
+      return;
+    }
     if (!engine.current) {
       const audio = new AudioEngine(draft);
       audio.onEnded = () => { if (alive.current && engine.current === audio) setPlaying("Stopped"); };
@@ -112,7 +124,8 @@ export function StartingPresetPanel({ jobId, revision, onPlay, onReferenceChange
     if (!draft) return;
     const next = parsePreset({ ...draft, parameters: { ...draft.parameters, [key]: value } });
     setDraft(next); setEdited(true);
-    if (applied) engine.current?.applyPreset(next);
+    if (onApplyPreset) setApplied(false);
+    else if (applied) engine.current?.applyPreset(next);
   }
 
   async function play(useFile: boolean) {
@@ -135,8 +148,10 @@ export function StartingPresetPanel({ jobId, revision, onPlay, onReferenceChange
     {generation?.status === "failed" && <p className="error" role="alert">{generation.error?.message} Retry is deliberate; another request may consume allowance.</p>}
     {draft && generation?.status === "ready" && <><h3>{draft.name}</h3><p>{draft.description}</p><div className="provenance"><strong>{edited ? "Edited starting preset" : "AI starting preset"}</strong><span>{draft.provenance.provider} · {draft.provenance.model}</span></div><p className="hint">Quality flags: {draft.quality_flags.join(", ")}. Local edits do not establish a calibrated match.</p>
       <div className="controls">{controls.map(([key, label, step, unit]) => { const bounds = schema.properties.parameters.properties[key]; return <label key={key} htmlFor={`starting-${key}`}><span>{label}<output>{draft.parameters[key]} {unit}</output></span><input id={`starting-${key}`} type="range" min={bounds.minimum} max={bounds.maximum} step={step} value={draft.parameters[key]} onChange={(event) => edit(key, Number(event.target.value))} /></label>; })}</div>
-      <button onClick={apply}>Apply starting preset</button><p role="status">{applied ? "Applied to the browser amp. Further edits update the amp; playback remains a separate action." : "Review or edit the controls, then Apply. Nothing is playing automatically."}</p>
+      <button onClick={apply}>Apply starting preset</button><p role="status">{applied ? onApplyPreset ? "Applied to the shared browser amp below. Use its controls, audition or live input; playback remains a separate action." : "Applied to the browser amp. Further edits update the amp; playback remains a separate action." : "Review or edit the controls, then Apply. Nothing is playing automatically."}</p>
+      {!onApplyPreset && <>
       <div className="preset-actions"><button disabled={!applied || startingAudio} onClick={() => void play(false)}>Play test signal</button><button className="stop" disabled={!applied} onClick={stop}>Stop preset audio</button></div><p className="hint">The test signal is synthetic, not a real guitar or a tone-match demonstration.</p><label className="file-label" htmlFor="preset-dry-file">Dry guitar recording · local audition only</label><input id="preset-dry-file" type="file" accept="audio/*" onChange={(event) => { stop(); setDryFile(event.target.files?.[0]); }} /><button className="secondary" disabled={!applied || !dryFile || startingAudio} onClick={() => void play(true)}>Play dry recording</button><p className="hint">A dry file stays in this browser and does not provide source calibration to the model. Reference and backing tracks are never amp inputs.</p><label className="toggle"><input type="checkbox" checked={bypass} disabled={!applied} onChange={(event) => { setBypass(event.target.checked); engine.current?.setBypass(event.target.checked); }} />Bypass drive and EQ</label><p role="status">{playing}</p></>}
+    </>}
     {error && <p className="error" role="alert">{error}</p>}
   </section>;
 }

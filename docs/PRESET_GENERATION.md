@@ -1,6 +1,6 @@
 # Barebone preset generation integration
 
-Status: integrated into the local `/separation.html` workflow. The provider uses the tested draft without AI quality tuning. Runtime generation remains disabled by default; this integration uses no additional paid calls. API/browser tests inject transport and are not evidence of new real inference or musical quality.
+Status: integrated into main Tone Match and the standalone `/separation.html` workflow. The provider uses the tested draft without AI quality tuning. Runtime generation remains disabled by default; this integration uses no additional paid calls. API/browser tests inject transport and are not evidence of new real inference or musical quality.
 
 ## Scope
 
@@ -8,7 +8,7 @@ Use the confirmed local guitar passage to request a six-control Nano starting pr
 
 ## Integrated files and ownership
 
-Isyraf's application-integration session incorporated the research chat's released provider/test/docs draft as the sole source writer. `main.py`/`jobs.py` now expose reference-scoped generation, and `StartingPresetPanel.tsx` provides generated controls and deliberate apply/play in the separate preview. Shazlin's main calibration/session UI and unpublished recordings-library work remain untouched by this increment; Tone Match integration is coordinated in issue #6.
+Isyraf's application-integration session incorporated the research chat's released provider/test/docs draft as the sole source writer. `main.py`/`jobs.py` now expose reference-scoped generation, and `StartingPresetPanel.tsx` provides generated controls and deliberate apply/play in the separate preview. The subsequent main Tone Match integration preserves calibration/session/recordings and delegates Apply to App's existing engine. The standalone preview retains its independent audition; embedded mode creates no second engine. Shared UX review remains in issue #6.
 
 ## Provider boundary
 

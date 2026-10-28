@@ -52,7 +52,7 @@ export function AppShell({ apiState, children, onNavigate, view }: AppShellProps
     <div className="app-frame">
       <header className="topbar">
         <div><p className="breadcrumb">Workspace <span aria-hidden="true">/</span> {current.title}</p><h1>{current.title}</h1><p>{current.description}</p></div>
-        <div className="topbar-status" title={apiState}><span className={apiConnected ? "status-dot connected" : "status-dot"} aria-hidden="true" />Demo Mode</div>
+        <div className="topbar-status" title={apiState}><span className={apiConnected ? "status-dot connected" : "status-dot"} aria-hidden="true" />Local workflow</div>
       </header>
       <main className="app-content" id="main-content">{children}</main>
     </div>
