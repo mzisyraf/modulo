@@ -180,3 +180,82 @@ and navigation cleanup already call `engine.stop()` and will cancel capture.
 Isyraf should agree a versioned source-feature/transport contract before
 depending on this local PCM shape as a server API. No preset-schema changes
 are needed to use this capture API.
+
+## Processed performance recorder (step 10, proposed API)
+
+The engine can encode its active live or sample source after input gain,
+drive/EQ/bypass, master gain and output protection. It connects only that
+protected output to a private `MediaStreamAudioDestinationNode` and native
+`MediaRecorder`. It never records the raw microphone stream, page/system
+audio, song/reference players or backing tracks. The normal headphone route
+is preserved. Whatever input the user selected is processed; the engine cannot
+determine whether that source is actually a guitar.
+
+This is the audio half for Shazlin's existing recording library. Its controls
+still need frontend wiring/review; no app UI changes are included here.
+
+```ts
+// After starting live input or a dry-sample audition, on a Record click:
+try {
+  const take = await engine.startPerformanceRecording();
+  // Pass take directly to apps/web's createPerformanceRecording(take, details).
+  // It contains blob, durationSeconds, mimeType, sampleRate and stopReason.
+} catch (error) {
+  // AbortError = discarded; other errors need visible retry guidance.
+  // Attach this handler immediately, including when navigating away.
+}
+
+// From a separate Finish button; resolves the original start promise:
+engine.finishPerformanceRecording(); // does not stop live monitoring
+// Discard instead:
+engine.cancelPerformanceRecording(); // rejects original promise with AbortError
+```
+
+`startPerformanceRecording({ maxSeconds?, maxBytes? }?)` requires an active
+engine source and running context. Defaults/hard upper limits are 180 seconds
+and 50 MiB, matching the library. Positive smaller limits may be supplied.
+Only one recording or finalization may run at once. The promise resolves only
+after the final encoded chunk arrives; do not create a Blob from intermediate
+chunks, or create a second raw-input recorder in the frontend.
+
+`PerformanceTake` has a playable audio `blob`, actual encoded `mimeType`,
+`durationSeconds` from the audio-context clock, processing-context `sampleRate`,
+and `stopReason`: `manual`, `duration_limit` or `source_stopped`. The codec may
+use a different internal sample rate and add padding; the processing rate and
+active recording duration are not an inspection of encoded file headers.
+WebM/Opus, Ogg/Opus and MP4 are considered in that order if supported; otherwise
+the browser's default is tried. Unsupported/empty/non-audio results reject.
+Use the returned MIME type rather than assuming WAV/MP3 or changing the file
+extension. Blob audio is not normalized or uploaded.
+
+`getPerformanceRecordingState()` is `idle`, `recording` or `stopping`. Stop and
+source replacement (including live device/channel switches), natural sample
+end and live track-ended finalize with `source_stopped`. `dispose()` discards
+pending recording. Cancel discards any buffered chunks. The engine releases
+the encoder destination/tracks and handlers without stopping live capture on
+normal Finish. Do not use `onEnded` to detect recording completion: it still
+describes the input source; the recording promise describes file completion.
+
+The duration timer stops slightly early for scheduling margin. Delayed timers
+that produce an overlong take cause rejection/discard, not a falsified capped
+duration. A size overflow, including the final chunk, discards the whole take
+rather than returning a corrupt partial container. Finalization has a five
+second timeout. Native encoders can buffer internally, so timeslices are not
+an exact memory or duration clock. Keep the tab active while recording.
+
+Frontend integration: retain a separate capture/session token, show Recording
+then Finalizing until the start promise settles, prevent duplicate starts,
+and handle auto-duration/source stops as completed takes. On Discard/new
+project/unmount, cancel explicitly and invalidate stale promise handlers so
+a finished take is not attached to a different project. Decide whether ordinary
+navigation should finalize/save or discard; current `engine.stop()` finalizes,
+while disposal discards. Snapshot project/preset metadata at start (or label
+changed controls as an edited take). Keep the 12-take library/Blob URL lifecycle
+in apps/web; the engine does not store completed takes or create object URLs.
+Dry calibration and performance capture remain separate types/routes.
+
+Synthetic decoded-file checks establish routing and lifecycle, not actual
+guitar timbre, recording quality on every browser or hardware latency. The
+reported live Drive crackling remains unresolved and is not changed by this
+recorder. Real Scarlett/Edge recording and downloaded-file listening still
+require human verification.
