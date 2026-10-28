@@ -113,6 +113,47 @@ def test_budget_cap_blocks_before_request_even_when_count_is_available(tmp_path)
     assert json.loads((tmp_path / "budget.json").read_text())["attempts"] == 1
 
 
+def test_explicit_uncapped_budget_preserves_ledger_and_request_stop(tmp_path):
+    ledger = {"attempts": 2, "reserved_usd": "5"}
+    (tmp_path / "budget.json").write_text(json.dumps(ledger))
+    calls = []
+    engine = provider.PresetGenerator(tmp_path, key="unit-test", budget_usd="unlimited", max_requests=3,
+                                      transport=lambda *_: calls.append(1) or response())
+    assert engine.available and engine.budget is None
+    engine.generate(REFERENCE)
+    after = json.loads((tmp_path / "budget.json").read_text())
+    assert after["attempts"] == 3
+    assert provider.Decimal(after["reserved_usd"]) == provider.Decimal("5") + provider.RESERVATION_USD
+    with pytest.raises(provider.PresetError) as failure:
+        engine.generate(REFERENCE)
+    assert failure.value.code == "budget_exhausted" and calls == [1]
+
+
+def test_uncapped_still_requires_explicit_count_and_readable_ledger(tmp_path):
+    engine = provider.PresetGenerator(tmp_path, key="unit-test", budget_usd="unlimited", max_requests=0)
+    assert not engine.available
+    (tmp_path / "budget.json").write_text('{"attempts":0,"reserved_usd":"NaN"}')
+    engine = provider.PresetGenerator(tmp_path, key="unit-test", budget_usd="unlimited", max_requests=3,
+                                      transport=lambda *_: pytest.fail("Corrupt ledger must not send a request"))
+    with pytest.raises(provider.PresetError) as failure:
+        engine.generate(REFERENCE)
+    assert failure.value.code == "budget_unavailable"
+
+
+def test_uncapped_environment_and_health_are_explicit(tmp_path, monkeypatch):
+    from fastapi.testclient import TestClient
+    from app.main import create_app
+    from app.jobs import JobStore
+    monkeypatch.setenv("NEBIUS_API_KEY", "unit-test")
+    monkeypatch.setenv("NEBIUS_BUDGET_USD", "unlimited")
+    monkeypatch.setenv("NEBIUS_MAX_REQUESTS", "100")
+    engine = provider.PresetGenerator.from_env(tmp_path / "budget")
+    assert engine.budget is None and engine.available
+    with TestClient(create_app(JobStore(tmp_path / "jobs"), engine), base_url="http://127.0.0.1") as client:
+        health = client.get("/api/health").json()
+    assert health["preset_budget_unlimited"] and health["preset_generation_available"]
+
+
 @pytest.mark.parametrize("budget", ["NaN", "Infinity", "-1", "100", "not-money"])
 def test_rejects_invalid_budgets(tmp_path, budget):
     with pytest.raises(provider.PresetError) as error:

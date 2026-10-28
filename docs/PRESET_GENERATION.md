@@ -1,6 +1,6 @@
 # Barebone preset generation integration
 
-Status: integrated into main Tone Match and the standalone `/separation.html` workflow. The provider uses the tested draft without AI quality tuning. Runtime generation remains disabled by default; this integration uses no additional paid calls. API/browser tests inject transport and are not evidence of new real inference or musical quality.
+Status: integrated into main Tone Match and the standalone `/separation.html` workflow. The provider uses the tested draft without AI quality tuning. Runtime generation remains disabled by default; offline API/browser tests inject transport. Explicit local operator configuration enables paid manual generation, including the opt-in uncapped-dollar mode below. Technical tests do not establish musical quality.
 
 ## Scope
 
@@ -59,10 +59,22 @@ NEBIUS_MAX_REQUESTS=0
 
 The previous US$0.10 / three-request experiment is finished; do not reuse its unused dollars as authorization for more requests. Integrate without changing the real .env or making live calls. Add the two zero-default fields to .env.example and explain activation only when the split includes that file.
 
-The local starter accepts at most US$1 and 100 configured requests; these are software ceilings, not approved spending. The durable `data/preset-inference/budget.json` reserves US$0.01608864 BEFORE each call. This overcounts an entire 262144-token input context plus 1500 completion tokens at the public Nano rates US$0.06/US$0.24 per million checked 27 October 2026. Recheck rates/model context before enabling a new allowance. The request itself is much smaller. Limits are cumulative against that directory; restart does not reset them. Corrupt/busy budget data fails closed. Errors/timeouts retain the reservation; do not delete/reset this ledger to retry. Local reservation is not a provider-side billing cap or invoice. Cloud deployment needs its own access/rate/budget design.
+The local starter accepts a numeric US$0–1 budget, or the explicit `unlimited` value to remove its dollar cap, with 0–100 configured requests. These settings are not provider-side billing limits. The durable `data/preset-inference/budget.json` reserves US$0.01608864 BEFORE each call. This overcounts an entire 262144-token input context plus 1500 completion tokens at the public Nano rates US$0.06/US$0.24 per million checked 27 October 2026. Recheck rates/model context before enabling a new allowance. The request itself is much smaller. Limits are cumulative against that directory; restart does not reset them. Corrupt/busy budget data fails closed. Errors/timeouts retain the reservation; do not delete/reset this ledger to retry. Local reservation is not a provider-side billing cap or invoice. Cloud deployment needs its own access/rate/budget design.
 
 ## Current evidence and remaining gaps
 
 Existing real Nano smoke: 3/3 responses satisfy the six-control preset schema, 2/3 satisfy all original checks, with inconsistent settings for identical synthetic inputs. That is access/format evidence only. The integrated provider/API/browser checks use injected transport; the browser harness uses synthetic separation input and a preset named TEST ONLY. They establish wiring, warnings, controls/lifecycle and cost guards, not hosted generation, real source calibration, listening quality or tone similarity. See `artifacts/nebius-model-access-20261027T143605Z/RESULTS.md` for the earlier real results. No additional paid request is authorized or performed by this integration.
 
 Official references: [chat completion limits](https://docs.tokenfactory.nebius.com/api-reference/inference/create-chat-completion), [public model/rate catalog](https://tokenfactory.nebius.com/api/public/models_info).
+
+
+## Explicit operator opt-in without a dollar cap
+
+An operator may set `NEBIUS_BUDGET_USD=unlimited` and `NEBIUS_MAX_REQUESTS=100` in their ignored local `.env`, then restart the API without zero-valued process overrides. Only the explicit text `unlimited` removes the monetary check; invalid/NaN/infinite numeric inputs still fail closed. Zero defaults keep new checkouts disabled. The cumulative 100-request stop, 1500 completion tokens, single output, manual action/no automatic retry, strict validation and durable reservation ledger remain. Existing reservations and failed attempts are not reset. The health response exposes `preset_budget_unlimited`; enabled uncapped UI states disclose that new generations/retries can incur charges. Unlimited local dollars do not remove provider charges or account credit limits.
+
+For this Isyraf session, the user explicitly requested removing the dollar cap on 28 October 2026; that instruction supersedes the earlier consumed smoke-only allowance for subsequent local manual generation. The feature does not authorize deployment or a team-wide `.env` change. New real-flow evidence uses the already-confirmed server reference and prepared user recording; it still does not supply source-calibration features or establish musical similarity.
+
+
+### Recorded-guitar live checkpoint — 28 October 2026
+
+After the user explicitly removed the local dollar cap, a real Nano request for the retained confirmed Maroon 5 00:00–00:15 reference returned a schema-valid generated starting preset. Deliberate Apply and brief playback of the user-provided 68.9-second guitar recording, bypass, real drive-curve edits and Stop passed in the browser with one audio context and no page errors. The source WAV was prepared locally from video with 1.068 dB conversion attenuation to leave headroom; the guitar recording was not sent to the provider. Ledger records one reserved request; reservation is not an invoice. No source-calibration/tone-similarity, live hardware or recording/play-along acceptance is inferred. Audio, preset and screenshots remain ignored local evidence under data/verification/guitar-audition.

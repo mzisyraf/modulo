@@ -26,6 +26,7 @@ export function StartingPresetPanel({ jobId, revision, onPlay, onReferenceChange
   const [generation, setGeneration] = useState<PresetGeneration>();
   const [draft, setDraft] = useState<Preset>();
   const [available, setAvailable] = useState<boolean | null>(null);
+  const [uncapped, setUncapped] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [refresh, setRefresh] = useState(0);
   const [error, setError] = useState("");
@@ -63,7 +64,10 @@ export function StartingPresetPanel({ jobId, revision, onPlay, onReferenceChange
     let timer: number | undefined;
     const signal = () => AbortSignal.any([controller.signal, AbortSignal.timeout(10000)]);
     apiJson("/api/health", { signal: signal() }).then((health) => {
-      if (!controller.signal.aborted) setAvailable(health.preset_generation_available === true);
+      if (!controller.signal.aborted) {
+        setAvailable(health.preset_generation_available === true);
+        setUncapped(health.preset_budget_unlimited === true);
+      }
     }).catch((failure) => { if (!controller.signal.aborted) { setAvailable(null); setError(errorMessage(failure)); } });
     async function poll() {
       try {
@@ -143,6 +147,7 @@ export function StartingPresetPanel({ jobId, revision, onPlay, onReferenceChange
   return <section className="result-panel starting-preset" aria-labelledby="starting-preset-title"><span className="step">05 / STARTING PRESET</span><h2 id="starting-preset-title">Generate a starting preset</h2>
     <p className="warning-message"><strong>Missing guitar calibration.</strong> This starting proposal uses target energy only. Your dry guitar, spectral tone and audible similarity have not been analysed; tone matching is unverified.</p>
     {available === false && <p className="notice" role="status">Generation is disabled: a separate backend request/budget allowance is required. No new paid requests are enabled by this integration.</p>}
+    {available && uncapped && <p className="hint" role="status">Manual generation is enabled without a dollar cap. New generations and deliberate retries can incur provider charges.</p>}
     <div className="preset-actions"><button disabled={!available || submitting || generation?.status === "generating" || generation?.status === "ready"} onClick={() => void generate()}>{submitting || generation?.status === "generating" ? "Generating starting preset…" : generation?.status === "failed" ? "Retry generation" : "Generate starting preset"}</button><button className="secondary" disabled={submitting} onClick={() => { setError(""); setRefresh((value) => value + 1); }}>Reconnect preset status</button></div>
     {generation?.status === "generating" && <p role="status">Generating for the confirmed passage. Separation and its audio remain available.</p>}
     {generation?.status === "failed" && <p className="error" role="alert">{generation.error?.message} Retry is deliberate; another request may consume allowance.</p>}

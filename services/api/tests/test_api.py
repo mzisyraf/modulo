@@ -15,6 +15,7 @@ def test_health_and_example_are_explicitly_scaffolded():
     assert client.get("/api/health").json() == {
         "status": "ok", "mode": "scaffold", "analysis_available": False,
         "separation_available": True, "preset_generation_available": False,
+        "preset_budget_unlimited": False,
     }
     response = client.get("/api/presets/example")
     assert response.status_code == 200

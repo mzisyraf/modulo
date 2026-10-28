@@ -90,7 +90,8 @@ def create_app(store=None, generator=None):
     def health(request: Request):
         provider = getattr(request.app.state, "generator", None)
         return {"status": "ok", "mode": "scaffold", "analysis_available": False,
-                "separation_available": True, "preset_generation_available": bool(provider and provider.available)}
+                "separation_available": True, "preset_generation_available": bool(provider and provider.available),
+                "preset_budget_unlimited": bool(provider and provider.budget is None)}
 
     @app.get("/api/presets/example")
     def preset_example():

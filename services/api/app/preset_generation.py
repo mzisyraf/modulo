@@ -68,11 +68,12 @@ class PresetGenerator:
         self.key = key
         self.transport = transport
         try:
-            self.budget = Decimal(str(budget_usd))
-            if not self.budget.is_finite() or not 0 <= self.budget <= Decimal("1") or type(max_requests) is not int or not 0 <= max_requests <= 100:
+            self.budget = None if str(budget_usd).strip().lower() == "unlimited" else Decimal(str(budget_usd))
+            if (self.budget is not None and (not self.budget.is_finite() or not 0 <= self.budget <= Decimal("1"))
+                    or type(max_requests) is not int or not 0 <= max_requests <= 100):
                 raise ValueError()
         except (ValueError, InvalidOperation):
-            raise PresetError("provider_configuration", "Use a finite local budget of US$0–1 and 0–100 requests.") from None
+            raise PresetError("provider_configuration", "Use a local budget of US$0–1 or explicit 'unlimited', and 0–100 requests.") from None
         self.max_requests = max_requests
 
     @classmethod
@@ -97,7 +98,7 @@ class PresetGenerator:
 
     @property
     def available(self):
-        return bool(self.key and self.max_requests and self.budget >= RESERVATION_USD)
+        return bool(self.key and self.max_requests and (self.budget is None or self.budget >= RESERVATION_USD))
 
     def reserve(self):
         if not self.available:
@@ -110,7 +111,7 @@ class PresetGenerator:
                 attempts, spent = ledger["attempts"], Decimal(ledger["reserved_usd"])
                 if type(attempts) is not int or attempts < 0 or not spent.is_finite() or spent < 0:
                     raise ValueError()
-                if attempts >= self.max_requests or spent + RESERVATION_USD > self.budget:
+                if attempts >= self.max_requests or (self.budget is not None and spent + RESERVATION_USD > self.budget):
                     raise PresetError("budget_exhausted", "The local preset-generation allowance is used. Ask the operator to review the budget.", 429)
                 temporary = self.directory / "budget.tmp"
                 temporary.write_text(json.dumps({"attempts": attempts + 1, "reserved_usd": str(spent + RESERVATION_USD)}), encoding="utf-8")
