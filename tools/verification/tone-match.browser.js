@@ -48,6 +48,9 @@ async (page) => {
     const [, id, action] = url.pathname.match(/^\/api\/jobs\/([^/]+)(?:\/(.*))?$/) ?? [];
     const job = jobs.get(id);
     if (!job) return json({ error: { message: "TEST ONLY expired job" } }, 404);
+    if (action === "references") return json({ method: "signal_contrast_v1", duration_seconds: 12,
+      options: [{ start_seconds: 0, end_seconds: 12, label: "TEST ONLY passage", explanation: "Synthetic suggestion", quality_flags: ["tone_difference_unverified"] }],
+      waveforms: { mix: Array(240).fill(.2), guitar: Array(240).fill(.1) } });
     if (action?.startsWith("audio/")) return route.fulfill({ contentType: "audio/wav", body: wav });
     if (action === "reference" && method === "POST") {
       job.result.reference = { ...request.postDataJSON(), quality_flags: ["separation_quality_unverified"], explanation: "TEST ONLY selected passage" };
@@ -100,6 +103,7 @@ async (page) => {
   await page.getByRole("button", { name: "Open project", exact: true }).click();
   await page.getByRole("heading", { name: "Compare the same passage" }).waitFor();
   check(await page.locator("#amp-title").innerText() === preset.name, "saved project reconnects to its own job and preset");
+  await page.getByRole("button", { name: "Manual selection", exact: true }).click();
   await page.locator("#reference-end").fill("11");
   check(await page.getByRole("button", { name: "Apply starting preset", exact: true }).count() === 0, "changed bounds remove stale proposal");
   check(await page.locator("#amp-title").innerText() !== preset.name, "changed bounds invalidate applied generated preset");

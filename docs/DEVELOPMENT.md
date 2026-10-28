@@ -91,7 +91,7 @@ The separate [Demucs checks](DEMUCS.md) cover output validation/failure handling
 
 For a browser integration check, run the local API and frontend, then verify:
 
-- Main Tone Match: upload a rights-cleared song to the local API, inspect job state and compare aligned original/guitar/backing audio. Confirm a 10–20 second reference; generation stays disabled without a separately approved allowance.
+- Main Tone Match: upload a rights-cleared song to the local API, inspect job state and compare aligned original/guitar/backing audio. Choose a fixed suggested waveform region or drag/edit a manual 10–20 second region; preview original/extracted guitar and confirm it. Confirm selection/mode changes invalidate prior confirmation; generation stays disabled without a separately approved allowance.
 - With offline injected responses, verify Generate does not Apply/play automatically, Apply reaches the one shared amp, proposal edits require reapply, and shared controls affect sample/live processing. Never enable paid calls merely to run a UI check.
 - Navigation stops audio while retaining the current job. New projects start with no previous job; reopening a saved in-tab project restores its job/preset. Changing a reference invalidates the generated preset. Confirm provider failure retains separated audio and allows deliberate retry. The standalone preview remains supported; see [LOCAL_SEPARATION.md](LOCAL_SEPARATION.md).
 - Device search and channel selection work; denial gives retry guidance. Live start/stop, disconnection, navigation and late permission grants release capture without reviving stale UI. Controls/bypass must not request capture again.

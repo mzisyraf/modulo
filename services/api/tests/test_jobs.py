@@ -29,6 +29,70 @@ def success(directory):
     (directory / "result.json").write_text(json.dumps({"device": "synthetic test GPU", "common_gain_linear": 0.9}))
 
 
+def test_reference_options_for_existing_job_cache_and_confirmation(local_api, monkeypatch):
+    client, store = local_api
+    job_id = upload(client).json()["job_id"]
+    assert terminal(client, job_id)["status"] == "ready"
+    response = client.get(f"/api/jobs/{job_id}/references")
+    assert response.status_code == 200
+    result = response.json()
+    assert result["method"] == "signal_contrast_v1" and len(result["options"]) == 1
+    assert len(json.dumps(result)) < 65536
+    assert client.get(f"/api/jobs/{job_id}").json()["result"]["reference"] is None
+    monkeypatch.setattr("app.jobs.reference_options", lambda *_: pytest.fail("Cached waveforms should not reread audio"))
+    assert client.get(f"/api/jobs/{job_id}/references").json() == result
+    assert client.post(f"/api/jobs/{job_id}/reference", json={"start_seconds": 0, "end_seconds": 10}).status_code == 200
+    assert client.get(f"/api/jobs/{job_id}").json()["result"]["reference_revision"] == 1
+    store.remove(job_id)
+    assert job_id not in store.reference_cache
+    assert client.get(f"/api/jobs/{job_id}/references").status_code == 404
+
+
+def test_reference_options_reject_pending_and_damaged_artifacts(local_api):
+    client, store = local_api
+    pending, _ = store.reserve(str(uuid4()))
+    assert client.get(f"/api/jobs/{pending['job_id']}/references").status_code == 409
+    store.fail(pending["job_id"], JobError("test", "TEST ONLY"))
+    job_id = upload(client).json()["job_id"]
+    assert terminal(client, job_id)["status"] == "ready"
+    (store.directory(job_id) / "guitar.wav").write_bytes(b"broken")
+    response = client.get(f"/api/jobs/{job_id}/references")
+    assert response.status_code == 422
+    assert response.json()["error"]["code"] == "reference_analysis_failed"
+    assert client.get(f"/api/jobs/{job_id}").json()["status"] == "ready"
+
+
+def test_waveform_scan_does_not_block_status_or_duplicate_work(local_api, monkeypatch):
+    from concurrent.futures import ThreadPoolExecutor
+    from app.reference import reference_options
+    client, store = local_api
+    job_id = upload(client).json()["job_id"]
+    assert terminal(client, job_id)["status"] == "ready"
+    entered, release = Event(), Event()
+    calls = []
+
+    def delayed(*paths):
+        calls.append(1); entered.set()
+        assert release.wait(10)
+        return reference_options(*paths)
+
+    monkeypatch.setattr("app.jobs.reference_options", delayed)
+    with ThreadPoolExecutor(max_workers=2) as requests:
+        first = requests.submit(client.get, f"/api/jobs/{job_id}/references")
+        try:
+            assert entered.wait(2)
+            second = requests.submit(client.get, f"/api/jobs/{job_id}/references")
+            assert client.get(f"/api/jobs/{job_id}").json()["status"] == "ready"
+            for _ in range(4):
+                extra, _ = store.reserve(str(uuid4()))
+                store.fail(extra["job_id"], JobError("test", "TEST ONLY"))
+            assert store.directory(job_id).exists()
+        finally:
+            release.set()
+        assert first.result().status_code == second.result().status_code == 200
+    assert calls == [1] and not store.reference_pending
+
+
 @pytest.fixture
 def local_api(tmp_path, monkeypatch):
     store = JobStore(tmp_path / "jobs")

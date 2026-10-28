@@ -143,6 +143,10 @@ def create_app(store=None, generator=None):
     def confirm_reference(job_id: str, interval: ReferenceInterval, request: Request):
         return request.app.state.jobs.confirm(job_id, interval.start_seconds, interval.end_seconds)
 
+    @app.get("/api/jobs/{job_id}/references")
+    def reference_options(job_id: str, request: Request):
+        return request.app.state.jobs.references(job_id)
+
     @app.post("/api/jobs/{job_id}/preset", status_code=202)
     def generate_preset(job_id: str, selection: PresetRequest, request: Request):
         jobs = request.app.state.jobs

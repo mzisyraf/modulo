@@ -1,6 +1,6 @@
 """Bounded local separation and reference-scoped starting-preset state."""
 
-from concurrent.futures import ThreadPoolExecutor
+from concurrent.futures import Future, ThreadPoolExecutor
 from copy import deepcopy
 import json
 import logging
@@ -17,7 +17,7 @@ import wave
 from .contracts import ROOT, validate_preset
 from .job_lock import exclusive_lock
 from .preset_generation import PresetError
-from .reference import select_reference
+from .reference import reference_options, select_reference
 
 MAX_UPLOAD_BYTES = 50 * 1024 * 1024
 MAX_JOBS = 4
@@ -51,6 +51,8 @@ class JobStore:
         self.lock = RLock()
         self.jobs = {}
         self.preset_running = {}
+        self.reference_cache = {}
+        self.reference_pending = {}
 
     def start(self):
         self.root.mkdir(parents=True, exist_ok=True)
@@ -122,7 +124,8 @@ class JobStore:
     def prune(self):
         with self.lock:
             for job_id, job in list(self.jobs.items()):
-                if time.time() >= job["expires_at"] and job["status"] in {"ready", "failed"} and job_id not in self.preset_running:
+                if (time.time() >= job["expires_at"] and job["status"] in {"ready", "failed"}
+                        and job_id not in self.preset_running and job_id not in self.reference_pending):
                     try:
                         self.remove(job_id)
                     except JobError:
@@ -134,6 +137,7 @@ class JobStore:
         except OSError as failure:
             raise JobError("storage_busy", "An older audio job is still in use. Close its player and retry.", 503, True) from failure
         del self.jobs[job_id]
+        self.reference_cache.pop(job_id, None)
 
     def reserve(self, key):
         canonical_id(key)
@@ -145,9 +149,9 @@ class JobStore:
             if any(job["status"] in {"queued", "running"} for job in self.jobs.values()):
                 raise JobError("worker_busy", "One local song is already processing. Wait for it to finish.", 429, True)
             while len(self.jobs) >= MAX_JOBS:
-                candidates = [item for item in self.jobs if item not in self.preset_running]
+                candidates = [item for item in self.jobs if item not in self.preset_running and item not in self.reference_pending]
                 if not candidates:
-                    raise JobError("generation_busy", "Retained jobs are generating presets. Wait before uploading another song.", 429, True)
+                    raise JobError("generation_busy", "Retained jobs are generating presets or loading waveforms. Wait before uploading another song.", 429, True)
                 self.remove(min(candidates, key=lambda item: self.jobs[item]["created_at"]))
             created = time.time()
             job_id = str(uuid4())
@@ -247,6 +251,38 @@ class JobStore:
         except Exception:
             logger.exception("Local separation job %s failed", job_id)
             self.fail(job_id, JobError("separation_failed", "Separation did not produce valid artifacts. Inspect worker.log and retry.", retryable=True))
+
+    def references(self, job_id):
+        with self.lock:
+            job = self.get(job_id)
+            if job["status"] != "ready":
+                raise JobError("job_not_ready", "Wait for separation before loading reference options.", 409)
+            if job_id in self.reference_cache:
+                return deepcopy(self.reference_cache[job_id])
+            pending = self.reference_pending.get(job_id)
+            owner = pending is None
+            if owner:
+                pending = self.reference_pending[job_id] = Future()
+        if not owner:
+            return deepcopy(pending.result())
+        # Pin files while reading outside the global lock; job status remains responsive.
+        try:
+            directory = self.directory(job_id)
+            try:
+                result = reference_options(directory / "guitar.wav", directory / "mix.wav")
+            except (OSError, ValueError, wave.Error, EOFError) as failure:
+                raise JobError("reference_analysis_failed", "Could not read reference waveforms. Reconnect or submit the song again.", 422) from failure
+            with self.lock:
+                self.get(job_id)
+                self.reference_cache[job_id] = result
+            pending.set_result(result)
+            return deepcopy(result)
+        except BaseException as failure:
+            pending.set_exception(failure)
+            raise
+        finally:
+            with self.lock:
+                self.reference_pending.pop(job_id, None)
 
     def confirm(self, job_id, start, end):
         with self.lock:
