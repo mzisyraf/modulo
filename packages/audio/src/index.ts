@@ -1,5 +1,5 @@
 import { parsePreset, type Preset } from "@modulo/contracts";
-import { driveCurve, pluckSamples } from "./dsp.ts";
+import { driveSettings, saturationCurve, pluckSamples } from "./dsp.ts";
 import { CalibrationBuffer, calibrationFrameLimit, inputLevel, type CalibrationAudio, type InputLevel } from "./calibration.ts";
 export type { CalibrationAudio, CalibrationFlag, InputLevel } from "./calibration.ts";
 import { recordProcessedOutput, type ProcessedRecording, type PerformanceRecordingOptions, type PerformanceTake } from "./recording.ts";
@@ -25,6 +25,10 @@ export class AudioEngine {
   private context?: AudioContext;
   private input?: GainNode;
   private shaper?: WaveShaperNode;
+  private drivePre?: GainNode;
+  private drivePost?: GainNode;
+  private driveClean?: GainNode;
+  private driveWet?: GainNode;
   private bass?: BiquadFilterNode;
   private mid?: BiquadFilterNode;
   private treble?: BiquadFilterNode;
@@ -59,7 +63,11 @@ export class AudioEngine {
     const parameters = this.preset.parameters;
     const time = this.context.currentTime;
     this.input!.gain.setTargetAtTime(10 ** (parameters.input_gain_db / 20), time, 0.015);
-    this.shaper!.curve = driveCurve(parameters.drive);
+    const drive = driveSettings(parameters.drive);
+    this.drivePre!.gain.setTargetAtTime(drive.preGain, time, 0.015);
+    this.drivePost!.gain.setTargetAtTime(drive.postGain, time, 0.015);
+    this.driveClean!.gain.setTargetAtTime(drive.clean, time, 0.015);
+    this.driveWet!.gain.setTargetAtTime(drive.distorted, time, 0.015);
     this.bass!.gain.setTargetAtTime(parameters.bass_db, time, 0.015);
     this.mid!.gain.setTargetAtTime(parameters.mid_db, time, 0.015);
     this.treble!.gain.setTargetAtTime(parameters.treble_db, time, 0.015);
@@ -80,7 +88,25 @@ export class AudioEngine {
       this.context = context;
       this.input = context.createGain();
       this.shaper = context.createWaveShaper();
-      this.shaper.oversample = "2x";
+      this.shaper.oversample = "4x";
+      this.shaper.curve = saturationCurve();
+      this.drivePre = context.createGain();
+      this.drivePost = context.createGain();
+      this.driveClean = context.createGain();
+      this.driveWet = context.createGain();
+      const drive = driveSettings(this.preset.parameters.drive);
+      this.drivePre.gain.value = drive.preGain;
+      this.drivePost.gain.value = drive.postGain;
+      this.driveClean.gain.value = drive.clean;
+      this.driveWet.gain.value = drive.distorted;
+      const driveHighpass = context.createBiquadFilter();
+      driveHighpass.type = "highpass";
+      driveHighpass.frequency.value = 50;
+      driveHighpass.Q.value = Math.SQRT1_2;
+      const driveLowpass = context.createBiquadFilter();
+      driveLowpass.type = "lowpass";
+      driveLowpass.frequency.value = 6500;
+      driveLowpass.Q.value = Math.SQRT1_2;
       this.bass = context.createBiquadFilter();
       this.bass.type = "lowshelf";
       this.bass.frequency.value = 250;
@@ -98,7 +124,10 @@ export class AudioEngine {
       this.master.gain.value = 10 ** (this.preset.parameters.master_gain_db / 20);
       this.wet.gain.value = this.bypass ? 0 : 1;
       this.dry.gain.value = this.bypass ? 1 : 0;
-      this.input.connect(this.shaper).connect(this.bass).connect(this.mid).connect(this.treble).connect(this.wet).connect(this.master);
+      this.input.connect(this.drivePre).connect(this.shaper).connect(this.drivePost)
+        .connect(driveHighpass).connect(driveLowpass).connect(this.driveWet).connect(this.bass);
+      this.input.connect(this.driveClean).connect(this.bass);
+      this.bass.connect(this.mid).connect(this.treble).connect(this.wet).connect(this.master);
       this.input.connect(this.dry).connect(this.master);
       // Bound the output even when stacked EQ boosts exceed full scale.
       const outputGuard = context.createWaveShaper();

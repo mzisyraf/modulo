@@ -12,6 +12,7 @@ class FakeNode {
   started = false;
   stopped = false;
   disconnected = false;
+  curve?: Float32Array;
   onended: (() => void) | null = null;
   connect(node: FakeNode) { return node; }
   disconnect() { this.disconnected = true; }
@@ -26,10 +27,11 @@ class FakeContext {
   currentTime = 0;
   destination = new FakeNode();
   sources: FakeNode[] = [];
+  shapers: FakeNode[] = [];
   finishDecode?: (buffer: unknown) => void;
   constructor() { FakeContext.current = this; }
   createGain() { return new FakeNode(); }
-  createWaveShaper() { return new FakeNode(); }
+  createWaveShaper() { const node = new FakeNode(); this.shapers.push(node); return node; }
   createBiquadFilter() { return new FakeNode(); }
   createBuffer() { return { copyToChannel() {} }; }
   createBufferSource() { const source = new FakeNode(); this.sources.push(source); return source; }
@@ -66,4 +68,21 @@ test("starting another audition stops and disconnects the previous source", asyn
     assert.equal(FakeContext.current.sources.filter((source) => source.started && !source.stopped).length, 1);
     await engine.dispose();
   } finally { globalThis.AudioContext = original; }
+});
+
+test("changing drive/EQ/bypass never replaces the active saturation curve", async () => {
+  const original = globalThis.AudioContext;
+  globalThis.AudioContext = FakeContext as unknown as typeof AudioContext;
+  const engine = new AudioEngine(parsePreset(example));
+  try {
+    await engine.playTestSignal();
+    const curve = FakeContext.current.shapers[0].curve;
+    assert.ok(curve);
+    for (const drive of [0, 0.01, 0.25, 1, 0]) {
+      engine.applyPreset(parsePreset({ ...example, parameters: { ...example.parameters, drive, bass_db: 12, mid_db: -12 } }));
+      engine.setBypass(true); engine.setBypass(false);
+      assert.equal(FakeContext.current.shapers[0].curve, curve);
+    }
+    assert.equal(FakeContext.current.shapers.length, 2); // fixed drive + output guard
+  } finally { await engine.dispose(); globalThis.AudioContext = original; }
 });
