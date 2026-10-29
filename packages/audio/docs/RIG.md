@@ -26,11 +26,23 @@ previous Scarlett Solo 4th-generation self-building sound with Drive enabled
 remains a separate, unresolved hardware/routing/listening investigation.
 Stop immediately if it returns. These changes do not establish its cause or fix.
 
+The workbench shows a compact, horizontally scrolling signal chain and one
+selected module's controls. A separate horizontal gear library always includes
+all 17 editable gear families, regardless of the factory rig. Drag a library
+handle into a chain gap to add gear, drag placed handles to reorder or move
+between parallel paths, and drop placed gear in the removal area to remove it.
+Add/destination, move-arrow and Remove buttons support keyboard/touch use.
+Input and Output stay fixed. Removing a parallel split module moves the split
+to its previous main-chain module; snapshots/CC references to removed gear are
+cleaned up. All models remain selectable in each dropdown; starred groups mark
+the loaded factory rig's starting choices, not a restriction or tone-match score.
+Imported/JSON-defined rigs have no automatic factory recommendation badge.
+
 The workbench supports catalog/model/parameter choices, enable/bypass, input
 device/channel selection, dry meter, monophonic tuner, snapshots, MIDI connect,
 temporary dry/wet takes with playback/download, custom IR loading, JSON preset
-import/export and offline WAV rendering. Edit the JSON for chain order, parallel
-path level/pan, MIDI assignments and removal of modules. The workbench is an
+import/export and offline WAV rendering. Edit the JSON for parallel
+path level/pan and MIDI assignments. The workbench is an
 audio development tool; Shazlin owns the main product UI.
 
 ## Implemented tiers

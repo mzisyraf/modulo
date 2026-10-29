@@ -7,16 +7,37 @@ const send = (method, params = {}) => new Promise((resolve, reject) => { const i
 try {
   await send("Page.navigate", { url: process.env.MODULO_RIG_URL || "http://127.0.0.1:5175/" }); await new Promise(resolve => setTimeout(resolve, 1000));
   const result = await send("Runtime.evaluate", { expression: `(async()=>{
-    const wait=ms=>new Promise(r=>setTimeout(r,ms)), el=id=>document.getElementById(id), check=(value,message)=>{if(!value)throw Error(message)};
+    const wait=ms=>new Promise(r=>setTimeout(r,ms)), el=id=>document.getElementById(id), checks=[], check=(value,message)=>{if(!value)throw Error(message);checks.push(message)}, rig=()=>JSON.parse(el("json").value);
+    const settled=async()=>{await wait(400)}, pick=id=>{document.querySelector('[data-module="'+id+'"] .gear-title').click()};
+    const drop=async(handle,target)=>{const dataTransfer=new DataTransfer();handle.dispatchEvent(new DragEvent("dragstart",{bubbles:true,dataTransfer}));target.dispatchEvent(new DragEvent("dragover",{bubbles:true,cancelable:true,dataTransfer}));target.dispatchEvent(new DragEvent("drop",{bubbles:true,cancelable:true,dataTransfer}));handle.dispatchEvent(new DragEvent("dragend",{bubbles:true,dataTransfer}));await settled()};
     check(document.title.includes("Rig workbench"),"workbench missing");
-    el("load").click(); await wait(500); check(!document.querySelector('#chain select').disabled,"controls disabled after load");
-    el("factory").value="3"; el("load").click(); await wait(500); check(el("chain").children.length===19,"expanded modules missing");
+    el("load").click(); await settled(); check(!document.querySelector('#controls select').disabled,"controls enabled after load");
+    check(el("gear-tray").children.length===17,"all 17 gear families available");
+    let amp=document.querySelector('[aria-label="amp model"]');check(amp.options.length===3&&amp.querySelector('optgroup').querySelector('option').value==='modern_high_gain',"all amps visible with modern recommendation");
+    el("factory").value="1";el("load").click();await settled();amp=document.querySelector('[aria-label="amp model"]');check(amp.options.length===3&&amp.querySelector('optgroup').querySelector('option').value==='american_clean',"clean recommendation changes without hiding amps");
+    amp.value="british_crunch";amp.dispatchEvent(new Event("change"));await settled();check(rig().chain.find(m=>m.id==="amp").model==="british_crunch","nonrecommended amp can be selected");
+    pick("cabinet");const cab=document.querySelector('[aria-label="cabinet model"]');cab.value="custom";cab.dispatchEvent(new Event("change"));await settled();check(rig().chain.find(m=>m.id==='cabinet').model==='open_112'&&document.querySelector('[aria-label="cabinet model"]').value==='open_112',"missing IR restores audible model and dropdown");
+    const fuzzHandle=document.querySelector('[aria-label="Add or drag fuzz"]');
+    await drop(fuzzHandle,document.querySelector('.gear-rail[data-path="main"] .drop-slot[data-before="amp"]'));
+    let fuzz=rig().chain.find(m=>m.type==="fuzz");check(fuzz&&rig().chain[rig().chain.findIndex(m=>m.id==="amp")-1].id===fuzz.id,"drag library gear into exact chain position");
+    check(document.querySelectorAll('#controls>article').length===1,"one selected module control panel");
+    await drop(document.querySelector('[aria-label="Drag '+fuzz.id+'"]'),document.querySelector('.drop-slot[data-before="gate"]'));
+    check(rig().chain[1].id===fuzz.id,"drag reorders existing gear");
+    await drop(document.querySelector('[aria-label="Drag '+fuzz.id+'"]'),el("remove-gear"));check(!rig().chain.some(m=>m.id===fuzz.id),"drop removes existing gear");
+    document.querySelector('[aria-label="Add chorus"]').click();await settled();const chorus=rig().chain.find(m=>m.type==="chorus");check(!!chorus,"button adds gear without dragging");
+    const earlier=document.querySelector('[aria-label="Move '+chorus.id+' earlier"]');earlier.focus();earlier.click();await settled();check(rig().chain.at(-3).id===chorus.id,"arrow button reorders gear");check(document.activeElement.getAttribute('aria-label')==='Move '+chorus.id+' earlier',"move button retains keyboard focus");
+    check(!document.querySelector('[aria-label="Remove input"]')&&!document.querySelector('[aria-label="Remove output"]'),"input and output are fixed");
+    el("factory").value="0";el("load").click();await settled();document.querySelector('[aria-label="Remove amp"]').click();await settled();check(rig().midi.bindings.length===0&&rig().snapshots.every(s=>s.values.every(m=>m.id!=='amp')),"removing mapped gear cleans snapshots and MIDI");
+    el("factory").value="3"; el("load").click(); await settled(); check(document.querySelectorAll('.chain-card').length===19,"expanded modules remain selectable");
     const gain=document.querySelector('[aria-label="amp gain"]');gain.value="0.6";gain.dispatchEvent(new Event("input")); await wait(100);check(JSON.parse(el("json").value).chain.find(m=>m.id==="amp").parameters.gain===0.6,"slider did not update engine JSON");
-    el("factory").value="4";el("load").click();await wait(500);check(JSON.parse(el("json").value).parallel.paths.length===2,"dual rig missing");
+    el("factory").value="4";el("load").click();await settled();check(rig().parallel.paths.length===2,"dual rig has two paths");
+    await drop(document.querySelector('[aria-label="Drag amp_a"]'),document.querySelector('.gear-rail[data-path="path:crunch_path"] .drop-slot[data-before="amp_b"]'));
+    check(rig().parallel.paths[1].chain[0].id==='amp_a',"drag supports moving between parallel paths");
+    el("destination").value="path:clean_path";document.querySelector('[aria-label="Add tremolo"]').click();await settled();check(rig().parallel.paths[0].chain.some(m=>m.type==='tremolo'),"button adds to chosen parallel path");
     el("start").click();await wait(500);check(el("status").textContent.includes("Live input active"),el("status").textContent);
     el("record").click();await wait(700);el("finish").click();await wait(500);check(el("takes").querySelectorAll("audio").length===2,el("status").textContent);
     el("stop").click();check(el("status").textContent==="Stopped.","stop not reflected");
-    return {passed:7, viewport:{width:innerWidth,height:innerHeight},title:document.title,status:el("status").textContent};
+    return {passed:checks.length,checks,viewport:{width:innerWidth,height:innerHeight},title:document.title,status:el("status").textContent};
   })()`, awaitPromise: true, returnByValue: true, timeout: 30000 });
   if (result.exceptionDetails) throw new Error(JSON.stringify(result.exceptionDetails));
   await send("Emulation.setDeviceMetricsOverride", { width: 390, height: 844, deviceScaleFactor: 1, mobile: true });
@@ -25,5 +46,8 @@ try {
   await send("Emulation.setDeviceMetricsOverride", { width: 1200, height: 900, deviceScaleFactor: 1, mobile: false });
   const screenshot = await send("Page.captureScreenshot", { format: "png", captureBeyondViewport: false });
   await writeFile("/private/tmp/modulo-rig-workbench.png", Buffer.from(screenshot.data, "base64"));
+  await send("Runtime.evaluate", { expression: 'document.getElementById("controls").scrollIntoView({block:"start"})' });
+  const detail = await send("Page.captureScreenshot", { format: "png", captureBeyondViewport: false });
+  await writeFile("/private/tmp/modulo-rig-library.png", Buffer.from(detail.data, "base64"));
   console.log(JSON.stringify({ ...result.result.value, mobile: mobile.result.value }));
 } finally { socket.close(); }
