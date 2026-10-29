@@ -23,6 +23,7 @@ export interface ToneFeatures {
   centroid_hz: number;
   flatness: number;
   crest_db: number;
+  fine_bands?: number[];
 }
 export const bandEdges = [40,120,350,1000,3000,8000,16000];
 
@@ -44,16 +45,17 @@ export function toneFeatures(samples: Float32Array, rate: number): ToneFeatures 
     active++;
   }
   if(!active)throw Error("No active spectral frames");
-  const bands=Array(6).fill(0);let total=0,weighted=0,logs=0,bins=0;
+  const bands=Array(6).fill(0),fine=Array(24).fill(0);let total=0,weighted=0,logs=0,bins=0;
   for(let i=1;i<power.length;i++){
     const hz=i*rate/size;if(hz<40||hz>=16000)continue;
     const value=power[i]/active;
     const band=bandEdges.findIndex((edge,index)=>index<6&&hz>=edge&&hz<bandEdges[index+1]);
     bands[band]+=value;total+=value;weighted+=hz*value;logs+=Math.log(Math.max(value,1e-20));bins++;
+    fine[Math.min(23,Math.floor(Math.log(hz/40)/Math.log(400)*24))]+=value;
   }
   if(total<=1e-16)throw Error("No usable guitar-band spectrum");
   return {method:"spectral_bands_v1",bands:bands.map(v=>v/total),centroid_hz:weighted/total,
-    flatness:Math.min(1,Math.exp(logs/bins)/(total/bins)),crest_db:20*Math.log10(peak/Math.sqrt(energy/samples.length))};
+    flatness:Math.min(1,Math.exp(logs/bins)/(total/bins)),crest_db:20*Math.log10(peak/Math.sqrt(energy/samples.length)),fine_bands:fine.map(v=>v/total)};
 }
 
 export function validToneFeatures(value: unknown): value is ToneFeatures {
@@ -62,7 +64,8 @@ export function validToneFeatures(value: unknown): value is ToneFeatures {
     &&x.bands.every(v=>Number.isFinite(v)&&v>=0&&v<=1)&&Math.abs(x.bands.reduce((a,b)=>a+b,0)-1)<.001
     &&Number.isFinite(x.centroid_hz)&&x.centroid_hz>=40&&x.centroid_hz<=16000
     &&Number.isFinite(x.flatness)&&x.flatness>=0&&x.flatness<=1
-    &&Number.isFinite(x.crest_db)&&x.crest_db>=0&&x.crest_db<=80);
+    &&Number.isFinite(x.crest_db)&&x.crest_db>=0&&x.crest_db<=80
+    &&(x.fine_bands===undefined||(Array.isArray(x.fine_bands)&&x.fine_bands.length===24&&x.fine_bands.every(v=>Number.isFinite(v)&&v>=0&&v<=1)&&Math.abs(x.fine_bands.reduce((a,b)=>a+b,0)-1)<.001)));
 }
 
 export function toneDistance(a: ToneFeatures,b: ToneFeatures): number {
@@ -70,4 +73,12 @@ export function toneDistance(a: ToneFeatures,b: ToneFeatures): number {
   // A different performance changes this proxy; it is not a perceptual accuracy score.
   const bands=a.bands.reduce((sum,value,i)=>sum+Math.abs(10*Math.log10((value+1e-6)/(b.bands[i]+1e-6))),0)/6;
   return bands+.2*Math.abs(a.crest_db-b.crest_db)+.1*Math.abs(10*Math.log10((a.flatness+1e-8)/(b.flatness+1e-8)));
+}
+
+/** Finer envelope for local optimization; the legacy six-band score stays unchanged. */
+export function detailedToneDistance(a: ToneFeatures,b: ToneFeatures): number {
+  const coarse=toneDistance(a,b);
+  if(!a.fine_bands||!b.fine_bands)return coarse;
+  const fine=a.fine_bands.reduce((sum,value,i)=>sum+Math.abs(10*Math.log10((value+1e-6)/(b.fine_bands![i]+1e-6))),0)/24;
+  return .7*fine+.3*coarse;
 }

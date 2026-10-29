@@ -13,6 +13,7 @@
   },
   "scripts": {
     "dev": "npm run dev --workspace @modulo/web",
+    "preview": "npm run preview --workspace @modulo/web",
     "build": "npm run build --workspace @modulo/web",
     "typecheck": "tsc --noEmit",
     "test": "node --test contracts/test/*.test.ts packages/audio/test/*.test.ts apps/web/test/*.test.ts",

@@ -19,6 +19,7 @@ def test_browser_and_python_spectral_parity():
     script="import {toneFeatures} from './apps/web/src/audioFeatures.ts';let s='';for await(const x of process.stdin)s+=x;console.log(JSON.stringify(toneFeatures(Float32Array.from(JSON.parse(s)),44100)));"
     browser=json.loads(subprocess.run(["node","--input-type=module","-e",script],cwd=ROOT,input=json.dumps(samples),text=True,capture_output=True,check=True).stdout)
     assert actual['bands']==pytest.approx(browser['bands'],abs=1e-10)
+    assert actual['fine_bands']==pytest.approx(browser['fine_bands'],abs=1e-10)
     for key in ['centroid_hz','flatness','crest_db']:assert actual[key]==pytest.approx(browser[key],abs=1e-8)
     assert actual['bands'][2]>.9
 

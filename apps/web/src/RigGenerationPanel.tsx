@@ -99,7 +99,7 @@ export function RigGenerationPanel({ jobId, revision, recording, onApply, onRefe
     {(submitting || generation?.status === "generating") && <p role="status">Generating individual gear settings…</p>}
     {generation?.status === "failed" && <p className="error" role="alert">{generation.error?.message}</p>}
     {draft && <><h3>{draft.name}</h3><p>{draft.description}</p><p className="hint">{generation?.rig_proposal?.provenance.model} · measured feature proposal · audible match unverified</p>
-      <ol>{draft.modules.map((module, index) => <li key={index}><strong>{getGearModel(module.model_id).name}{module.enabled ? "" : " (bypassed)"}</strong><p>{Object.entries(module.parameters).map(([key, value]) => `${key}: ${value}`).join(" · ")}</p></li>)}</ol>
+      <ol>{draft.modules.map((module, index) => { const model = getGearModel(module.model_id); return <li key={index}><strong>{model.name}{module.enabled ? "" : " (bypassed)"}</strong><p>{model.parameters.map(parameter => { const value = module.parameters[parameter.id]; return `${parameter.label}: ${typeof value === "number" ? Number(value.toFixed(3)) : typeof value === "boolean" ? value ? "On" : "Off" : value}${parameter.unit ? ` ${parameter.unit}` : ""}`; }).join(" · ")}</p></li>; })}</ol>
       <button className="secondary" disabled={busy || !active} onClick={() => void check()}>Check custom rig</button>{" "}
       <button className="secondary" disabled={busy || !active} onClick={() => void check(true)}>Refine individual settings locally</button>
       {busy && <><p role="status">Rendering locally{renders ? ` · ${renders}/80 candidates` : ""}…</p><button className="stop" onClick={stop}>Cancel rendering</button></>}

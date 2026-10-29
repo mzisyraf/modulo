@@ -67,6 +67,7 @@ def create_app(store=None, generator=None, rig_generator=None):
         origin = request.headers.get("origin")
         if request.method not in {"GET", "HEAD"} and origin and origin not in {
             str(request.base_url).rstrip("/"), "http://127.0.0.1:5173", "http://localhost:5173",
+            "http://127.0.0.1:4173", "http://localhost:4173",
         }:
             return JSONResponse(status_code=403, content={"error": {
                 "code": "origin_forbidden", "message": "Use modulo from this local machine.", "retryable": False,

@@ -17,10 +17,12 @@ class ToneFeatures(BaseModel):
     centroid_hz: float = Field(ge=40, le=16000)
     flatness: float = Field(ge=0, le=1)
     crest_db: float = Field(ge=0, le=80)
+    fine_bands: list[Annotated[float, Field(ge=0, le=1)]] | None = Field(default=None, min_length=24, max_length=24)
 
     @model_validator(mode="after")
     def normalized(self):
         if abs(sum(self.bands) - 1) >= .001: raise ValueError("Spectral bands must sum to one")
+        if self.fine_bands is not None and abs(sum(self.fine_bands)-1) >= .001: raise ValueError("Fine spectral bands must sum to one")
         return self
 
 
@@ -60,18 +62,19 @@ def tone_features(samples, rate):
         spectrum = _power([x*w for x,w in zip(block,window)])
         power = [x+y for x,y in zip(power,spectrum)]; active += 1
     if not active: raise ValueError("No active spectral frames")
-    bands = [0.]*6; total = weighted = logs = 0.; bins = 0
+    bands = [0.]*6; fine = [0.]*24; total = weighted = logs = 0.; bins = 0
     for i in range(1,len(power)):
         hz = i*rate/size
         if not 40 <= hz < 16000: continue
         value = power[i]/active
         band = next(k for k in range(6) if EDGES[k] <= hz < EDGES[k+1])
         bands[band] += value; total += value; weighted += hz*value
+        fine[min(23, math.floor(math.log(hz/40)/math.log(400)*24))] += value
         logs += math.log(max(value,1e-20)); bins += 1
     if total <= 1e-16: raise ValueError("No usable guitar-band spectrum")
     return ToneFeatures.model_validate({"method":"spectral_bands_v1", "bands":[x/total for x in bands],
         "centroid_hz":weighted/total,"flatness":min(1,math.exp(logs/bins)/(total/bins)),
-        "crest_db":20*math.log10(max(map(abs,samples))/math.sqrt(energy))}).model_dump()
+        "crest_db":20*math.log10(max(map(abs,samples))/math.sqrt(energy)),"fine_bands":[x/total for x in fine]}).model_dump()
 
 
 def wav_tone_features(path, start, end, *, temporal=False):

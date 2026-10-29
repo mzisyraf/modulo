@@ -33,7 +33,7 @@ export function RecordingLibrary({ onDelete, onOpenToneMatch, recordings }: Reco
 
     <section className="recording-capture-status" aria-labelledby="capture-status-title">
       <div className="recording-status-icon" aria-hidden="true">●</div>
-      <div><span className="step">PERFORMANCE CAPTURE</span><h3 id="capture-status-title">Record from Tone Match</h3><p>Start live input, then use Record, Finish or Discard below the input check. Modulo captures the processed guitar sound—not your dry calibration sample.</p></div>
+      <div><span className="step">PERFORMANCE CAPTURE</span><h3 id="capture-status-title">Record from Tone Match</h3><p>Start live input or play a dry guitar recording, then use Record, Finish or Discard. Modulo captures the active amp's processed output.</p></div>
       <button onClick={onOpenToneMatch}>Open recorder</button>
     </section>
 
@@ -41,7 +41,7 @@ export function RecordingLibrary({ onDelete, onOpenToneMatch, recordings }: Reco
       <div className="section-heading"><div><span className="step">THIS SESSION</span><h2 id="take-library-title">Saved takes</h2></div><span className="local-chip">{recordings.length} {recordings.length === 1 ? "take" : "takes"}</span></div>
       {recordings.length === 0 ? <div className="recording-empty">
         <div className="recording-empty-mark" aria-hidden="true"><span>●</span></div>
-        <div><h3>No performance recordings yet</h3><p>Start live input in Tone Match and record a processed take. Finished recordings will appear here; nothing is uploaded.</p></div>
+        <div><h3>No performance recordings yet</h3><p>Start live input or dry-audio playback in Tone Match and record a processed take. Finished recordings appear here; nothing is uploaded.</p></div>
         <button className="secondary" onClick={onOpenToneMatch}>Return to Tone Match</button>
       </div> : <div className="recording-list">{recordings.map((recording, index) => <article className="recording-card" key={recording.id}>
         <div className="recording-number" aria-hidden="true">{String(recordings.length - index).padStart(2, "0")}</div>

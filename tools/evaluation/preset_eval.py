@@ -25,8 +25,8 @@ def write(path, value):
 
 
 def engine_hash():
-    sources = sorted((ROOT / "packages/audio/src").rglob("*"))
-    return hashlib.sha256(b"".join(path.relative_to(ROOT).as_posix().encode() + b"\0" + path.read_bytes() for path in sources if path.is_file() and path.suffix in {".ts", ".js"})).hexdigest()
+    from app.rig_proposal import audio_source_hash
+    return audio_source_hash()
 
 
 def evaluation_hash():
@@ -99,7 +99,7 @@ def propose(output):
         print(f"Saved real Nemotron proposal: {case['id']}")
 
 
-def serve(output, *, rig=False):
+def serve(output, *, rig=False, port=5175):
     token = secrets.token_hex(24)
     origin = "http://127.0.0.1:5173"
     class Handler(SimpleHTTPRequestHandler):
@@ -122,7 +122,7 @@ def serve(output, *, rig=False):
             if self.headers.get("Origin") != origin or self.headers.get("X-Eval-Token") != token:
                 self.send_error(403); return
             name = self.path.removeprefix("/save/")
-            pattern = (r"rig-(targets|report)\.(json|html)|(clean|crunch|space)(-heldout)?-r[0-2]-(target|neutral|nemotron|refined)(-listen)?\.wav" if rig
+            pattern = (r"rig-(targets|report)\.(json|html)|(clean|crunch|space|external)(-heldout)?(-(nano|super))?-r[0-2]-(target|neutral|nemotron|refined)(-listen)?\.wav" if rig
                        else r"report\.(json|html)|(eq|drive)(-heldout)?-(target|neutral|nemotron|refined)(-listen)?\.wav")
             if not self.path.startswith("/save/") or not re.fullmatch(pattern, name):
                 self.send_error(400); return
@@ -135,8 +135,8 @@ def serve(output, *, rig=False):
             temporary = output / (name + ".tmp")
             temporary.write_bytes(data); temporary.replace(output / name)
             self.send_response(204); self.end_headers()
-    print(f"Benchmark receiver: http://127.0.0.1:5175/report.html", flush=True)
-    ThreadingHTTPServer(("127.0.0.1", 5175), Handler).serve_forever()
+    print(f"Benchmark receiver: http://127.0.0.1:{port}/report.html", flush=True)
+    ThreadingHTTPServer(("127.0.0.1", port), Handler).serve_forever()
 
 
 def verify(output):

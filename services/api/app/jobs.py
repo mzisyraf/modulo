@@ -364,7 +364,7 @@ class JobStore:
                 raise JobError("reference_changed", "The confirmed passage changed. Review and confirm it again.", 409)
             previous = job.get("generation")
             kind = getattr(generator, "output_field", "preset")
-            if previous and previous.get("kind", "preset") == kind and previous["reference_revision"] == revision and previous.get("source_calibration") == source_calibration and previous["status"] in {"generating", "ready"}:
+            if previous and previous.get("generator_key") == getattr(generator, "cache_key", None) and previous.get("kind", "preset") == kind and previous["reference_revision"] == revision and previous.get("source_calibration") == source_calibration and previous["status"] in {"generating", "ready"}:
                 return previous
             if job_id in self.preset_running:
                 raise JobError("generation_busy", "The previous attempt is finishing. Wait before generating for the new passage.", 409, True)
@@ -374,6 +374,7 @@ class JobStore:
             generation = {"request_id": request_id, "reference_revision": revision, "status": "generating"}
             if kind != "preset":
                 generation["kind"] = kind
+                generation["generator_key"] = generator.cache_key
             if source_calibration is not None:
                 generation["source_calibration"] = source_calibration
             self.jobs[job_id]["generation"] = generation

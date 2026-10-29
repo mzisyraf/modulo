@@ -25,7 +25,7 @@ export function calibrationKey(source?: SourceCalibration): string {
   if(!source)return "";
   const tone=source.tone_features;
   return JSON.stringify([source.id,source.method,source.origin,source.duration_seconds,source.rms_dbfs,source.peak_dbfs,source.clipped_fraction,
-    tone?[tone.method,...tone.bands,tone.centroid_hz,tone.flatness,tone.crest_db]:null, source.temporal_features ?? null]);
+    tone?[tone.method,...tone.bands,tone.centroid_hz,tone.flatness,tone.crest_db,tone.fine_bands??null]:null, source.temporal_features ?? null]);
 }
 
 export function recordingLevels(samples: Float32Array, rate: number) {

@@ -2,7 +2,9 @@
 async (page) => {
   const p = await page.context().newPage();
   try {
-    const base = "http://127.0.0.1:5175", config = await (await p.request.get(`${base}/config.json`)).json();
+    const base = await page.evaluate(() => window.__rigEvalBase ?? "http://127.0.0.1:5175");
+    if (!/^http:\/\/127\.0\.0\.1:517[56]$/.test(base)) throw Error("Use a known loopback evaluation receiver.");
+    const config = await (await p.request.get(`${base}/config.json`)).json();
     const source = await (await p.request.get(`${base}/input.wav`)).body(), held = await (await p.request.get(`${base}/validation.wav`)).body();
     const proposalsResponse = await p.request.get(`${base}/proposals.json`), proposals = proposalsResponse.ok() && !config.render_targets_only ? await proposalsResponse.json() : [];
     const session = await (await p.request.get(`${base}/session`)).json();
@@ -26,7 +28,8 @@ async (page) => {
       const report={engine_sha256:config.engine_sha256,evaluation_sha256:config.evaluation_sha256,source_sha256:config.source_sha256,validation_sha256:config.validation_sha256,paired_same_performance:true,cases:[],audible_contexts:0};
       try {
         for(const row of config.cases){
-          const target=await render(input,row.target),targetMono=mono(target),heldTarget=await render(validation,row.target),targetFeatures=toneFeatures(targetMono,44100),timing=temporalFeatures(targetMono,44100);
+          const loadTarget=async name=>{if(!/^[a-z-]+\.wav$/.test(name))throw Error("Invalid evaluation target filename");return new OfflineAudioContext(2,1,44100).decodeAudioData(await(await fetch(`${base}/${name}`)).arrayBuffer());};
+          const target=row.target_file?await loadTarget(row.target_file):await render(input,row.target),targetMono=mono(target),heldTarget=row.held_target_file?await loadTarget(row.held_target_file):await render(validation,row.target),targetFeatures=toneFeatures(targetMono,44100),timing=temporalFeatures(targetMono,44100);
           const targetHash=Array.from(new Uint8Array(await crypto.subtle.digest("SHA-256",await audio.encodeRigWav(target).arrayBuffer())),x=>x.toString(16).padStart(2,"0")).join("");
           if(config.expected_target_hashes && config.expected_target_hashes[`${row.id}-r0-target.wav`]!==targetHash)throw Error("Default target DSP changed; do not reuse cached requests");
           targets.cases.push({id:row.id,features:targetFeatures,temporal:timing,rms_dbfs:levels(targetMono).rms_dbfs});
@@ -34,20 +37,21 @@ async (page) => {
           const baseline=compareAudio(mono(neutral),targetMono,{sampleRate:44100,paired:true}),heldBaseline=compareAudio(mono(heldNeutral),mono(heldTarget),{sampleRate:44100,paired:true});
           const oracle=compareAudio(targetMono,targetMono,{sampleRate:44100,paired:true});
           const outcomes=[];
-          for(const item of proposals.filter(item=>item.case===row.id)){
+          for(const item of proposals.filter(item=>item.case===row.id && (!config.evaluate_prompt_version || item.prompt_version===config.evaluate_prompt_version))){
             if(item.status!=="ready"){outcomes.push({model:item.model,repeat:item.repeat,status:item.status,error:item.error});continue;}
             const proposal=audio.parseRigProposal(item.result.proposal),candidate=await render(input,proposal);
-            const refinement=await refineRig(input,proposal,gain,targetFeatures,{temporal:timing,targetRmsDbfs:levels(targetMono).rms_dbfs});
+            const refinement=await refineRig(input,proposal,gain,targetFeatures,{temporal:timing,targetRmsDbfs:levels(targetMono).rms_dbfs,progress:renders=>{window.__rigEvalProgress={case:row.id,model:item.model,repeat:item.repeat,renders};}});
             const refined=await render(input,refinement.proposal,refinement.outputLevelDb),heldRaw=await render(validation,proposal),heldRefined=await render(validation,refinement.proposal,refinement.outputLevelDb);
             const rawMetrics=compareAudio(mono(candidate),targetMono,{sampleRate:44100,paired:true}),refinedMetrics=compareAudio(mono(refined),targetMono,{sampleRate:44100,paired:true});
             const heldMetrics=compareAudio(mono(heldRefined),mono(heldTarget),{sampleRate:44100,paired:true}),heldRawMetrics=compareAudio(mono(heldRaw),mono(heldTarget),{sampleRate:44100,paired:true});
-            outcomes.push({model:item.model,repeat:item.repeat,status:"ready",raw:rawMetrics,refined:refinedMetrics,refinement:{before:refinement.before,after:refinement.after,renders:refinement.renders,proposal:refinement.proposal,outputLevelDb:refinement.outputLevelDb},
+            const modelTag=item.model.includes("super")?"super":"nano";
+            outcomes.push({model:item.model,prompt_version:item.prompt_version,repeat:item.repeat,status:"ready",audio_prefix:`${row.id}-${modelTag}-r${item.repeat}`,raw:rawMetrics,refined:refinedMetrics,refinement:{before:refinement.before,after:refinement.after,renders:refinement.renders,proposal:refinement.proposal,outputLevelDb:refinement.outputLevelDb},
               beats_neutral:beatsBaseline(refinedMetrics,baseline),held_out:{not_used_for_refinement:true,raw:heldRawMetrics,refined:heldMetrics,neutral:heldBaseline,beats_neutral:beatsBaseline(heldMetrics,heldBaseline)},usage:item.usage});
             if(item.repeat===0){
               const buffers={target,neutral,nemotron:candidate,refined};
-              const commonRms=Math.min(.08,...Object.values(buffers).map(buffer=>{const x=levels(mono(buffer));return .9*x.rms/Math.max(x.peak,1e-12);}));
+              const commonRms=Math.min(.08,...Object.values(buffers).map(buffer=>{const x=levels(mono(buffer));let peak=0;for(let ch=0;ch<buffer.numberOfChannels;ch++)for(const sample of buffer.getChannelData(ch))peak=Math.max(peak,Math.abs(sample));return .9*x.rms/Math.max(peak,1e-12);}));
               for(const [name,buffer] of Object.entries(buffers)){
-                const prefix=`${row.id}-r${item.repeat}-${name}`;await save(`${prefix}.wav`,audio.encodeRigWav(buffer));
+                const prefix=`${row.id}-${modelTag}-r${item.repeat}-${name}`;await save(`${prefix}.wav`,audio.encodeRigWav(buffer));
                 const listening=new OfflineAudioContext(buffer.numberOfChannels,buffer.length,44100).createBuffer(buffer.numberOfChannels,buffer.length,44100),factor=commonRms/levels(mono(buffer)).rms;
                 for(let ch=0;ch<buffer.numberOfChannels;ch++)listening.copyToChannel(buffer.getChannelData(ch).map(x=>x*factor),ch);
                 await save(`${prefix}-listen.wav`,audio.encodeRigWav(listening));

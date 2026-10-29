@@ -9,7 +9,7 @@ import sys
 
 from preset_eval import ROOT, prepare, serve, write, engine_hash
 sys.path.insert(0, str(ROOT / "services/api"))
-from app.rig_generation import RigGenerator, SUPER_MODEL, CATALOG_SHA
+from app.rig_generation import RigGenerator, SUPER_MODEL, CATALOG_SHA, PROMPT_VERSION
 from app.preset_generation import post_completion
 
 
@@ -18,6 +18,7 @@ def propose(directory, model, count, case_id=None):
     targets = json.loads((directory / "rig-targets.json").read_text())
     if config["engine_sha256"] != engine_hash() or targets["engine_sha256"] != engine_hash(): raise ValueError("DSP changed; regenerate targets first")
     provider = RigGenerator.from_env(); provider.model = model; provider.reservation_model = model
+    provider.allow_super_fallback = False  # Grade exact models independently; the main app's repair policy is separate.
     provider.max_model_requests = 6 if model == SUPER_MODEL else 100
     if not provider.available: raise ValueError("Bounded generation must be enabled first")
     path = directory / "proposals.json"
@@ -25,10 +26,10 @@ def propose(directory, model, count, case_id=None):
     for row in targets["cases"]:
         if case_id is not None and row["id"] != case_id: continue
         for repeat in range(count):
-            if any(item["case"] == row["id"] and item["repeat"] == repeat and item["model"] == model for item in results): continue
-            item = {"case": row["id"], "repeat": repeat, "model": model, "catalog_sha256": CATALOG_SHA}
+            if any(item["case"] == row["id"] and item["repeat"] == repeat and item["model"] == model and item.get("prompt_version", "rig-features-v1") == PROMPT_VERSION for item in results): continue
+            item = {"case": row["id"], "repeat": repeat, "model": model, "catalog_sha256": CATALOG_SHA, "prompt_version": PROMPT_VERSION}
             def transport(key, payload):
-                response = post_completion(key, payload, timeout=120)
+                response = post_completion(key, payload, timeout=180)
                 item["usage"] = response.get("usage", {})
                 item["finish_reason"] = response.get("choices", [{}])[0].get("finish_reason")
                 return response
@@ -50,6 +51,7 @@ def propose(directory, model, count, case_id=None):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("action", choices=["prepare", "serve", "propose"]); parser.add_argument("directory", type=Path)
+    parser.add_argument("--port", type=int, choices=[5175, 5176], default=5175)
     parser.add_argument("--source", type=Path); parser.add_argument("--model", default="nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B")
     parser.add_argument("--repeats", type=int, choices=[1, 2, 3], default=3); parser.add_argument("--generate", action="store_true")
     parser.add_argument("--case", choices=["clean", "crunch", "space", "external"])
@@ -59,7 +61,7 @@ if __name__ == "__main__":
         if not args.source: parser.error("Supply --source")
         prepare(args.source, directory)
         subprocess.run(["node", "tools/evaluation/rig-cases.ts", str(directory / "config.json")], cwd=ROOT, check=True)
-    elif args.action == "serve": serve(directory, rig=True)
+    elif args.action == "serve": serve(directory, rig=True, port=args.port)
     else:
         if not args.generate: parser.error("Explicit --generate required for paid calls")
         if args.model not in ("nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B", SUPER_MODEL): parser.error("Unapproved model")

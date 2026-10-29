@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "scripts": { "dev": "vite", "build": "vite build" },
+  "scripts": { "dev": "vite", "build": "vite build", "preview": "vite preview" },
   "dependencies": {
     "@modulo/audio": "0.1.0",
     "@modulo/contracts": "0.1.0",

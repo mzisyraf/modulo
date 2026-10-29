@@ -2,7 +2,7 @@
 
 Turn a guitar sound in a mixed song into a browser preset you can play through.
 
-**Status:** browser amp/live capture and a fixture preset API work. The main Tone Match [workflow](docs/LOCAL_SEPARATION.md) connect live-guitar level/spectral measurements, real upload, CUDA guitar/backing separation, reference confirmation and budget-gated starting rigs with editable Apply/Play. The main page compares the same captured live exercise with the rig on/off. Generation is disabled by default; rendered checks/local refinement are available; broad audible tone-match and physical-rig acceptance remain incomplete.
+**Status:** the main Tone Match flow supports Local or Modal Cloud API separation, confirmed guitar passages, live/file calibration, and NVIDIA/Nebius generation of individual parameters for Dinnie's implemented model rig. Check, refine locally, apply, audition and record through the shared browser engine. [Cloud setup](docs/TEAM_CLOUD_SETUP.md) requires no local GPU. Paid generation is disabled by default. [Measured overnight results](docs/OVERNIGHT_RESULTS.md) show working integration and inconsistent distortion/delay matching; audible matching and physical-interface acceptance remain open.
 
 - **Team:** Isyraf — AI/backend/integration; Dinnie — browser audio/DSP; Shazlin — frontend/UX.
 - **Deadline:** 31 October 2026, 01:00 MYT (30 October, 17:00 UTC).

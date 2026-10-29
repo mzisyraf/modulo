@@ -27,7 +27,11 @@ def test_custom_values_validated_before_return_and_durable_reservation(tmp_path)
     assert result["proposal"] == PROPOSAL and result["catalog_sha256"] == CATALOG_SHA
     assert result["provenance"]["model"] == MODEL
     packet = json.loads(calls[0]["messages"][1]["content"])
-    assert packet["source"]["origin"] == "file" and packet["target"] == FEATURES
+    assert packet["band_edges_hz"] == [40, 120, 350, 1000, 3000, 8000, 16000]
+    assert packet["envelope_lags_ms"] == [50, 100, 150, 200, 250, 300, 400, 500, 750, 1000]
+    assert packet["band_delta_db"] == [0.] * 6
+    assert packet["source"]["origin"] == "file" and packet["target"] == {key: value for key, value in FEATURES.items() if key != "fine_bands"}
+    assert "fine_bands" not in packet["source"]["tone_features"]
     assert "factory" not in packet and calls[0]["response_format"]["json_schema"]["strict"]
     assert json.loads((tmp_path / "budget.json").read_text())["reserved_usd"] == "0.20"
     engine.generate({**REFERENCE, "tone_features": FEATURES}, source)
@@ -57,6 +61,45 @@ def test_missing_calibration_never_reserves_and_bad_model_output_keeps_reservati
 def test_rig_requires_bounded_budget_and_rejects_forged_result(tmp_path):
     assert not RigGenerator(tmp_path, key="test", budget_usd="unlimited", max_requests=2).available
     with pytest.raises(ValueError): validate_generated_rig({"proposal": PROPOSAL})
+
+
+def test_super_reservations_have_a_durable_six_request_stop(tmp_path):
+    from app.rig_generation import SUPER_MODEL
+    engine = RigGenerator(tmp_path, key="test-only", budget_usd="10", max_requests=30, model=SUPER_MODEL)
+    for _ in range(6): engine.reserve()
+    restarted = RigGenerator(tmp_path, key="test-only", budget_usd="10", max_requests=30, model=SUPER_MODEL)
+    with pytest.raises(PresetError) as error: restarted.reserve()
+    assert error.value.code == "budget_exhausted"
+    ledger = json.loads((tmp_path / "budget.json").read_text())
+    assert ledger["attempts"] == 6 and ledger["model_attempts"][SUPER_MODEL] == 6 and ledger["reserved_usd"] == "1.20"
+
+
+def test_approved_schema_fallback_is_one_counted_super_call(tmp_path):
+    from app.rig_generation import SUPER_MODEL
+    calls = []
+    def transport(_key, payload):
+        calls.append(payload["model"])
+        return {**response({} if payload["model"] == MODEL else PROPOSAL), "model": payload["model"]}
+    engine = RigGenerator(tmp_path, key="test", budget_usd="1", max_requests=3, transport=transport, allow_super_fallback=True)
+    result = engine.generate({**REFERENCE, "tone_features": FEATURES}, {**SOURCE, "tone_features": FEATURES})
+    assert calls == [MODEL, SUPER_MODEL] and result["provenance"]["model"] == SUPER_MODEL
+    ledger = json.loads((tmp_path / "budget.json").read_text())
+    assert ledger["attempts"] == 2 and ledger["reserved_usd"] == "0.40"
+
+
+def test_fallback_does_not_retry_provider_or_budget_errors_or_loop(tmp_path):
+    calls = []
+    def unavailable(_key, payload):
+        calls.append(payload["model"]); raise PresetError("provider_unavailable", "Unavailable")
+    engine = RigGenerator(tmp_path, key="test", budget_usd="1", max_requests=3, transport=unavailable, allow_super_fallback=True)
+    with pytest.raises(PresetError): engine.generate({**REFERENCE, "tone_features": FEATURES}, {**SOURCE, "tone_features": FEATURES})
+    assert len(calls) == 1
+    calls.clear()
+    def invalid(_key, payload):
+        calls.append(payload["model"]); return {**response({}), "model": payload["model"]}
+    engine.transport = invalid
+    with pytest.raises(PresetError): engine.generate({**REFERENCE, "tone_features": FEATURES}, {**SOURCE, "tone_features": FEATURES})
+    assert len(calls) == 2
 
 
 def test_rig_api_measures_target_caches_own_kind_and_invalidates_reference(tmp_path, monkeypatch):

@@ -1,5 +1,5 @@
 import { compileRigProposal, createGearModule, getGearModel, modelValues, normalizeModelValue, denormalizeModelValue, parseRigProposal, renderRigFile, type RigProposal } from "@modulo/audio";
-import { toneFeatures, toneDistance, validToneFeatures, type ToneFeatures } from "./audioFeatures.ts";
+import { toneFeatures, detailedToneDistance, validToneFeatures, type ToneFeatures } from "./audioFeatures.ts";
 import { encodeMonoWav } from "./localAudio.ts";
 import { temporalFeatures, temporalDistance, type TemporalFeatures } from "./temporalFeatures.ts";
 
@@ -13,7 +13,7 @@ export async function scoreRig(file: File, proposal: RigProposal, inputGainDb: n
     energy += mono[i] ** 2;
   }
   const guardFraction = guarded / (mono.length * channels.length), safe = peak <= .951 && guardFraction < .01;
-  return { loss: toneDistance(toneFeatures(mono, rendered.buffer.sampleRate), target) + (temporal ? 3 * temporalDistance(temporalFeatures(mono, rendered.buffer.sampleRate), temporal) : 0), safe, peak, guardFraction, rmsDbfs: 10 * Math.log10(Math.max(1e-24, energy / mono.length)) };
+  return { loss: detailedToneDistance(toneFeatures(mono, rendered.buffer.sampleRate), target) + (temporal ? 3 * temporalDistance(temporalFeatures(mono, rendered.buffer.sampleRate), temporal) : 0), safe, peak, guardFraction, rmsDbfs: 10 * Math.log10(Math.max(1e-24, energy / mono.length)) };
 }
 export function neutralRigProposal(): RigProposal {
   return { proposal_version: "1", name: "Neutral reference", description: "No added EQ or saturation", tempo_bpm: 120,

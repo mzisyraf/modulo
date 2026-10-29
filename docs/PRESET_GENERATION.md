@@ -1,6 +1,18 @@
-# Barebone preset generation integration
+# Preset and custom model-rig generation
 
-Status: integrated into main Tone Match and the standalone `/separation.html` workflow. Measured spectral guidance, strict structured output and local rendered refinement are evaluated in [PRESET_EVALUATION.md](PRESET_EVALUATION.md). Runtime generation remains disabled by default; offline API/browser tests inject transport. Explicit local operator configuration enables paid manual generation, including the opt-in uncapped-dollar mode below. Technical tests do not establish musical quality.
+Status: main Tone Match supports a full model rig with explicit individual parameters, alongside the legacy six-control preset under its disclosure. The standalone `/separation.html` page was removed. Runtime generation remains disabled by default; offline API/browser tests inject transport. Explicit operator configuration enables paid manual generation. Full rigs require a bounded numeric allowance; the legacy uncapped option does not enable them. Technical checks and spectral proxies do not establish musical quality.
+
+## Custom model rigs
+
+`POST /api/jobs/{job_id}/rig` uses the confirmed reference revision plus validated live/file source calibration. Existing async job status, expiry, stale-result checks and durable request reservations are reused. Generation is tagged `kind=rig_proposal` and returns `rig_proposal` rather than a legacy `preset`; old requests remain on `/preset`.
+
+The installed TypeScript model registry owns supported controls. `node tools/evaluation/export-rig-catalog.ts` generates `contracts/rig-proposal.schema.json`, `rig-catalog.json` and its hash; `npm run check` verifies parity. A proposal contains 1–8 ordered model IDs, enabled states and complete own-parameter values. The backend and browser reject unknown/missing/unsafe values; the browser compiles through the real model adapters into a validated RigPreset. Input calibration and a protected output are added by trusted code. No factory-preset identifier, custom IR asset or arbitrary routing is accepted from the model.
+
+The main flow offers live capture or a locally decoded dry recording, including the licensed supplied DI. Only numeric descriptors go to Token Factory. Generate does not Apply or play. Check renders the actual graph; refinement performs at most 80 local candidate renders, using a finer spectral envelope and timing proxies, then calibrates output within -36 to -6 dB and peak headroom. The source input gain stays fixed. Review/apply remains deliberate; actual model controls remain editable. Approximate model processors, performance differences and separation bleed limit tone accuracy.
+
+Exact runtime IDs: Nano `nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B`, conditional approved Super `nvidia/nemotron-3-super-120b-a12b`, selected by backend `NEBIUS_RIG_MODEL`. Full-rig calls reserve US$0.20 before transport against the existing shared local ledger; errors retain reservations. This exceeds the worst-case full 262144-token context plus 10000 output at Super's US$0.30/US$0.90 per million, checked against the official catalog on 30 October. A 180-second transport timeout allows bounded reasoning. Explicit `NEBIUS_RIG_FALLBACK=1` permits one Super repair only after invalid Nano rig output; both attempts reserve funds. Auth, rate, transport and budget failures do not trigger this repair. Super has a durable six-request stop. A numeric US$0–10 allowance and cumulative request limit are required. These remain local controls, not a global cap on a shared key.
+
+Cache scope includes source measurements, reference revision, catalog, all audio source files, model and prompt/analysis versions. Catalog or response mismatches fail before application. See [the approved execution plan](OVERNIGHT_EXECUTION_PLAN.md), [declared evaluations](../.Codex/evals/full-rig.md) and [GPUless team setup](TEAM_CLOUD_SETUP.md).
 
 ## Scope
 

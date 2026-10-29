@@ -31,6 +31,12 @@ def test_job_requires_an_audio_upload():
     assert "job_id" not in response.json()
 
 
+def test_local_built_preview_can_submit_but_unrelated_origins_cannot():
+    for origin in ["http://127.0.0.1:4173", "http://localhost:4173"]:
+        assert client.post("/api/jobs", headers={"Origin": origin}).status_code == 415
+    assert client.post("/api/jobs", headers={"Origin": "https://unrelated.example"}).status_code == 403
+
+
 @pytest.mark.parametrize("value", [-0.01, 1.01, float("nan"), float("inf"), "0.5", None, True, 10**400])
 def test_shared_schema_rejects_unsafe_drive(value):
     preset = example_preset()

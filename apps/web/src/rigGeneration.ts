@@ -4,7 +4,7 @@ import { calibrationKey, type SourceCalibration } from "./recordingCalibration.t
 import { validTemporalFeatures, type TemporalFeatures } from "./temporalFeatures.ts";
 import catalogHash from "../../../contracts/rig-catalog-hash.json" with { type: "json" };
 
-export interface GeneratedRig { proposal: RigProposal; provenance: { kind: "generated"; provider: "nebius"; model: string }; catalog_sha256: string; quality_flags: string[] }
+export interface GeneratedRig { proposal: RigProposal; provenance: { kind: "generated"; provider: "nebius"; model: string }; catalog_sha256: string; quality_flags: string[]; prompt_version?: string }
 export interface RigGeneration {
   request_id: string; reference_revision: number; kind: "rig_proposal"; status: "generating" | "ready" | "failed";
   source_calibration: SourceCalibration; rig_proposal?: GeneratedRig; target_tone_features?: ToneFeatures;
