@@ -235,6 +235,7 @@ audio { width: 100%; height: 40px; }
 .calibration-heading + p { margin: 4px 0 16px; font-size: 12px; }
 .calibration-chip { flex: 0 0 auto; padding: 5px 8px; border: 1px solid #5c4940; border-radius: 999px; background: #211816; color: #b8aaa2; font-size: 9px; font-weight: 800; letter-spacing: .09em; text-transform: uppercase; }
 .calibration-chip.recording { border-color: rgba(255, 210, 31, .58); color: #ffe36a; box-shadow: 0 0 16px rgba(255, 210, 31, .1); }
+.calibration-chip.finalizing { border-color: rgba(168, 153, 255, .52); color: #c8bcff; box-shadow: 0 0 16px rgba(168, 153, 255, .1); }
 .calibration-chip.complete { border-color: rgba(104, 182, 132, .5); color: #9ed6ad; }
 .calibration-chip.error { border-color: #865862; color: #f1cad1; }
 .input-meter { padding: 13px; border: 1px solid #4b3932; border-radius: 10px; background: #17100f; }
@@ -266,6 +267,17 @@ audio { width: 100%; height: 40px; }
 .take-summary ul { padding-left: 17px; color: #edcc94; }
 .take-summary.usable { border-color: rgba(104, 182, 132, .38); }
 .take-summary.needs-retry { border-color: rgba(255, 210, 31, .35); }
+.performance-capture { margin-top: 20px; padding: 18px; border: 1px solid rgba(233, 111, 81, .28); border-radius: 11px; background: linear-gradient(135deg, rgba(55, 30, 26, .7), rgba(26, 19, 17, .82)); }
+.performance-capture .calibration-heading + p { margin: 4px 0 14px; font-size: 12px; }
+.performance-actions { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 9px; }
+.performance-actions > button:only-child { grid-column: 1 / -1; }
+.performance-actions .secondary { margin-top: 0; }
+.performance-status { min-height: 17px; margin: 10px 0 0; color: #b8aaa2; font-size: 11px; }
+.performance-status.recording { color: #ffe16a; }
+.performance-status.finalizing { color: #c8bcff; }
+.performance-status.error { color: #f1cad1; }
+.text-action { margin-top: 8px; padding: 0; border: 0; background: transparent; color: var(--accent); box-shadow: none; font-size: 11px; }
+.text-action:hover { color: #fff0a0; box-shadow: none; transform: none; }
 .capture-info { display: grid; grid-template-columns: 1fr 1fr; gap: 1px; margin: 12px 0 0; overflow: hidden; border: 1px solid #4b3932; border-radius: 8px; background: #4b3932; }
 .capture-info div { min-width: 0; padding: 9px 10px; background: #1a1311; }
 .capture-info dt { color: #9f9189; font-size: 9px; letter-spacing: .07em; text-transform: uppercase; }
