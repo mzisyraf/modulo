@@ -2,8 +2,58 @@
 
 The engine has no React or network dependency. Existing `playTestSignal()` and
 `playFile(file)` return `Promise<boolean>`; `false` means a newer start/stop
-canceled playback. The existing preset v1 schema, gain/drive/EQ, bypass, master
-and output guard are unchanged. Cabinet, delay and reverb remain issue #5 work.
+canceled playback. The preset v1 schema, EQ controls, bypass, master and output
+guard remain supported; Drive behavior is revised below. The additive full rig
+API (including cabinet, delay and reverb) is documented in [docs/RIG.md](docs/RIG.md).
+Its main-app frontend integration and hardware listening review remain open.
+
+## Drive tuning revision (29 October 2026, listening review pending)
+
+The previous starter curve `tanh((1 + 40 * drive) * x)` (normalized at full
+scale) boosted quiet signals roughly 11 times at Drive 0.25 and 41 times at
+Drive 1. It was also reassigned on every preset/EQ change. This revision uses
+a fixed clipper and ramps its surrounding gains with the same 15 ms target
+time constant as the other controls, so EQ/Drive edits do not replace an
+active waveshaper curve. There is no hard noise gate or silence threshold in
+the monitoring path that could chop note decays.
+
+The revised drive branch is:
+
+`pre-gain → fixed soft clipper (4x oversampling) → makeup attenuation → 50 Hz high-pass → 6.5 kHz low-pass → drive blend → existing EQ`
+
+Both branch filters use Q = 1/sqrt(2). They reduce rumble and very bright
+distortion harmonics; they are not an amp/cabinet circuit model. The blend's
+clean component enters the EQ directly. Drive `d` in [0, 1] controls
+`preGain = 1 + 7*d*d`, `postGain = 1/sqrt(preGain)`, clean weight `1-d` and
+distorted weight `d`. The fixed saturator is `tanh(3*x)/tanh(3)` with the
+native waveshaper input clipped to its table domain. `saturationCurve()`
+supplies that immutable table; `driveCurve(d)` is now a memoryless reference
+for the combined transfer, excluding filters/oversampling. It is not a table
+that the engine replaces while playing.
+
+At Drive 0 the distorted component is zero and the signal is clean before EQ;
+at neutral EQ it matches the existing bypass output. Bypass still skips the
+entire drive/EQ section and retains input/master gain and output protection.
+Intermediate drive values intentionally mix clean and softened distortion
+inside the graph; there is no added dry-to-headphones monitoring connection.
+Dry calibration remains before these stages, and the performance recorder
+continues to capture their protected processed output.
+
+This changes the sound/level of existing numeric Drive values without changing
+the preset schema. In particular, presets made for the old curve can be much
+quieter/less saturated. Isyraf's provider DSP description, offline refinement
+and benchmark hashes need review/recalibration before this revision is
+integrated with his separate renderer/listening-gain branch. No matching or
+human listening acceptance is inferred from synthetic tests. Never treat
+`driveCurve()` alone as a complete graph model: filters and gain ramps matter.
+
+Retest the real guitar at a low headphone volume: flat EQ and Drive 0, then
+0.1/0.25/0.5, plus bypass, sustained notes, hard/soft strums, and slowly moving
+Drive/EQ. Compare at a comfortable similar perceived level using Output level
+with headroom; do not compensate by clipping the Scarlett input. This cannot
+repair clipping/noise already present in the interface's dry signal, and does
+not establish that all reported static or breakup is fixed. No cabinet model,
+compressor, delay, or reverb is added by this change.
 
 ## Live input (issue #4)
 
@@ -269,3 +319,13 @@ require human verification.
 ## Silent live calibration
 
 `startLive(deviceId, channel, monitor = true)` preserves existing monitored input by default. Passing `false` omits the selected splitter-to-amp connection entirely, while retaining dry metering and the silent capture worklet. Use this for guided live calibration, then stop/dispose to release capture. This does not suppress an interface hardware direct-monitor path or repair external loopback routing. No preset/schema change.
+
+## Full rig engine
+
+The additive four-tier rig engine, catalog, recording/rendering APIs and frontend
+handoff are documented in [docs/RIG.md](docs/RIG.md). Try the audio workbench with
+`npm run dev:rig --workspace @modulo/audio` at http://127.0.0.1:5175/.
+Model-specific controls are now wired into the main React page and the workbench;
+shared UI/API review is still pending. Branded choices
+are approximations; built-in IRs are synthetic. The existing provider Preset v1
+and live-input/calibration/performance-recording APIs above remain supported.

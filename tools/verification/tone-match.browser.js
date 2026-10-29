@@ -23,7 +23,9 @@ async (page) => {
   await page.addInitScript(() => {
     if (window.__toneMatchInstrumented) return;
     window.__toneMatchInstrumented = true;
-    window.__contexts = []; window.__shapers = []; window.__micRequests = 0;
+    window.__contexts = []; window.__shapers = []; window.__micRequests = 0; window.__parameterChanges = [];
+    const setTarget = AudioParam.prototype.setTargetAtTime;
+    AudioParam.prototype.setTargetAtTime = function(value, ...args) { window.__parameterChanges.push({ before: this.value, after: value }); return setTarget.call(this, value, ...args); };
     const connect = AudioNode.prototype.connect;
     AudioNode.prototype.connect = function(destination, ...args) {
       if (destination instanceof AudioDestinationNode && !(this.context instanceof OfflineAudioContext)) {
@@ -124,10 +126,9 @@ async (page) => {
   check(await page.getByRole("button", { name: "Play test signal", exact: true }).count() === 1, "embedded panel has no second audition owner");
   await page.getByRole("button", { name: "Play test signal", exact: true }).click();
   await page.waitForFunction(() => window.__contexts.length === 1 && window.__shapers.length === 2);
-  const beforeCurve = await page.evaluate(() => Array.from(window.__shapers[0].curve));
+  await page.evaluate(() => { window.__parameterChanges = []; });
   await page.locator("#drive").fill("0.8");
-  const afterCurve = await page.evaluate(() => Array.from(window.__shapers[0].curve));
-  check(afterCurve.some((v, i) => v !== beforeCurve[i]), "real shared engine receives edits");
+  check(await page.evaluate(() => window.__parameterChanges.some(change => Math.abs(change.before-change.after) > .001)), "real shared engine receives smoothed drive edits");
   await page.getByRole("button", { name: "Play backing passage", exact: true }).click();
   await page.waitForFunction(() => !document.querySelector('audio[aria-label="Guitar-reduced backing"]').paused);
   check(await page.getByText("Playing synthetic test signal", { exact: true }).count() === 0, "backing stops amp without pausing itself");

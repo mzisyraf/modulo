@@ -4,5 +4,9 @@
   "private": true,
   "type": "module",
   "exports": { ".": "./src/index.ts" },
+  "scripts": {
+    "dev:rig": "vite demo --host 127.0.0.1 --port 5175 --strictPort",
+    "check:rig": "tsc -p tsconfig.rig.json"
+  },
   "dependencies": { "@modulo/contracts": "0.1.0" }
 }

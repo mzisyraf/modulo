@@ -1,10 +1,26 @@
 import { parsePreset, type Preset } from "@modulo/contracts";
-import { driveCurve, pluckSamples } from "./dsp.ts";
+import { driveSettings, saturationCurve, pluckSamples } from "./dsp.ts";
 import { CalibrationBuffer, calibrationFrameLimit, inputLevel, type CalibrationAudio, type InputLevel } from "./calibration.ts";
 export type { CalibrationAudio, CalibrationFlag, InputLevel } from "./calibration.ts";
 import { recordProcessedOutput, type ProcessedRecording, type PerformanceRecordingOptions, type PerformanceTake } from "./recording.ts";
 export { MAX_RECORDING_SECONDS, MAX_RECORDING_BYTES } from "./recording.ts";
 export type { PerformanceTake, PerformanceRecordingOptions } from "./recording.ts";
+import { RigGraph, prepareRig } from "./rig/graph.ts";
+import { CabinetIRLibrary } from "./rig/impulses.ts";
+import { allRigModules, parseRigPreset, applyRigSnapshot, snapshotRig, validateControl, type RigPreset } from "./rig/preset.ts";
+import { RigMidiController, addMidiBinding, estimatePitch, expressionValue } from "./rig/control.ts";
+import { renderRigFile, type RigRenderOptions } from "./rig/render.ts";
+import { recordRig, type RigRecording, type RigRecordingOptions, type RigTake } from "./rig/recording.ts";
+export * from "./rig/catalog.ts";
+export * from "./rig/preset.ts";
+export * from "./rig/control.ts";
+export { factoryRigPresets } from "./rig/factory.ts";
+export * from "./rig/models.ts";
+import { modelFor, parameterToDSP } from "./rig/models.ts";
+export { editRig, recommendedModels, type RigEdit } from "./rig/editor.ts";
+export { CabinetIRLibrary } from "./rig/impulses.ts";
+export { renderRigFile, encodeRigWav, type RigRenderOptions } from "./rig/render.ts";
+export type { RigTake, RigRecordingOptions } from "./rig/recording.ts";
 
 export interface LiveInputInfo {
   /** Zero-based hardware input channel. */
@@ -25,6 +41,10 @@ export class AudioEngine {
   private context?: AudioContext | OfflineAudioContext;
   private input?: GainNode;
   private shaper?: WaveShaperNode;
+  private drivePre?: GainNode;
+  private drivePost?: GainNode;
+  private driveClean?: GainNode;
+  private driveWet?: GainNode;
   private bass?: BiquadFilterNode;
   private mid?: BiquadFilterNode;
   private treble?: BiquadFilterNode;
@@ -33,6 +53,20 @@ export class AudioEngine {
   private master?: GainNode;
   private outputGuard?: WaveShaperNode;
   private performanceRecording?: ProcessedRecording;
+  private rigRecording?: RigRecording;
+  private rawTap?: GainNode;
+  private rig?: RigGraph;
+  private rigRequest = 0;
+  private rigNeedsReset = false;
+  private retiredRigs = new Map<RigGraph, ReturnType<typeof setTimeout>>();
+  private readonly irs = new CabinetIRLibrary();
+  private tunerMuted = false;
+  private tunerSamples = new Float32Array(4096);
+  private tuner?: AnalyserNode;
+  readonly midi: RigMidiController;
+  onRigError?: (message: string) => void;
+  /** UI subscription; callbacks must not throw into the audio-engine lifecycle. */
+  onRigChange?: (preset: RigPreset | null) => void;
   private source?: AudioBufferSourceNode;
   private liveSource?: MediaStreamAudioSourceNode;
   private liveSplitter?: ChannelSplitterNode;
@@ -53,26 +87,50 @@ export class AudioEngine {
 
   constructor(preset: Preset) {
     this.preset = parsePreset(preset);
+    this.midi = new RigMidiController({
+      get: () => this.requireRig(), parameter: (id, key, value) => this.setRigParameter(id, key, value),
+      snapshot: id => this.loadRigSnapshot(id),
+      binding: binding => { this.rig!.preset = addMidiBinding(this.requireRig(), binding); this.notifyRig(); },
+    });
   }
 
   applyPreset(value: Preset): void {
     this.preset = parsePreset(value);
+    this.rigRequest++;
+    if (this.rig) {
+      this.releaseRig(this.rig); this.rig = undefined; this.rigNeedsReset = false;
+      this.input!.connect(this.drivePre!); this.input!.connect(this.driveClean!);
+    }
+    this.clearRetiredRigs(); this.midi.disconnect();
+    this.updateLegacyPreset(); this.setBypass(this.bypass);
+    this.notifyRig();
+  }
+
+  private notifyRig(): void { try { this.onRigChange?.(this.getRigPreset()); } catch { /* UI observers cannot break audio cleanup or controls. */ } }
+
+  private updateLegacyPreset(): void {
     if (!this.context) return;
     const parameters = this.preset.parameters;
     const time = this.context.currentTime;
     this.input!.gain.setTargetAtTime(10 ** (parameters.input_gain_db / 20), time, 0.015);
-    this.shaper!.curve = driveCurve(parameters.drive);
+    const drive = driveSettings(parameters.drive);
+    this.drivePre!.gain.setTargetAtTime(drive.preGain, time, 0.015);
+    this.drivePost!.gain.setTargetAtTime(drive.postGain, time, 0.015);
+    this.driveClean!.gain.setTargetAtTime(drive.clean, time, 0.015);
+    this.driveWet!.gain.setTargetAtTime(drive.distorted, time, 0.015);
     this.bass!.gain.setTargetAtTime(parameters.bass_db, time, 0.015);
     this.mid!.gain.setTargetAtTime(parameters.mid_db, time, 0.015);
     this.treble!.gain.setTargetAtTime(parameters.treble_db, time, 0.015);
-    this.master!.gain.setTargetAtTime(10 ** (parameters.master_gain_db / 20), time, 0.015);
+    this.master!.gain.setTargetAtTime(this.tunerMuted ? 0 : 10 ** (parameters.master_gain_db / 20), time, 0.015);
   }
 
   setBypass(bypass: boolean): void {
     this.bypass = bypass;
     if (!this.context) return;
+    if (this.rig) { this.rig.setBypass(bypass); return; }
     this.wet!.gain.setTargetAtTime(bypass ? 0 : this.wetListeningGain, this.context.currentTime, 0.015);
     this.dry!.gain.setTargetAtTime(bypass ? this.dryListeningGain : 0, this.context.currentTime, 0.015);
+
   }
 
   /** Transient file-comparison levels after effects, before master/output protection; not preset parameters. */
@@ -90,8 +148,28 @@ export class AudioEngine {
       const context = offline ?? new AudioContext({ latencyHint: "interactive" });
       this.context = context;
       this.input = context.createGain();
+      this.rawTap = context.createGain();
+      this.rawTap.connect(this.input);
       this.shaper = context.createWaveShaper();
-      this.shaper.oversample = "2x";
+      this.shaper.oversample = "4x";
+      this.shaper.curve = saturationCurve();
+      this.drivePre = context.createGain();
+      this.drivePost = context.createGain();
+      this.driveClean = context.createGain();
+      this.driveWet = context.createGain();
+      const drive = driveSettings(this.preset.parameters.drive);
+      this.drivePre.gain.value = drive.preGain;
+      this.drivePost.gain.value = drive.postGain;
+      this.driveClean.gain.value = drive.clean;
+      this.driveWet.gain.value = drive.distorted;
+      const driveHighpass = context.createBiquadFilter();
+      driveHighpass.type = "highpass";
+      driveHighpass.frequency.value = 50;
+      driveHighpass.Q.value = Math.SQRT1_2;
+      const driveLowpass = context.createBiquadFilter();
+      driveLowpass.type = "lowpass";
+      driveLowpass.frequency.value = 6500;
+      driveLowpass.Q.value = Math.SQRT1_2;
       this.bass = context.createBiquadFilter();
       this.bass.type = "lowshelf";
       this.bass.frequency.value = 250;
@@ -109,17 +187,26 @@ export class AudioEngine {
       this.master.gain.value = 10 ** (this.preset.parameters.master_gain_db / 20);
       this.wet.gain.value = this.bypass ? 0 : this.wetListeningGain;
       this.dry.gain.value = this.bypass ? this.dryListeningGain : 0;
-      this.input.connect(this.shaper).connect(this.bass).connect(this.mid).connect(this.treble).connect(this.wet).connect(this.master);
+      this.input.connect(this.drivePre).connect(this.shaper).connect(this.drivePost)
+        .connect(driveHighpass).connect(driveLowpass).connect(this.driveWet).connect(this.bass);
+      this.input.connect(this.driveClean).connect(this.bass);
+      this.bass.connect(this.mid).connect(this.treble).connect(this.wet).connect(this.master);
+
       this.input.connect(this.dry).connect(this.master);
       // Bound the output even when stacked EQ boosts exceed full scale.
       const outputGuard = context.createWaveShaper();
       this.outputGuard = outputGuard;
       outputGuard.curve = new Float32Array([-0.95, 0, 0.95]);
       this.master.connect(outputGuard).connect(context.destination);
-      this.applyPreset(this.preset);
+      this.updateLegacyPreset();
       this.setBypass(this.bypass);
     }
+    if (this.rig && this.rigNeedsReset) {
+      const replacement = new RigGraph(this.context, this.rig.preset, this.irs);
+      this.releaseRig(this.rig); this.rig = replacement; this.connectRig(replacement); this.rigNeedsReset = false;
+    }
     if (!offline && this.context.state === "suspended") await this.context.resume();
+
     return this.context;
   }
 
@@ -131,10 +218,11 @@ export class AudioEngine {
     if (request !== this.request || this.disposed) return false;
     const source = context.createBufferSource();
     source.buffer = buffer;
-    source.connect(this.input!);
+    source.connect(this.rawTap!);
     this.source = source;
     source.onended = () => { this.stop(); this.onEnded?.(); };
     source.start();
+    this.rig?.setActive(true);
     return true;
   }
 
@@ -209,7 +297,8 @@ export class AudioEngine {
       source = context.createMediaStreamSource(new MediaStream([track]));
       splitter = context.createChannelSplitter(2);
       source.connect(splitter);
-      if (monitor) splitter.connect(this.input!, channel, 0);
+      if (monitor) splitter.connect(this.rawTap!, channel, 0);
+
       const ended = () => {
         if (this.liveStream !== stream) return;
         this.stop();
@@ -229,6 +318,7 @@ export class AudioEngine {
         outputLatencySeconds: context.outputLatency,
       };
       this.liveInfo = info;
+      this.rig?.setActive(true);
       return structuredClone(info);
     } catch (error) {
       source?.disconnect();
@@ -335,7 +425,7 @@ export class AudioEngine {
     if (!this.context || !("createMediaStreamDestination" in this.context) || this.context.state !== "running" || !this.outputGuard || (!this.liveStream && !this.source)) {
       throw new Error("Start live input or sample playback before recording a performance.");
     }
-    if (this.performanceRecording) throw new Error("A performance recording is already recording or finalizing.");
+    if (this.performanceRecording || this.rigRecording) throw new Error("A performance recording is already recording or finalizing.");
     const session = recordProcessedOutput(this.context, this.outputGuard, options);
     this.performanceRecording = session;
     try { return await session.result; }
@@ -351,12 +441,149 @@ export class AudioEngine {
     return this.performanceRecording?.state() ?? "idle";
   }
 
+  private requireRig(): RigPreset {
+    if (this.disposed) throw new Error("Audio engine is closed.");
+    if (!this.rig) throw new Error("Apply an engine rig first.");
+    return structuredClone(this.rig.preset);
+  }
+
+  private releaseRig(graph: RigGraph): void {
+    this.input?.disconnect(graph.input); graph.dispose();
+  }
+  private clearRetiredRigs(): void {
+    for (const [graph, timer] of this.retiredRigs) { clearTimeout(timer); this.releaseRig(graph); }
+    this.retiredRigs.clear();
+  }
+  private connectRig(graph: RigGraph): void {
+    graph.onError = message => { this.stop(); this.onRigError?.(message); };
+    this.input!.connect(graph.input); graph.output.connect(this.wet!); graph.setBypass(this.bypass);
+    this.input!.gain.cancelScheduledValues(this.context!.currentTime); this.input!.gain.value = 1;
+    this.master!.gain.cancelScheduledValues(this.context!.currentTime); this.master!.gain.value = this.tunerMuted ? 0 : 1;
+    this.wet!.gain.cancelScheduledValues(this.context!.currentTime); this.wet!.gain.value = 1;
+    this.dry!.gain.cancelScheduledValues(this.context!.currentTime); this.dry!.gain.value = 0;
+    if (!this.source && !this.liveStream) graph.silence();
+  }
+
+  /** Call from a gesture. Rig changes are validated before replacing the audible graph. */
+  async applyRigPreset(value: RigPreset): Promise<boolean> {
+    const preset = parseRigPreset(value), token = ++this.rigRequest, request = this.request;
+    const context = await this.initialize();
+    await prepareRig(context, preset);
+    if (this.disposed || token !== this.rigRequest || request !== this.request) return false;
+    if (this.rig?.canUpdate(preset)) { this.rig.update(preset); this.notifyRig(); return true; }
+    const next = new RigGraph(context, preset, this.irs), previous = this.rig;
+    // Build first: missing IRs or unsupported nodes leave the current rig intact.
+    this.clearRetiredRigs();
+    if (!previous) { this.input!.disconnect(this.drivePre!); this.input!.disconnect(this.driveClean!); }
+    this.rig = next; this.rigNeedsReset = false; this.connectRig(next);
+    if (previous) {
+      if (this.source || this.liveStream) next.fadeIn();
+      previous.setActive(false);
+      const timer = setTimeout(() => { this.releaseRig(previous); this.retiredRigs.delete(previous); }, 100);
+      this.retiredRigs.set(previous, timer);
+    }
+    this.notifyRig(); return true;
+  }
+  getRigPreset(): RigPreset | null { return this.rig ? structuredClone(this.rig.preset) : null; }
+  /** Model-owned parameter IDs; the legacy setRigParameter wire API remains available. */
+  async setModelParameter(id: string, parameter: string, value: number | boolean | string, atTime?: number): Promise<boolean> {
+    const next = this.requireRig(), module = allRigModules(next).find(item => item.id === id);
+    if (!module) throw new Error("Unknown rig module.");
+    const mapped = parameterToDSP(modelFor(module), parameter, value);
+    if (mapped.realtime && typeof mapped.value !== "string") { this.setRigParameter(id, mapped.target, mapped.value, atTime); return true; }
+    if (atTime !== undefined) throw new Error("This model control requires an immediate graph rebuild.");
+    module.parameters[mapped.target] = mapped.value;
+    return this.applyRigPreset(next);
+  }
+  /** Learn a numeric model-owned control; descriptor mapping also applies to pedal endpoints. */
+  learnModelMidi(id: string, parameter: string, min: number, max: number, curve: "linear" | "squared" = "linear"): void {
+    const module = allRigModules(this.requireRig()).find(item => item.id === id); if (!module) throw new Error("Unknown rig module.");
+    const model = modelFor(module), low = parameterToDSP(model, parameter, min), high = parameterToDSP(model, parameter, max);
+    if (!low.realtime || typeof low.value !== "number" || typeof high.value !== "number") throw new Error("MIDI learn requires a realtime numeric model control.");
+    this.midi.learn(id, low.target, low.value, high.value, curve);
+  }
+  setRigParameter(id: string, parameter: string, value: number | boolean, atTime?: number): void {
+    const next = this.requireRig(), module = allRigModules(next).find(item => item.id === id);
+    if (!module) throw new Error("Unknown rig module.");
+    module.parameters[parameter] = value; parseRigPreset(next);
+    this.rig!.setParameter(id, parameter, value, atTime);
+    this.notifyRig();
+  }
+  setRigModuleEnabled(id: string, enabled: boolean): void {
+    const next = this.requireRig(), module = allRigModules(next).find(item => item.id === id);
+    if (!module) throw new Error("Unknown rig module.");
+    module.on = enabled; this.rig!.update(parseRigPreset(next)); this.notifyRig();
+  }
+  setRigTempo(bpm: number): void { const next = this.requireRig(); next.tempo_bpm = bpm; this.rig!.update(parseRigPreset(next)); this.notifyRig(); }
+  saveRigSnapshot(id: string, name: string): void {
+    const next = this.requireRig(); next.snapshots = [...next.snapshots.filter(item => item.id !== id), snapshotRig(next, id, name)];
+    this.rig!.preset = parseRigPreset(next); this.notifyRig();
+  }
+  loadRigSnapshot(id: string): Promise<boolean> { return this.applyRigPreset(applyRigSnapshot(this.requireRig(), id)); }
+  setRigExpression(id: string, parameter: string, position: number, min: number, max: number, curve: "linear" | "squared" = "linear"): void {
+    const module = allRigModules(this.requireRig()).find(item => item.id === id);
+    if (!module) throw new Error("Unknown rig module.");
+    validateControl(module.type, parameter, min, true); validateControl(module.type, parameter, max, true);
+    this.setRigParameter(id, parameter, expressionValue({ min, max, curve }, position));
+  }
+  async loadCabinetIR(id: string, file: File) {
+    if (this.rig && allRigModules(this.rig.preset).some(item => item.type === "cabinet" && item.parameters.ir_id === id)) throw new Error("Use a new IR identifier or remove it from the rig before replacing it.");
+    return this.irs.load(id, file, await this.initialize());
+  }
+  listCabinetIRs() { return this.irs.list(); }
+  removeCabinetIR(id: string): void {
+    if (this.rig && allRigModules(this.rig.preset).some(item => item.type === "cabinet" && item.parameters.ir_id === id)) throw new Error("Remove this IR from the rig before unloading it.");
+    this.irs.remove(id);
+  }
+  renderRigFile(file: File, options?: RigRenderOptions) { return renderRigFile(file, this.requireRig(), options, this.irs); }
+
+  /** Monophonic tuner, dry tap only. Poll at most 10 times/second; returns null for quiet/unclear input. */
+  getTunerReading(referenceHz = 440) {
+    if (!this.context || (!this.liveStream && !this.source)) return null;
+    if (!this.tuner) { this.tuner = this.context.createAnalyser(); this.tuner.fftSize = this.tunerSamples.length; this.rawTap!.connect(this.tuner); }
+    this.tuner.getFloatTimeDomainData(this.tunerSamples); return estimatePitch(this.tunerSamples, this.context.sampleRate, referenceHz);
+  }
+  setTunerMuted(muted: boolean): void {
+    this.tunerMuted = muted;
+    if (this.context) this.master!.gain.setTargetAtTime(muted ? 0 : this.rig ? 1 : 10 ** (this.preset.parameters.master_gain_db / 20), this.context.currentTime, 0.015);
+  }
+  getDiagnostics() {
+    const context = this.context;
+    return { mode: this.rig ? "rig" : "preset-v1", contextState: context?.state ?? "uninitialized", contextTimeSeconds: context?.currentTime ?? null, sampleRate: context?.sampleRate ?? null,
+      baseLatencySeconds: context && "baseLatency" in context ? context.baseLatency : null,
+      outputLatencySeconds: context && "outputLatency" in context ? context.outputLatency : null,
+      measuredRoundTripLatencySeconds: null, audioThreadCpuPercent: null, dropoutCount: null,
+      capture: this.liveInfo ? structuredClone(this.liveInfo) : null, tunerMuted: this.tunerMuted,
+      graph: this.rig?.diagnostics() ?? null, retiringGraphs: this.retiredRigs.size,
+      recording: this.rigRecording?.state() ?? this.getPerformanceRecordingState(), customIRCount: this.irs.list().length };
+  }
+  /** Browser output routing is optional; unsupported browsers should use OS output settings. */
+  async setOutputDevice(deviceId: string): Promise<void> {
+    const context = await this.initialize();
+    const selectable = context as AudioContext & { setSinkId?: (id: string) => Promise<void> };
+    if (!selectable.setSinkId) throw new Error("Output selection is unavailable; choose the output in OS sound settings.");
+    await selectable.setSinkId(deviceId);
+  }
+  async startRigRecording(options: RigRecordingOptions = {}): Promise<RigTake> {
+    if (!this.context || !("createMediaStreamDestination" in this.context) || this.context.state !== "running" || (!this.liveStream && !this.source)) throw new Error("Start input or playback before recording.");
+    if (this.rigRecording || this.performanceRecording) throw new Error("A performance recording is already recording or finalizing.");
+    const session = recordRig(this.context, this.rawTap!, this.outputGuard!, options); this.rigRecording = session;
+    try { return await session.result; } finally { if (this.rigRecording === session) this.rigRecording = undefined; }
+  }
+  finishRigRecording(): void { this.rigRecording?.stop(); }
+  cancelRigRecording(): void { this.rigRecording?.cancel(); }
+
   stop(): void {
     this.request++;
+    this.rigRequest++;
+    this.rig?.silence(); this.rigNeedsReset = !!this.rig;
+    for (const graph of this.retiredRigs.keys()) graph.silence();
+    this.rigRecording?.stop("source_stopped");
     this.performanceRecording?.stop("source_stopped");
     this.cancelCalibration();
     this.meter?.disconnect();
     this.meter = undefined;
+    if (this.tuner) { this.rawTap?.disconnect(this.tuner); this.tuner.disconnect(); this.tuner = undefined; }
     this.liveInfo = undefined;
     if (this.source) {
       this.source.onended = null;
@@ -380,9 +607,14 @@ export class AudioEngine {
 
   async dispose(): Promise<void> {
     this.disposed = true;
+    this.midi.disconnect(); this.cancelRigRecording();
     this.cancelPerformanceRecording();
     this.stop();
+    if (this.rig) { this.releaseRig(this.rig); this.rig = undefined; }
+    this.clearRetiredRigs();
+    this.irs.clear();
     if (this.context && "close" in this.context) await this.context.close();
+
     this.context = undefined;
     this.calibrationModule = undefined;
   }

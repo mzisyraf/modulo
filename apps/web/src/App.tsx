@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { AudioEngine, type InputLevel, type LiveInputInfo } from "@modulo/audio";
+import { AudioEngine, type InputLevel, type LiveInputInfo, type RigPreset } from "@modulo/audio";
+
 import { parsePreset, type Preset } from "@modulo/contracts";
 import example from "../../../fixtures/preset.example.json";
 import { AppShell, type AppView } from "./AppShell";
@@ -12,6 +13,8 @@ import type { PresetAudition } from "./StartingPresetPanel";
 import "./separation.css";
 import { RecordingLibrary } from "./RecordingLibrary";
 import { addPerformanceRecording, createPerformanceRecording, type PerformanceRecording } from "./performanceRecordings";
+import { ModelRigPanel } from "./ModelRigPanel";
+
 
 const initialPreset = parsePreset(example);
 const controls = [
@@ -37,6 +40,7 @@ interface StoredProject {
   jobStage: JobStage;
   jobId: string;
   preset: Preset;
+  rigPreset?: RigPreset;
   bypass: boolean;
 }
 
@@ -44,6 +48,7 @@ const levelDb = (value: number) => 20 * Math.log10(Math.max(value, 1e-8));
 export function App() {
   const [view, setView] = useState<AppView>("workspace");
   const [preset, setPreset] = useState<Preset>(initialPreset);
+  const [modelRig, setModelRig] = useState<RigPreset | null>(null);
   const [apiState, setApiState] = useState("Checking API…");
   const [audioState, setAudioState] = useState("Stopped");
   const [error, setError] = useState("");
@@ -70,6 +75,8 @@ export function App() {
   const engine = useRef<AudioEngine | null>(null);
   const workflow = useRef<PresetAudition | null>(null);
   const audioRun = useRef(0);
+  const rigRestoreRun = useRef(0);
+
   const liveRequests = useRef(new LiveRequestGate());
   const performanceRun = useRef(0);
   const performanceStateRef = useRef<PerformanceRecordingState>("idle");
@@ -105,6 +112,8 @@ export function App() {
 
   useEffect(() => {
     const audio = new AudioEngine(initialPreset);
+    audio.onRigChange = setModelRig;
+    audio.onRigError = message => { audio.onEnded?.(); setError(message); setLiveState("error"); setLiveMessage(message); };
     audio.onEnded = () => {
       if (performanceStateRef.current === "recording") {
         updatePerformanceStatus("finalizing", "The audio source stopped. Finalizing your take…");
@@ -133,9 +142,12 @@ export function App() {
     return () => {
       controller.abort();
       audioRun.current++;
+      rigRestoreRun.current++;
+
       liveRequests.current.cancel();
       performanceRun.current++;
       audio.cancelPerformanceRecording();
+      audio.onRigChange = undefined;
       engineSource.current = "none";
       void audio.dispose();
     };
@@ -178,6 +190,7 @@ export function App() {
       jobStage,
       jobId,
       preset,
+      rigPreset: engine.current?.getRigPreset() ?? undefined,
       bypass,
     };
   }
@@ -189,6 +202,7 @@ export function App() {
       || project.dryFile
       || project.jobStage !== "idle"
       || project.bypass
+      || project.rigPreset
       || project.preset.name !== initialPreset.name
       || controls.some(([key]) => project.preset.parameters[key] !== initialPreset.parameters[key]),
     );
@@ -212,7 +226,7 @@ export function App() {
     const details = {
       projectId: activeProjectId,
       projectTitle: projectTitle(songFile?.name),
-      presetName: preset.name,
+      presetName: modelRig?.name ?? preset.name,
     };
     updatePerformanceStatus("recording", "Recording processed audio… Finish when you’re done, or discard this take.");
     try {
@@ -257,6 +271,8 @@ export function App() {
     setJobId(project.jobId);
     setPreset(project.preset);
     engine.current?.applyPreset(project.preset);
+    const restore = ++rigRestoreRun.current;
+    if (project.rigPreset) void engine.current?.applyRigPreset(project.rigPreset).catch(failure => { if (restore === rigRestoreRun.current) setError(failure instanceof Error ? failure.message : "Could not restore model rig."); });
     setBypass(project.bypass);
     engine.current?.setBypass(project.bypass);
     setError("");
@@ -273,6 +289,8 @@ export function App() {
   function stopEngineAudio(message = "Stopped", stopWorkflow = true) {
     audioRun.current++; setBusy(false);
     if (stopWorkflow) workflow.current?.stop();
+    rigRestoreRun.current++;
+
     liveRequests.current.cancel();
     markPerformanceFinalizing();
     engineSource.current = "none";
@@ -425,8 +443,9 @@ export function App() {
           <div className="project-copy">
             <span className="project-kicker">LOCAL PROJECT</span>
             <h3>{projectTitle(songFile?.name)}</h3>
-            <p>{preset.name} · Custom amp preset</p>
+            <p>{modelRig?.name ?? preset.name} · Custom amp preset</p>
             <div className="project-meta"><span className={hasResult ? "state-dot complete" : "state-dot"} />{hasResult ? "Tone ready to preview" : processing ? "Separating your song" : songFile ? "Song added — ready to continue" : "No reference song added yet"}</div>
+
           </div>
           <div className="project-song"><span>Reference</span><strong>{songFile?.name ?? "Add a song"}</strong></div>
           <button onClick={() => navigate("tone-match")}>Continue <span aria-hidden="true">→</span></button>
@@ -449,12 +468,14 @@ export function App() {
         onJobChange={(id, file, status) => { setJobId(id); setSongFile(file); setJobStage(status); }}
         onApplyPreset={applyStartingPreset} onStopAudio={() => stopEngineAudio("Stopped — song preview took over the audio output.", false)} onInvalidatePreset={invalidateStartingPreset} />
 
+      <ModelRigPanel key={`rig-${sessionKey}`} engineRef={engine} value={modelRig} legacyPreset={preset} />
       <div className="grid">
-        <section aria-labelledby="amp-title"><span className="step">06 / AMP</span><h2 id="amp-title">{preset.name}</h2><p>{preset.description}</p><div className="provenance"><strong>{hasResult ? "AI starting preset · editable" : "Manual example preset"}</strong><span>{hasResult ? `${preset.provenance.provider} · ${preset.provenance.model} · tone unverified` : "Manually made · not generated from your song"}</span></div><div className="controls">{controls.map(([key, label, min, max, step, unit]) => <label key={key} htmlFor={key}><span>{label}<output>{preset.parameters[key]} {unit}</output></span><input id={key} type="range" min={min} max={max} step={step} value={preset.parameters[key]} onChange={(event) => changeControl(key, Number(event.target.value))} /></label>)}</div><button className="secondary" onClick={() => void loadApiExample()}>Load demo preset</button></section>
-        <section aria-labelledby="audition-title"><span className="step">07 / AUDITION</span><h2 id="audition-title">Hear the browser amp</h2><p>Working gain, drive and EQ. Start at a comfortable listening level.</p><button disabled={busy} onClick={() => void play(false)}>Play test signal</button><p className="hint">A two-second synthesized pluck, not an isolated guitar or AI result.</p><label className="file-label" htmlFor="dry-file">Dry guitar recording · local audition only</label><AudioFileDropzone key={`dry-${sessionKey}`} id="dry-file" accept="audio/*" formats="Browser-supported audio" maxBytes={20 * 1024 * 1024} file={dryFile} onFile={setDryFile} /><button className="secondary" disabled={!dryFile || busy} onClick={() => void play(true)}>Play dry recording</button><label className="toggle"><input type="checkbox" checked={bypass} onChange={(event) => { setBypass(event.target.checked); engine.current?.setBypass(event.target.checked); }} />Bypass drive and EQ</label><button className="stop" onClick={() => stopEngineAudio()}>Stop audio</button><p role="status">{audioState}</p></section>
+        <section aria-labelledby="amp-title"><span className="step">06 / AMP</span><h2 id="amp-title">{preset.name}</h2><p>{preset.description}</p><div className="provenance"><strong>{hasResult ? "AI starting preset · editable" : "Manual example preset"}</strong><span>{hasResult ? `${preset.provenance.provider} · ${preset.provenance.model} · tone unverified` : "Manually made · not generated from your song"}</span></div>{modelRig && <p>Model rig active above. Use demo preset to return to these controls.</p>}<div className="controls">{controls.map(([key, label, min, max, step, unit]) => <label key={key} htmlFor={key}><span>{label}<output>{preset.parameters[key]} {unit}</output></span><input id={key} type="range" disabled={Boolean(modelRig)} min={min} max={max} step={step} value={preset.parameters[key]} onChange={(event) => changeControl(key, Number(event.target.value))} /></label>)}</div><button className="secondary" onClick={() => void loadApiExample()}>Load demo preset</button></section>
+        <section aria-labelledby="audition-title"><span className="step">07 / AUDITION</span><h2 id="audition-title">Hear the browser amp</h2><p>Play through the active preset or model rig. Start at a comfortable listening level.</p><button disabled={busy} onClick={() => void play(false)}>Play test signal</button><p className="hint">A two-second synthesized pluck, not an isolated guitar or AI result.</p><label className="file-label" htmlFor="dry-file">Dry guitar recording · local audition only</label><AudioFileDropzone key={`dry-${sessionKey}`} id="dry-file" accept="audio/*" formats="Browser-supported audio" maxBytes={20 * 1024 * 1024} file={dryFile} onFile={setDryFile} /><button className="secondary" disabled={!dryFile || busy} onClick={() => void play(true)}>Play dry recording</button><label className="toggle"><input type="checkbox" checked={bypass} onChange={(event) => { setBypass(event.target.checked); engine.current?.setBypass(event.target.checked); }} />Bypass effects</label><button className="stop" onClick={() => stopEngineAudio()}>Stop audio</button><p role="status">{audioState}</p></section>
         <section aria-labelledby="live-title" className="live-panel">
           <span className="step">08 / LIVE INPUT</span><h2 id="live-title">Connect your guitar</h2>
-          <p>Use a local audio interface to play through the same gain, drive, EQ and bypass controls. Starting rigs still require listening verification.</p>
+          <p>Use a local audio interface to play through the active preset or model rig. Starting rigs still require listening verification.</p>
+
           <label className="select-label" htmlFor="device">Input device</label>
           <ChoiceMenu id="device" kind="device" searchable value={selectedDeviceId} disabled={!inputDevices.length || liveState === "starting" || liveState === "live"} onChange={changeLiveDevice} options={inputDevices.map((device) => ({ label: device.label, value: device.deviceId }))} placeholder="No audio inputs found" />
           <button className="secondary compact-action" disabled={liveState === "starting" || liveState === "live"} onClick={() => void refreshInputDevices()}>Refresh inputs</button>
@@ -468,7 +489,7 @@ export function App() {
           {inputLevel && <p role="status">Dry input: RMS {levelDb(inputLevel.rms).toFixed(1)} dBFS · peak {levelDb(inputLevel.peak).toFixed(1)} dBFS{inputLevel.clipping ? " · Clipping — lower interface gain" : ""}</p>}
           <div className="performance-capture" aria-labelledby="performance-capture-title">
             <div className="calibration-heading"><div><span className="step">PERFORMANCE</span><h3 id="performance-capture-title">Record your processed guitar</h3></div><span className={`calibration-chip ${performanceState}`}>{performanceState === "recording" ? "Recording" : performanceState === "finalizing" ? "Finalizing" : performanceState === "error" ? "Error" : "Ready"}</span></div>
-            <p>Capture the sound after Modulo’s gain, Drive, EQ and bypass controls. Takes stay in this tab for playback, download or deletion.</p>
+            <p>Capture the protected output of the active preset or model rig. Takes stay in this tab for playback, download or deletion.</p>
             <div className="performance-actions">
               {(performanceState === "idle" || performanceState === "error") && <button disabled={engineSource.current === "none"} onClick={() => void recordPerformance()}>{performanceState === "error" ? "Retry recording" : "Record"}</button>}
               {performanceState === "recording" && <><button onClick={finishPerformanceRecording}>Finish</button><button className="secondary" onClick={() => discardPerformanceRecording()}>Discard</button></>}
