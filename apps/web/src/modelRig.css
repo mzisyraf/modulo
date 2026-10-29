@@ -119,3 +119,78 @@
 @media(max-width:1000px){.model-rig-panel+.grid{gap:22px;margin-top:26px}}
 @media(max-width:760px){.model-rig-panel+.grid{gap:20px;margin-top:22px}.model-rig-panel+.grid>section{padding:20px}.model-rig-path::after{width:24px}.model-library-card{min-height:194px}.model-library-select{grid-template-columns:72px minmax(0,1fr)}.model-library-visual{width:72px}}
 @media(max-width:480px){.model-rig-panel+.grid>section{padding:18px 16px}.model-library-select{grid-template-columns:68px minmax(0,1fr)}.model-library-visual{width:68px}.model-control-group{padding:9px}.model-control-group-grid{gap:8px}}
+
+
+/* Selected gear: accessible taxi-yellow enable/bypass toggle.
+   Works with the existing checkbox JSX and preserves its onChange logic. */
+.model-rig-selected-actions .model-rig-enable {
+  display: inline-flex !important;
+  flex-direction: row-reverse; /* text at left, toggle at right */
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  min-height: 39px;
+  margin: 0;
+  color: var(--rig-cream, #f7efe5) !important;
+  font-size: .83rem;
+  font-weight: 650;
+  white-space: nowrap;
+  cursor: pointer;
+}
+.model-rig-selected-actions .model-rig-enable > span {
+  line-height: 1.25;
+}
+.model-rig-selected-actions .model-rig-enable input[type=checkbox] {
+  -webkit-appearance: none;
+  appearance: none;
+  position: relative;
+  display: block;
+  flex: 0 0 46px;
+  width: 46px;
+  height: 26px;
+  margin: 0;
+  padding: 0;
+  border: 1px solid #806150;
+  border-radius: 999px;
+  background: #574039;
+  box-shadow: inset 0 1px 3px #0005;
+  cursor: pointer;
+  transition: background-color .18s ease, border-color .18s ease;
+}
+.model-rig-selected-actions .model-rig-enable input[type=checkbox]::before {
+  content: "";
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: #f5eae0;
+  box-shadow: 0 1px 3px #0005;
+  transition: transform .18s ease, background-color .18s ease;
+}
+.model-rig-selected-actions .model-rig-enable input[type=checkbox]:checked {
+  border-color: var(--rig-yellow, #ffd21f);
+  background: var(--rig-yellow, #ffd21f);
+}
+.model-rig-selected-actions .model-rig-enable input[type=checkbox]:checked::before {
+  transform: translateX(20px);
+  background: #211611;
+}
+.model-rig-selected-actions .model-rig-enable input[type=checkbox]:focus-visible {
+  outline: 2px solid var(--rig-yellow, #ffd21f);
+  outline-offset: 3px;
+}
+.model-rig-selected-actions .model-rig-enable:has(input:disabled) {
+  opacity: .55;
+  cursor: not-allowed;
+}
+.model-rig-selected-actions .model-rig-enable input[type=checkbox]:disabled {
+  cursor: not-allowed;
+}
+@media (prefers-reduced-motion: reduce) {
+  .model-rig-selected-actions .model-rig-enable input[type=checkbox],
+  .model-rig-selected-actions .model-rig-enable input[type=checkbox]::before {
+    transition: none;
+  }
+}
