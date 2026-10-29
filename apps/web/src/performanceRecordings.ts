@@ -7,6 +7,7 @@ export interface PerformanceTake {
   durationSeconds: number;
   mimeType: string;
   sampleRate?: number;
+  stopReason: "manual" | "duration_limit" | "source_stopped";
 }
 
 export interface PerformanceRecording extends PerformanceTake {
@@ -38,8 +39,8 @@ export function createPerformanceRecording(
   if (!Number.isFinite(take.durationSeconds) || take.durationSeconds <= 0 || take.durationSeconds > MAX_PERFORMANCE_RECORDING_SECONDS) {
     throw new Error("Performance recordings must be between 0 and 3 minutes.");
   }
-  const mimeType = take.mimeType.split(";", 1)[0].trim().toLowerCase();
-  if (!mimeType.startsWith("audio/")) {
+  const mimeType = take.mimeType.trim().toLowerCase();
+  if (!mimeType.split(";", 1)[0].startsWith("audio/")) {
     throw new Error("The performance recorder must return an audio format.");
   }
 

@@ -2,6 +2,9 @@ import { parsePreset, type Preset } from "@modulo/contracts";
 import { driveCurve, pluckSamples } from "./dsp.ts";
 import { CalibrationBuffer, calibrationFrameLimit, inputLevel, type CalibrationAudio, type InputLevel } from "./calibration.ts";
 export type { CalibrationAudio, CalibrationFlag, InputLevel } from "./calibration.ts";
+import { recordProcessedOutput, type ProcessedRecording, type PerformanceRecordingOptions, type PerformanceTake } from "./recording.ts";
+export { MAX_RECORDING_SECONDS, MAX_RECORDING_BYTES } from "./recording.ts";
+export type { PerformanceTake, PerformanceRecordingOptions } from "./recording.ts";
 
 export interface LiveInputInfo {
   /** Zero-based hardware input channel. */
@@ -28,6 +31,8 @@ export class AudioEngine {
   private wet?: GainNode;
   private dry?: GainNode;
   private master?: GainNode;
+  private outputGuard?: WaveShaperNode;
+  private performanceRecording?: ProcessedRecording;
   private source?: AudioBufferSourceNode;
   private liveSource?: MediaStreamAudioSourceNode;
   private liveSplitter?: ChannelSplitterNode;
@@ -108,6 +113,7 @@ export class AudioEngine {
       this.input.connect(this.dry).connect(this.master);
       // Bound the output even when stacked EQ boosts exceed full scale.
       const outputGuard = context.createWaveShaper();
+      this.outputGuard = outputGuard;
       outputGuard.curve = new Float32Array([-0.95, 0, 0.95]);
       this.master.connect(outputGuard).connect(context.destination);
       this.applyPreset(this.preset);
@@ -324,8 +330,30 @@ export class AudioEngine {
   /** Discard a pending take; its start promise rejects with AbortError. */
   cancelCalibration(): void { this.calibration?.cancel(); }
 
+  /** Resolve with an encoded processed take on finish/limit/source stop; catch cancellation. */
+  async startPerformanceRecording(options?: PerformanceRecordingOptions): Promise<PerformanceTake> {
+    if (!this.context || this.context.state !== "running" || !this.outputGuard || (!this.liveStream && !this.source)) {
+      throw new Error("Start live input or sample playback before recording a performance.");
+    }
+    if (this.performanceRecording) throw new Error("A performance recording is already recording or finalizing.");
+    const session = recordProcessedOutput(this.context, this.outputGuard, options);
+    this.performanceRecording = session;
+    try { return await session.result; }
+    finally { if (this.performanceRecording === session) this.performanceRecording = undefined; }
+  }
+
+  /** Finish the file; live monitoring continues. Await the original start promise. */
+  finishPerformanceRecording(): void { this.performanceRecording?.stop(); }
+
+  cancelPerformanceRecording(): void { this.performanceRecording?.cancel(); }
+
+  getPerformanceRecordingState(): "idle" | "recording" | "stopping" {
+    return this.performanceRecording?.state() ?? "idle";
+  }
+
   stop(): void {
     this.request++;
+    this.performanceRecording?.stop("source_stopped");
     this.cancelCalibration();
     this.meter?.disconnect();
     this.meter = undefined;
@@ -352,6 +380,7 @@ export class AudioEngine {
 
   async dispose(): Promise<void> {
     this.disposed = true;
+    this.cancelPerformanceRecording();
     this.stop();
     if (this.context && "close" in this.context) await this.context.close();
     this.context = undefined;
