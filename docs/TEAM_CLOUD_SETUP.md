@@ -11,7 +11,7 @@ Isyraf's chosen setup: share the existing hackathon credentials privately with D
 
 Use an encrypted file transfer or AES-encrypted archive; send its password separately. Do not send the plaintext files through a group chat or GitHub. Do not put them in the frontend, a `VITE_*` variable, screenshots, logs or a commit. Git ignores both paths. Keep an existing teammate `.env` backup privately before replacing it; never overwrite their credentials automatically.
 
-The shared Modal token grants workspace access beyond just one inference function. All three people share the same credit balance and the same ten-attempt cloud ledger (eight remained after the initial smoke checks). That counter must not be reset to bypass limits. The initial token expires **5 November 2026**; Isyraf must renew/re-share for later use. Revoke shared credentials after the event. [Modal authentication and workspaces](https://modal.com/docs/guide/workspaces).
+The shared Modal token grants workspace access beyond just one inference function. All three people share the same credit balance and the same ten-attempt cloud ledger (**seven remained at the 30 October planning check**, after three reservations). That counter must not be reset to bypass limits. The initial token expires **5 November 2026**; Isyraf must renew/re-share for later use. Revoke shared credentials after the event. [Modal authentication and workspaces](https://modal.com/docs/guide/workspaces).
 
 ## Run the full app without a GPU
 
