@@ -11,16 +11,45 @@ function initialRig(): RigPreset {
   return clean;
 }
 
+const STARTER_RECOMMENDATIONS = new Set(allRigModules(initialRig()).map(module => modelFor(module).id));
+const GEAR_MARKS: Record<string, string> = { input: "IN", gate: "GATE", compressor: "COMP", overdrive: "OD", distortion: "DIST", fuzz: "FUZZ", boost: "BOOST", wah: "WAH", amp: "AMP", cabinet: "CAB", eq: "EQ", chorus: "CHOR", flanger: "FLNG", phaser: "PHASE", tremolo: "TREM", delay: "DLY", reverb: "REV", pitch: "PITCH", output: "OUT" };
+const GEAR_FAMILIES: Record<string, string> = { amp: "Amplifier", cabinet: "Cabinet", gate: "Noise gate", input: "Input", output: "Output" };
+const gearMark = (type: string) => GEAR_MARKS[type] ?? type.slice(0, 5).toUpperCase();
+const gearFamily = (type: string) => (GEAR_CATEGORIES as Record<string, string>)[type] ?? GEAR_FAMILIES[type] ?? type;
+const LIBRARY_GROUPS = [
+  { id: "all", label: "All gear", types: [] },
+  { id: "amplifiers", label: "Amplifiers", types: ["amp"] },
+  { id: "cabinets", label: "Cabinets", types: ["cabinet"] },
+  { id: "drive", label: "Drive", types: ["overdrive", "distortion", "fuzz", "boost", "wah"] },
+  { id: "dynamics", label: "Dynamics", types: ["compressor", "gate"] },
+  { id: "modulation", label: "Modulation", types: ["chorus", "flanger", "phaser", "tremolo", "pitch"] },
+  { id: "delay", label: "Delay", types: ["delay"] },
+  { id: "reverb", label: "Reverb", types: ["reverb"] },
+  { id: "utilities", label: "Utilities", types: ["eq"] },
+] as const;
+
+function GearVisual({ type, label, parameterCount = 3, compact = false }: { type: string; label: string; parameterCount?: number; compact?: boolean }) {
+  const count = Math.max(1, Math.min(3, parameterCount));
+  if (type === "amp") return <span className={`gear-visual gear-amp${compact ? " is-compact" : ""}`} aria-hidden="true"><i className="gear-amp-handle" /><i className="gear-amp-grille" /><span className="gear-amp-name">{label.replace(/ preamp/i, "")}</span><span className="gear-amp-controls">{Array.from({ length: 7 }, (_, index) => <i key={index} />)}</span></span>;
+  if (type === "cabinet") return <span className={`gear-visual gear-cabinet${compact ? " is-compact" : ""}`} aria-hidden="true"><i className="gear-cabinet-grille" /><b>CAB</b></span>;
+  return <span className={`gear-visual gear-pedal gear-${type}${compact ? " is-compact" : ""}`} aria-hidden="true"><span className="gear-mini-knobs">{Array.from({ length: count }, (_, index) => <i key={index} />)}</span><b>{gearMark(type)}</b><i className="gear-led" /><i className="gear-footswitch" /></span>;
+}
+
 export function ModelRigPanel({ engineRef, value, legacyPreset }: Props) {
   const [draft, setDraft] = useState(initialRig), [selectedId, setSelectedId] = useState("amp"), [category, setCategory] = useState<GearCategory | "all">("all");
   const [libraryId, setLibraryId] = useState("delay.single_tap"), [busy, setBusy] = useState(false), [message, setMessage] = useState("Edit this local rig, then choose Use model rig to hear it through the existing player or live input.");
+  const [libraryGroup, setLibraryGroup] = useState("all"), [search, setSearch] = useState("");
   const [assets, setAssets] = useState<{ id: string; name: string }[]>(() => engineRef.current?.listCabinetIRs() ?? []), [destination, setDestination] = useState("main");
   const [irAssetId, setIRAssetId] = useState("my_cab");
-  const mounted = useRef(true), urls = useRef(new Set<string>()), actionToken = useRef(0);
+  const mounted = useRef(true), urls = useRef(new Set<string>()), actionToken = useRef(0), libraryRef = useRef<HTMLDivElement>(null);
   useEffect(() => { mounted.current = true; return () => { mounted.current = false; actionToken.current++; urls.current.forEach(URL.revokeObjectURL); }; }, []);
   const rig = value ?? draft, modules = allRigModules(rig), selected = modules.find(item => item.id === selectedId) ?? modules.find(item => item.type === "amp") ?? modules[0];
   const models = getGearModels(category === "all" ? undefined : category).filter(item => !["input", "output"].includes(item.type));
-  const libraryModel = models.find(item => item.id === libraryId) ?? models[0];
+  const libraryModels = [...models].sort((left, right) => Number(STARTER_RECOMMENDATIONS.has(right.id)) - Number(STARTER_RECOMMENDATIONS.has(left.id)) || left.name.localeCompare(right.name));
+  const allLibraryModels = getGearModels().filter(item => !["input", "output"].includes(item.type));
+  const activeGroup = LIBRARY_GROUPS.find(item => item.id === libraryGroup) ?? LIBRARY_GROUPS[0], query = search.trim().toLocaleLowerCase();
+  const visibleLibraryModels = allLibraryModels.filter(model => (!activeGroup.types.length || (activeGroup.types as readonly string[]).includes(model.type)) && (!query || `${model.name} ${model.description} ${gearFamily(model.type)}`.toLocaleLowerCase().includes(query))).sort((left, right) => Number(STARTER_RECOMMENDATIONS.has(right.id)) - Number(STARTER_RECOMMENDATIONS.has(left.id)) || left.name.localeCompare(right.name));
+  const libraryModel = libraryModels.find(item => item.id === libraryId) ?? libraryModels[0], selectedModel = modelFor(selected);
   const chains = [{ id: "main", name: "Main chain", chain: rig.chain }, ...(rig.parallel?.paths.map(path => ({ id: `path:${path.id}`, name: path.id.replaceAll("_", " "), chain: path.chain })) ?? [])];
   const target = chains.some(chain => chain.id === destination) ? destination : "main";
   const run = async (action: () => Promise<void> | void) => {
@@ -71,37 +100,55 @@ export function ModelRigPanel({ engineRef, value, legacyPreset }: Props) {
   }
 
   return <section className="model-rig-panel" aria-labelledby="model-rig-title">
-    <span className="step">MODEL RIG</span><h2 id="model-rig-title">Choose the gear. Shape its sound.</h2>
-    <p>These local algorithmic models have their own controls. They are not a setup generated from your song or verified hardware emulations.</p>
-    <div className="model-rig-toolbar"><strong>{value ? "Model rig active" : "Model rig draft"}</strong><button disabled={busy} onClick={() => void run(async () => { const audio = engineRef.current; if (!audio) throw new Error("Audio is not ready yet."); if (await audio.applyRigPreset(rig)) { setDraft(rig); setMessage("Model rig active. Use the existing audition or live input controls to listen."); } })}>Use model rig</button>
-      <button className="secondary" disabled={!value || busy} onClick={() => { setDraft(rig); engineRef.current?.applyPreset(legacyPreset); setMessage("Previous demo preset restored."); }}>Use demo preset</button><button className="secondary" onClick={save}>Save rig JSON</button></div>
-    {chains.map(path => <div key={path.id}><h3>{path.name}</h3><div className="model-rig-chain" onDragOver={dragOver} onDrop={event => onDrop(event, path.id)} aria-label={path.name}>
-      {path.chain.map((module, index) => <div className={`model-rig-card${module.id === selected.id ? " is-selected" : ""}`} key={module.id} data-rig-instance={module.id} onDragOver={dragOver} onDrop={event => onDrop(event, path.id, module.id)}>
-        <button className="secondary" onClick={() => setSelectedId(module.id)} aria-pressed={module.id === selected.id}>{modelFor(module).name}</button>
-        <small>{module.on ? "Enabled" : "Bypassed"}</small>
-        {!["input", "output"].includes(module.type) && <div className="model-rig-card-actions"><button disabled={busy} draggable onDragStart={event => event.dataTransfer.setData("application/x-modulo-model-gear", JSON.stringify({ instanceId: module.id }))} onClick={() => setSelectedId(module.id)} aria-label={`Drag ${module.id}`}>⠿</button>
-          <button disabled={busy || index <= (path.id === "main" ? 1 : 0)} onClick={() => edit({ action: "move", id: module.id, target: path.id, before: path.chain[index - 1]?.id })} aria-label={`Move ${module.id} earlier`}>←</button>
-          <button disabled={busy || index >= path.chain.length - (path.id === "main" ? 2 : 1)} onClick={() => edit({ action: "move", id: module.id, target: path.id, before: path.chain[index + 2]?.id })} aria-label={`Move ${module.id} later`}>→</button>
-          <button disabled={busy} onClick={() => edit({ action: "remove", id: module.id })} aria-label={`Remove ${module.id}`}>Remove</button></div>}
-      </div>)}
-    </div></div>)}
-    <div className="model-rig-toolbar"><label>Selected model <select aria-label="Selected gear model" disabled={busy} value={`${selected.type}.${selected.model}`} onChange={event => { const id = event.target.value; void run(async () => { await commit(changeGearModel(engineRef.current?.getRigPreset() ?? draft, selected.id, id, assets[0]?.id)); }); }}>
-      {getGearModels().filter(model => model.type === selected.type).map(model => <option value={model.id} key={model.id}>{model.name}</option>)}
-    </select></label>{!["input", "output"].includes(selected.type) && <label><input type="checkbox" disabled={busy} checked={selected.on} onChange={event => { const enabled = event.target.checked; void run(async () => { const next = structuredClone(engineRef.current?.getRigPreset() ?? draft); allRigModules(next).find(item => item.id === selected.id)!.on = enabled; await commit(parseRigPreset(next)); }); }} />Enable this gear</label>}</div>
-    <button className="secondary" disabled={busy} onClick={() => void run(async () => { if (await commit(resetGearModel(engineRef.current?.getRigPreset() ?? draft, selected.id)) && mounted.current) setMessage("Model defaults restored; this gear’s saved snapshot values and incompatible mappings were cleared."); })}>Reset model defaults</button>
-    <p className="model-rig-reference">{modelFor(selected).description} {modelFor(selected).dsp.approximation}</p>
-    <ModelControls module={selected} disabled={busy} assets={assets} onChange={changeParameter} />
-    <div className="model-rig-toolbar"><label>Category <select aria-label="Gear category" value={category} onChange={event => setCategory(event.target.value as GearCategory | "all")}><option value="all">All gear</option>{Object.entries(GEAR_CATEGORIES).map(([id, label]) => <option key={id} value={id}>{label}</option>)}</select></label>
-      <label>Gear library <select aria-label="Model gear library" value={libraryModel.id} onChange={event => setLibraryId(event.target.value)}>{models.map(model => <option key={model.id} value={model.id}>{model.name}</option>)}</select></label>
-      <label>Add to <select aria-label="Model gear destination" value={target} onChange={event => setDestination(event.target.value)}>{chains.map(path => <option key={path.id} value={path.id}>{path.name}</option>)}</select></label>
-      <button disabled={busy} draggable onDragStart={event => event.dataTransfer.setData("application/x-modulo-model-gear", JSON.stringify({ modelId: libraryModel.id }))} onClick={() => add(libraryModel.id)}>＋ Add selected gear / drag</button></div>
-    <div className="model-rig-file"><label>Load rig JSON <input type="file" accept="application/json,.json" disabled={busy} onChange={event => { const file = event.target.files?.[0]; event.currentTarget.value = ""; if (file) void run(async () => {
-      if (file.size > 256 * 1024) throw new Error("Rig JSON must be at most 256 KiB."); const next = importRigPreset(await file.text());
-      if (!mounted.current) return; const custom = allRigModules(next).find(module => module.type === "cabinet" && module.model === "custom"); if (custom) setIRAssetId(String(custom.parameters.ir_id));
-      if (await commit(next) && mounted.current) setMessage("Rig loaded. Missing custom IRs must be imported separately.");
-    }); }} /></label>
-      <label>IR ID <input type="text" aria-label="Cabinet IR identifier" maxLength={64} value={irAssetId} disabled={busy} onChange={event => setIRAssetId(event.target.value)} /></label>
-      <label>Import cabinet IR <input type="file" accept="audio/*" disabled={busy} onChange={event => { const file = event.target.files?.[0]; event.currentTarget.value = ""; if (file) void run(async () => { const audio = engineRef.current; if (!audio) throw new Error("Audio is not ready."); await audio.loadCabinetIR(irAssetId, file); if (mounted.current) { setAssets(audio.listCabinetIRs()); setMessage("IR imported. Select User cabinet IR to use it. Reuse this IR ID when loading its preset."); } }); }} /></label></div>
-    <p className="model-rig-status" role="status">{message}</p>
+    <header className="model-rig-heading">
+      <div className="model-rig-title"><span className="model-rig-kicker">MODEL RIG</span><h2 id="model-rig-title">Build your signal chain.</h2><p>Arrange your gear, choose a model and shape only the controls that the engine supports.</p></div>
+      <div className="model-rig-primary-actions"><button disabled={busy} onClick={() => void run(async () => { const audio = engineRef.current; if (!audio) throw new Error("Audio is not ready yet."); if (await audio.applyRigPreset(rig)) { setDraft(rig); setMessage("Model rig active. Use the existing audition or live input controls to listen."); } })}>Use model rig</button>
+        <button className="secondary" disabled={!value || busy} onClick={() => { setDraft(rig); engineRef.current?.applyPreset(legacyPreset); setMessage("Previous demo preset restored."); }}>Use demo preset</button><button className="secondary" onClick={save}>Save rig JSON</button></div>
+      <span className="model-rig-mode"><i />{value ? "Model rig active" : "Manual local rig"}</span>
+    </header>
+
+    <section className="model-rig-workbench-section" aria-labelledby="model-rig-chain-title">
+      <div className="model-rig-section-heading"><div><span className="model-rig-kicker">SIGNAL CHAIN</span><h3 id="model-rig-chain-title">Current chain</h3></div><p>Drag to reorder. Select a module to edit it.</p><button className="model-rig-add-gear" onClick={() => libraryRef.current?.scrollIntoView({ behavior: "smooth", block: "start" })}>＋ Add gear</button></div>
+      {chains.map(path => <div className="model-rig-path" key={path.id}><span className="model-rig-path-label"><span>{path.name}</span><small>{path.chain.length} modules</small></span><div className="model-rig-chain" onDragOver={dragOver} onDrop={event => onDrop(event, path.id)} aria-label={path.name}>
+        {path.chain.map((module, index) => { const model = modelFor(module); return <div className={`model-rig-card gear-stage-${module.type}${module.id === selected.id ? " is-selected" : ""}${module.on ? "" : " is-bypassed"}`} key={module.id} data-rig-instance={module.id} onDragOver={dragOver} onDrop={event => onDrop(event, path.id, module.id)}>
+          <button className="model-rig-card-select" onClick={() => setSelectedId(module.id)} aria-pressed={module.id === selected.id}><span className="gear-jack gear-jack-in" /><GearVisual type={module.type} label={model.name} parameterCount={model.parameters.length} /><span className="gear-jack gear-jack-out" /><span className="model-rig-card-copy"><strong>{model.name}</strong><small>{gearFamily(module.type)}</small><span className="model-rig-card-state"><i />{module.on ? "Enabled" : "Bypassed"}</span></span></button>
+          {!['input', 'output'].includes(module.type) && <div className="model-rig-card-actions"><button disabled={busy} draggable onDragStart={event => event.dataTransfer.setData("application/x-modulo-model-gear", JSON.stringify({ instanceId: module.id }))} onClick={() => setSelectedId(module.id)} aria-label={`Drag ${module.id}`} title="Drag to reorder">⠿</button>
+            <button disabled={busy || index <= (path.id === "main" ? 1 : 0)} onClick={() => edit({ action: "move", id: module.id, target: path.id, before: path.chain[index - 1]?.id })} aria-label={`Move ${module.id} earlier`} title="Move earlier">←</button>
+            <button disabled={busy || index >= path.chain.length - (path.id === "main" ? 2 : 1)} onClick={() => edit({ action: "move", id: module.id, target: path.id, before: path.chain[index + 2]?.id })} aria-label={`Move ${module.id} later`} title="Move later">→</button>
+            <button disabled={busy} onClick={() => edit({ action: "remove", id: module.id })} aria-label={`Remove ${module.id}`} title="Remove from rig">×</button></div>}
+        </div>; })}
+        <button className="model-rig-add-slot" onClick={() => libraryRef.current?.scrollIntoView({ behavior: "smooth", block: "start" })}><span>＋</span>Add effect</button>
+      </div></div>)}
+    </section>
+
+    <div className="model-rig-main-grid">
+      <section className="model-rig-selected-panel" aria-labelledby="model-rig-selected-title">
+        <div className="model-rig-selected-heading"><GearVisual type={selected.type} label={selectedModel.name} parameterCount={selectedModel.parameters.length} compact /><div><span className="model-rig-kicker">SELECTED GEAR</span><h3 id="model-rig-selected-title">{selectedModel.name}</h3><p>{selectedModel.description}</p></div><span className="model-rig-family">{gearFamily(selected.type)}</span></div>
+        <div className="model-rig-selected-actions"><label><span>Selected model</span><select aria-label="Selected gear model" disabled={busy} value={`${selected.type}.${selected.model}`} onChange={event => { const id = event.target.value; void run(async () => { await commit(changeGearModel(engineRef.current?.getRigPreset() ?? draft, selected.id, id, assets[0]?.id)); }); }}>
+          {getGearModels().filter(model => model.type === selected.type).map(model => <option value={model.id} key={model.id}>{model.name}</option>)}</select></label>
+          {!['input', 'output'].includes(selected.type) && <label className="model-rig-enable"><input type="checkbox" disabled={busy} checked={selected.on} onChange={event => { const enabled = event.target.checked; void run(async () => { const next = structuredClone(engineRef.current?.getRigPreset() ?? draft); allRigModules(next).find(item => item.id === selected.id)!.on = enabled; await commit(parseRigPreset(next)); }); }} /><span>Enable this gear</span></label>}
+          <button className="secondary" disabled={busy} onClick={() => void run(async () => { if (await commit(resetGearModel(engineRef.current?.getRigPreset() ?? draft, selected.id)) && mounted.current) setMessage("Model defaults restored; this gear’s saved snapshot values and incompatible mappings were cleared."); })}>Reset model defaults</button></div>
+        <ModelControls module={selected} disabled={busy} assets={assets} onChange={changeParameter} />
+        <p className="model-rig-reference"><strong>Model note</strong>{selectedModel.dsp.approximation}</p>
+      </section>
+
+      <section className="model-rig-library" ref={libraryRef} aria-labelledby="model-rig-library-title">
+        <div className="model-rig-library-heading"><div><span className="model-rig-kicker">GEAR LIBRARY</span><h3 id="model-rig-library-title">Explore all models</h3><p>Starter picks are suggestions. Every implemented model remains available.</p></div><label className="model-rig-search"><span aria-hidden="true">⌕</span><input type="search" value={search} onChange={event => setSearch(event.target.value)} placeholder="Search models…" aria-label="Search gear models" /></label></div>
+        <div className="model-rig-filters" role="group" aria-label="Filter gear library">{LIBRARY_GROUPS.map(group => <button className={libraryGroup === group.id ? "is-active" : ""} aria-pressed={libraryGroup === group.id} key={group.id} onClick={() => setLibraryGroup(group.id)}>{group.label}</button>)}</div>
+        {chains.length > 1 && <label className="model-rig-destination"><span>Add gear to</span><select aria-label="Model gear destination" value={target} onChange={event => setDestination(event.target.value)}>{chains.map(path => <option key={path.id} value={path.id}>{path.name}</option>)}</select></label>}
+        <div className="model-rig-library-grid" aria-label="All available gear">
+          {visibleLibraryModels.map(model => { const present = modules.some(module => modelFor(module).id === model.id); return <article className={`model-library-card${model.id === libraryId ? " is-selected" : ""}`} key={model.id} draggable onDragStart={event => event.dataTransfer.setData("application/x-modulo-model-gear", JSON.stringify({ modelId: model.id }))}>
+            <button className="model-library-select" onClick={() => setLibraryId(model.id)} aria-pressed={model.id === libraryId}><GearVisual type={model.type} label={model.name} parameterCount={model.parameters.length} compact /><span className="model-library-copy"><span><small>{gearFamily(model.type)}</small>{present && <em>In rig</em>}</span><strong>{model.name}</strong><span>{model.description}</span></span>{STARTER_RECOMMENDATIONS.has(model.id) && <span className="model-library-recommended">★ Starter</span>}</button>
+            <button className="model-library-add" disabled={busy} onClick={() => add(model.id)} aria-label={`Add ${model.name} to ${chains.find(path => path.id === target)?.name ?? "chain"}`}>＋ Add to rig</button>
+          </article>; })}
+          {!visibleLibraryModels.length && <p className="model-rig-empty">No gear matches “{search}”. Try another name or category.</p>}
+        </div>
+        <div className="model-rig-compat-controls" aria-hidden="true"><label>Category <select aria-label="Gear category" value={category} onChange={event => setCategory(event.target.value as GearCategory | "all")}><option value="all">All gear</option>{Object.entries(GEAR_CATEGORIES).map(([id, label]) => <option key={id} value={id}>{label}</option>)}</select></label><label>Gear library <select aria-label="Model gear library" value={libraryModel.id} onChange={event => setLibraryId(event.target.value)}>{libraryModels.map(model => <option key={model.id} value={model.id}>{model.name}</option>)}</select></label><label>Add to <select aria-label="Model gear destination" value={target} onChange={event => setDestination(event.target.value)}>{chains.map(path => <option key={path.id} value={path.id}>{path.name}</option>)}</select></label><button disabled={busy} onClick={() => add(libraryModel.id)}>＋ Add selected gear / drag</button></div>
+      </section>
+    </div>
+
+    <footer className="model-rig-footer"><details className="model-rig-files"><summary>Rig files and custom cabinet IRs</summary><div className="model-rig-file"><label>Load rig JSON <input type="file" accept="application/json,.json" disabled={busy} onChange={event => { const file = event.target.files?.[0]; event.currentTarget.value = ""; if (file) void run(async () => {
+      if (file.size > 256 * 1024) throw new Error("Rig JSON must be at most 256 KiB."); const next = importRigPreset(await file.text()); if (!mounted.current) return; const custom = allRigModules(next).find(module => module.type === "cabinet" && module.model === "custom"); if (custom) setIRAssetId(String(custom.parameters.ir_id)); if (await commit(next) && mounted.current) setMessage("Rig loaded. Missing custom IRs must be imported separately."); }); }} /></label>
+      <label>IR ID <input type="text" aria-label="Cabinet IR identifier" maxLength={64} value={irAssetId} disabled={busy} onChange={event => setIRAssetId(event.target.value)} /></label><label>Import cabinet IR <input type="file" accept="audio/*" disabled={busy} onChange={event => { const file = event.target.files?.[0]; event.currentTarget.value = ""; if (file) void run(async () => { const audio = engineRef.current; if (!audio) throw new Error("Audio is not ready."); await audio.loadCabinetIR(irAssetId, file); if (mounted.current) { setAssets(audio.listCabinetIRs()); setMessage("IR imported. Select User cabinet IR to use it. Reuse this IR ID when loading its preset."); } }); }} /></label></div></details><p className="model-rig-status" role="status">{message}</p></footer>
   </section>;
 }
