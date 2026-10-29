@@ -10,6 +10,7 @@ import { encodeMonoWav } from "./localAudio";
 import { projectTitle, upsertProject } from "./projectSessions";
 import { RecordingLibrary } from "./RecordingLibrary";
 import { addPerformanceRecording, createPerformanceRecording, type PerformanceRecording } from "./performanceRecordings";
+import { ReferenceWaveformReview } from "./ReferenceWaveformReview";
 
 const initialPreset = parsePreset(example);
 const controls = [
@@ -621,7 +622,7 @@ export function App() {
         </section>
       </div>
 
-      {hasResult && <section className="result-panel" aria-labelledby="result-title"><div className="result-heading"><div><span className="step">03 / REFERENCE</span><h2 id="result-title">Review the selected passage</h2></div><span className={fixtureOutcome === "low_quality" ? "quality-badge warning" : "quality-badge"}>{fixtureOutcome === "low_quality" ? "Needs another listen" : "Demo result"}</span></div>{fixtureOutcome === "low_quality" && <p className="warning-message" role="status"><strong>This section may be hard to match.</strong> In the finished flow, you’ll be able to choose another passage or upload a different song.</p>}<div className="players"><div><h3>Your song</h3><p>The original file from this browser.</p><audio ref={mixPlayer} controls preload="metadata" src={songUrl} onPlay={() => playSource("mix")}>Your browser does not support audio playback.</audio></div><div><h3>Guitar reference</h3><p>Demo passage · 00:42–00:57 · currently plays the original file.</p><audio ref={referencePlayer} controls preload="metadata" src={songUrl} onPlay={() => playSource("reference")}>Your browser does not support audio playback.</audio></div></div><div className="explanation"><span>Why this passage</span><p>This demo highlights a clear, sustained 15-second phrase. No audio measurements are performed yet.</p></div></section>}
+      {hasResult && songFile && <ReferenceWaveformReview file={songFile} sourceUrl={songUrl} outcome={fixtureOutcome} mixPlayer={mixPlayer} referencePlayer={referencePlayer} onPlayerStart={playSource} onContinue={() => document.getElementById("amp-title")?.scrollIntoView({ behavior: "smooth", block: "start" })} />}
 
       <div className="grid">
         <section aria-labelledby="amp-title"><span className="step">04 / PRESET</span><h2 id="amp-title">{preset.name}</h2><p>{preset.description}</p><div className="provenance"><strong>Demo preset</strong><span>Manually made · not generated from your song</span></div><div className="controls">{controls.map(([key, label, min, max, step, unit]) => <label key={key} htmlFor={key}><span>{label}<output>{preset.parameters[key]} {unit}</output></span><input id={key} type="range" min={min} max={max} step={step} value={preset.parameters[key]} onChange={(event) => changeControl(key, Number(event.target.value))} /></label>)}</div><button className="secondary" onClick={() => void loadApiExample()}>Load demo preset</button></section>
