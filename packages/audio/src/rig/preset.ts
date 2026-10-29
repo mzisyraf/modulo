@@ -119,7 +119,8 @@ export function parseRigPreset(value: unknown): RigPreset {
 }
 
 export function createRigModule(type: ModuleType, modelId = moduleDefinition(type).models[0].id, id: string = type): RigModule {
-  return { id, type, model: modelId, on: true, parameters: Object.fromEntries(Object.entries(moduleDefinition(type).controls).map(([key, control]) => [key, control.defaultValue])) };
+  const definition = moduleDefinition(type);
+  return { id, type, model: modelId, on: true, parameters: { ...Object.fromEntries(Object.entries(definition.controls).map(([key, control]) => [key, control.defaultValue])), ...definition.models.find(model => model.id === modelId)?.defaults } };
 }
 export function createRigPreset(name = "Modern High Gain"): RigPreset {
   const types: ModuleType[] = ["input", "gate", "compressor", "overdrive", "amp", "cabinet", "eq", "delay", "reverb", "output"];

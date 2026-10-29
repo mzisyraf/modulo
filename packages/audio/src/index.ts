@@ -15,6 +15,9 @@ export * from "./rig/catalog.ts";
 export * from "./rig/preset.ts";
 export * from "./rig/control.ts";
 export { factoryRigPresets } from "./rig/factory.ts";
+export * from "./rig/models.ts";
+import { modelFor, parameterToDSP } from "./rig/models.ts";
+export { editRig, recommendedModels, type RigEdit } from "./rig/editor.ts";
 export { CabinetIRLibrary } from "./rig/impulses.ts";
 export { renderRigFile, encodeRigWav, type RigRenderOptions } from "./rig/render.ts";
 export type { RigTake, RigRecordingOptions } from "./rig/recording.ts";
@@ -62,6 +65,8 @@ export class AudioEngine {
   private tuner?: AnalyserNode;
   readonly midi: RigMidiController;
   onRigError?: (message: string) => void;
+  /** UI subscription; callbacks must not throw into the audio-engine lifecycle. */
+  onRigChange?: (preset: RigPreset | null) => void;
   private source?: AudioBufferSourceNode;
   private liveSource?: MediaStreamAudioSourceNode;
   private liveSplitter?: ChannelSplitterNode;
@@ -83,7 +88,7 @@ export class AudioEngine {
     this.midi = new RigMidiController({
       get: () => this.requireRig(), parameter: (id, key, value) => this.setRigParameter(id, key, value),
       snapshot: id => this.loadRigSnapshot(id),
-      binding: binding => { this.rig!.preset = addMidiBinding(this.requireRig(), binding); },
+      binding: binding => { this.rig!.preset = addMidiBinding(this.requireRig(), binding); this.notifyRig(); },
     });
   }
 
@@ -96,7 +101,10 @@ export class AudioEngine {
     }
     this.clearRetiredRigs(); this.midi.disconnect();
     this.updateLegacyPreset(); this.setBypass(this.bypass);
+    this.notifyRig();
   }
+
+  private notifyRig(): void { try { this.onRigChange?.(this.getRigPreset()); } catch { /* UI observers cannot break audio cleanup or controls. */ } }
 
   private updateLegacyPreset(): void {
     if (!this.context) return;
@@ -429,7 +437,7 @@ export class AudioEngine {
     const context = await this.initialize();
     await prepareRig(context, preset);
     if (this.disposed || token !== this.rigRequest || request !== this.request) return false;
-    if (this.rig?.canUpdate(preset)) { this.rig.update(preset); return true; }
+    if (this.rig?.canUpdate(preset)) { this.rig.update(preset); this.notifyRig(); return true; }
     const next = new RigGraph(context, preset, this.irs), previous = this.rig;
     // Build first: missing IRs or unsupported nodes leave the current rig intact.
     this.clearRetiredRigs();
@@ -441,24 +449,42 @@ export class AudioEngine {
       const timer = setTimeout(() => { this.releaseRig(previous); this.retiredRigs.delete(previous); }, 100);
       this.retiredRigs.set(previous, timer);
     }
-    return true;
+    this.notifyRig(); return true;
   }
   getRigPreset(): RigPreset | null { return this.rig ? structuredClone(this.rig.preset) : null; }
+  /** Model-owned parameter IDs; the legacy setRigParameter wire API remains available. */
+  async setModelParameter(id: string, parameter: string, value: number | boolean | string, atTime?: number): Promise<boolean> {
+    const next = this.requireRig(), module = allRigModules(next).find(item => item.id === id);
+    if (!module) throw new Error("Unknown rig module.");
+    const mapped = parameterToDSP(modelFor(module), parameter, value);
+    if (mapped.realtime && typeof mapped.value !== "string") { this.setRigParameter(id, mapped.target, mapped.value, atTime); return true; }
+    if (atTime !== undefined) throw new Error("This model control requires an immediate graph rebuild.");
+    module.parameters[mapped.target] = mapped.value;
+    return this.applyRigPreset(next);
+  }
+  /** Learn a numeric model-owned control; descriptor mapping also applies to pedal endpoints. */
+  learnModelMidi(id: string, parameter: string, min: number, max: number, curve: "linear" | "squared" = "linear"): void {
+    const module = allRigModules(this.requireRig()).find(item => item.id === id); if (!module) throw new Error("Unknown rig module.");
+    const model = modelFor(module), low = parameterToDSP(model, parameter, min), high = parameterToDSP(model, parameter, max);
+    if (!low.realtime || typeof low.value !== "number" || typeof high.value !== "number") throw new Error("MIDI learn requires a realtime numeric model control.");
+    this.midi.learn(id, low.target, low.value, high.value, curve);
+  }
   setRigParameter(id: string, parameter: string, value: number | boolean, atTime?: number): void {
     const next = this.requireRig(), module = allRigModules(next).find(item => item.id === id);
     if (!module) throw new Error("Unknown rig module.");
     module.parameters[parameter] = value; parseRigPreset(next);
     this.rig!.setParameter(id, parameter, value, atTime);
+    this.notifyRig();
   }
   setRigModuleEnabled(id: string, enabled: boolean): void {
     const next = this.requireRig(), module = allRigModules(next).find(item => item.id === id);
     if (!module) throw new Error("Unknown rig module.");
-    module.on = enabled; this.rig!.update(parseRigPreset(next));
+    module.on = enabled; this.rig!.update(parseRigPreset(next)); this.notifyRig();
   }
-  setRigTempo(bpm: number): void { const next = this.requireRig(); next.tempo_bpm = bpm; this.rig!.update(parseRigPreset(next)); }
+  setRigTempo(bpm: number): void { const next = this.requireRig(); next.tempo_bpm = bpm; this.rig!.update(parseRigPreset(next)); this.notifyRig(); }
   saveRigSnapshot(id: string, name: string): void {
     const next = this.requireRig(); next.snapshots = [...next.snapshots.filter(item => item.id !== id), snapshotRig(next, id, name)];
-    this.rig!.preset = parseRigPreset(next);
+    this.rig!.preset = parseRigPreset(next); this.notifyRig();
   }
   loadRigSnapshot(id: string): Promise<boolean> { return this.applyRigPreset(applyRigSnapshot(this.requireRig(), id)); }
   setRigExpression(id: string, parameter: string, position: number, min: number, max: number, curve: "linear" | "squared" = "linear"): void {

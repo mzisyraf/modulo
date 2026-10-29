@@ -1,6 +1,8 @@
 import { moduleDefinition, type Values } from "./catalog.ts";
 import { allRigModules, parseRigPreset, validateControl, type RigModule, type RigPreset } from "./preset.ts";
 import { cabinetImpulse, reverbImpulse, CabinetIRLibrary } from "./impulses.ts";
+import { modelFor } from "./models.ts";
+import { buildModelProcessor } from "./modelProcessors.ts";
 
 const db = (value: number) => 10 ** (value / 20);
 const prepared = new WeakMap<BaseAudioContext, Promise<void>>();
@@ -110,7 +112,8 @@ export class RigGraph {
       bind(dry.gain, p => 1 - value(p)); bind(wet.gain, value);
     };
     const coeff = model.coefficients;
-    switch (module.type) {
+    const custom = buildModelProcessor(modelFor(module).dsp.factory, { context, input, output: enabled, gain: value => this.gain(value), filter: (type, frequency) => this.filter(type, frequency), own: node => this.own(node), bind });
+    if (!custom) switch (module.type) {
       case "input": {
         const gain = this.gain(); input.connect(gain).connect(enabled);
         bind(gain.gain, p => p.mute ? 0 : db(Number(p.trim_db)) * (p.invert ? -1 : 1)); break;
