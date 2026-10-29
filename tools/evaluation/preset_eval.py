@@ -25,11 +25,12 @@ def write(path, value):
 
 
 def engine_hash():
-    return hashlib.sha256(b"".join((ROOT / "packages/audio/src" / name).read_bytes() for name in ["index.ts", "dsp.ts"])).hexdigest()
+    sources = sorted((ROOT / "packages/audio/src").rglob("*"))
+    return hashlib.sha256(b"".join(path.relative_to(ROOT).as_posix().encode() + b"\0" + path.read_bytes() for path in sources if path.is_file() and path.suffix in {".ts", ".js"})).hexdigest()
 
 
 def evaluation_hash():
-    paths=["tools/evaluation/metrics.mjs","apps/web/src/audioFeatures.ts","apps/web/src/refinePreset.ts"]
+    paths=["tools/evaluation/metrics.mjs","apps/web/src/audioFeatures.ts","apps/web/src/refinePreset.ts","apps/web/src/refineRig.ts","apps/web/src/temporalFeatures.ts"]
     return hashlib.sha256(b"".join((ROOT/name).read_bytes() for name in paths)).hexdigest()
 
 
@@ -98,7 +99,7 @@ def propose(output):
         print(f"Saved real Nemotron proposal: {case['id']}")
 
 
-def serve(output):
+def serve(output, *, rig=False):
     token = secrets.token_hex(24)
     origin = "http://127.0.0.1:5173"
     class Handler(SimpleHTTPRequestHandler):
@@ -121,11 +122,13 @@ def serve(output):
             if self.headers.get("Origin") != origin or self.headers.get("X-Eval-Token") != token:
                 self.send_error(403); return
             name = self.path.removeprefix("/save/")
-            if not self.path.startswith("/save/") or not re.fullmatch(r"report\.(json|html)|(eq|drive)(-heldout)?-(target|neutral|nemotron|refined)(-listen)?\.wav", name):
+            pattern = (r"rig-(targets|report)\.(json|html)|(clean|crunch|space)(-heldout)?-r[0-2]-(target|neutral|nemotron|refined)(-listen)?\.wav" if rig
+                       else r"report\.(json|html)|(eq|drive)(-heldout)?-(target|neutral|nemotron|refined)(-listen)?\.wav")
+            if not self.path.startswith("/save/") or not re.fullmatch(pattern, name):
                 self.send_error(400); return
             try: size = int(self.headers.get("Content-Length", "0"))
             except ValueError: size = 0
-            if not 0 < size <= 2*1024*1024:
+            if not 0 < size <= (4 if rig else 2)*1024*1024:
                 self.send_error(413); return
             data = self.rfile.read(size)
             if len(data) != size: self.send_error(400); return

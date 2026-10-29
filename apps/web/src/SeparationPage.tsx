@@ -5,6 +5,9 @@ import type { Preset } from "@modulo/contracts";
 import { StartingPresetPanel, type PresetAudition } from "./StartingPresetPanel";
 import { GuitarCalibration, type LiveCalibrationControl } from "./GuitarCalibrationPanel";
 import type { CalibratedRecording } from "./recordingCalibration";
+import type { RigPreset } from "@modulo/audio";
+import type { GeneratedRig } from "./rigGeneration";
+import { RigGenerationPanel } from "./RigGenerationPanel";
 
 const storageKey = "modulo.local-separation-job";
 const tracks = [["mix", "Original mix", "Decoded original with the same gain as the separated tracks."], ["guitar", "Extracted guitar", "Combined guitar stem; separation may contain bleed or missing notes."], ["backing", "Guitar-reduced backing", "Sum of the aligned non-guitar stems; residual guitar may remain."]] as const;
@@ -29,12 +32,14 @@ interface Props {
   initialFile?: File;
   onJobChange?: (id: string, file: File | undefined, status: SeparationJob["status"] | "idle") => void;
   onApplyPreset?: (preset: Preset) => void;
+  onApplyRig?: (rig: RigPreset, generated: GeneratedRig) => Promise<void>;
+  onSourceChange?: (recording?: CalibratedRecording) => void;
   onStopAudio?: () => void;
   onInvalidatePreset?: () => void;
   ref?: Ref<PresetAudition>;
 }
 
-export function SeparationPage({ embedded = false, active = true, onInputChosen, initialJobId = "", initialFile, onJobChange, onApplyPreset, onStopAudio, onInvalidatePreset, ref }: Props) {
+export function SeparationPage({ embedded = false, active = true, onInputChosen, initialJobId = "", initialFile, onJobChange, onApplyPreset, onApplyRig, onSourceChange, onStopAudio, onInvalidatePreset, ref }: Props) {
   const [file, setFile] = useState<File | undefined>(initialFile);
   const [backend, setBackend] = useState<"local" | "modal">("local");
   const [recording, setRecording] = useState<CalibratedRecording>();
@@ -59,6 +64,7 @@ export function SeparationPage({ embedded = false, active = true, onInputChosen,
   const preview = useRef<{ player: HTMLAudioElement; end: number } | null>(null);
   const liveCalibration = useRef<LiveCalibrationControl | null>(null);
   const presetAudition = useRef<PresetAudition | null>(null);
+  const rigAudition = useRef<PresetAudition | null>(null);
   const result = job?.status === "ready" ? job.result : undefined;
   const processing = uploading || Boolean(jobId && (!job || job.status === "queued" || job.status === "running"));
 
@@ -73,6 +79,7 @@ export function SeparationPage({ embedded = false, active = true, onInputChosen,
   function pausePlayers(except?: HTMLAudioElement) {
     liveCalibration.current?.stop();
     presetAudition.current?.stop();
+    rigAudition.current?.stop();
     Object.values(players.current).forEach((player) => { if (player && player !== except) player.pause(); });
   }
 
@@ -191,7 +198,7 @@ export function SeparationPage({ embedded = false, active = true, onInputChosen,
     {!embedded && <><header className="hero"><div><a className="separation-brand" href="/">modulo <span>↗ Browser amp</span></a><span className="eyebrow">TONE WORKFLOW</span><h1>From song to your guitar.</h1><p>Calibrate your connected guitar, choose a target song, then compare your live exercise with the rig on or off. An instrument input is required for calibration.</p></div><div className="mode-badge"><strong>{backend === "modal" ? "Cloud API separation" : "Local separation"}</strong><span>Tone match remains unverified</span></div></header>
       <ol className="local-flow-guide"><li><strong>Calibrate your live guitar.</strong> Set your guitar’s starting input level.</li><li><strong>Choose a target song.</strong> Separate it and listen to the extracted guitar.</li><li><strong>Confirm a passage.</strong> Choose a suggestion or highlight a manual region.</li><li><strong>Generate and Apply.</strong> Add the song’s starting rig over your input calibration.</li><li><strong>Compare your guitar.</strong> Compare the captured live exercise with Original / Rig applied.</li></ol></>}
     <p className="notice">{backend === "modal" ? "Cloud API sends your song to Modal for GPU separation. Downloads are kept on this laptop; abandoned cloud jobs expire after 24–25 hours." : "Local processes your song on this laptop’s GPU."} This laptop’s API retains up to four jobs for 24 hours. Preset generation sends measured descriptors, not audio, to Nebius with a configured allowance.</p>
-    <GuitarCalibration ref={liveCalibration} active={active} onInputChosen={onInputChosen} onStart={() => { pausePlayers(); onStopAudio?.(); }} onChange={next => { pausePlayers(); invalidatePreset.current?.(); setRecording(next); }} />
+    <GuitarCalibration ref={liveCalibration} active={active} onInputChosen={onInputChosen} onStart={() => { pausePlayers(); onStopAudio?.(); }} onChange={next => { pausePlayers(); invalidatePreset.current?.(); setRecording(next); onSourceChange?.(next); }} />
     <div className="workflow-grid">
       <section className="upload-panel" aria-labelledby="local-upload-title"><span className="step">01 / SONG</span><h2 id="local-upload-title">Choose a mixed song</h2><p>Use audio you have permission to process. WAV or MP3, mono/stereo, 10 seconds–4:55, up to 50 MiB.</p><fieldset disabled={processing || confirming} className="upload-panel">
         <legend>Separation processing</legend>
@@ -208,7 +215,8 @@ export function SeparationPage({ embedded = false, active = true, onInputChosen,
         {confirmed && <div className="success-state" role="status"><strong>Reference confirmed: {timestamp(confirmed.start_seconds)}–{timestamp(confirmed.end_seconds)}</strong><p>{confirmed.explanation}</p><p>Quality flags: {confirmed.quality_flags.join(", ")}</p><p>Calibrate your connected guitar above to include source measurements in a new preset.</p></div>}
       </div>
     </section>}
-    {result && (confirmed ? <StartingPresetPanel key={`${jobId}:${result.reference_revision ?? 0}`} recording={recording} ref={presetAudition} jobId={jobId} revision={result.reference_revision ?? 0} onApplyPreset={onApplyPreset} onPlay={() => { pausePlayers(); onStopAudio?.(); }} onReferenceChanged={() => { pausePlayers(); onInvalidatePreset?.(); setConfirmed(null); setReconnect((value) => value + 1); setError("The confirmed passage changed. Review it and confirm again."); }} /> : <p className="notice">Confirm a passage to unlock starting-preset generation and audition.</p>)}
+    {result && confirmed && onApplyRig && <RigGenerationPanel key={`rig-${jobId}:${result.reference_revision ?? 0}`} ref={rigAudition} active={active} recording={recording} jobId={jobId} revision={result.reference_revision ?? 0} onApply={onApplyRig} onReferenceChanged={() => { pausePlayers(); onInvalidatePreset?.(); setConfirmed(null); setReconnect(value => value + 1); setError("The confirmed passage changed. Review it and confirm again."); }} />}
+    {result && (confirmed ? <details open={!onApplyRig}><summary>Legacy six-control starting preset</summary><StartingPresetPanel key={`${jobId}:${result.reference_revision ?? 0}`} recording={recording} ref={presetAudition} jobId={jobId} revision={result.reference_revision ?? 0} onApplyPreset={onApplyPreset} onPlay={() => { pausePlayers(); onStopAudio?.(); }} onReferenceChanged={() => { pausePlayers(); onInvalidatePreset?.(); setConfirmed(null); setReconnect((value) => value + 1); setError("The confirmed passage changed. Review it and confirm again."); }} /></details> : <p className="notice">Confirm a passage to unlock rig generation and audition.</p>)}
     {error && <p className="error" role="alert">{error}</p>}
     {!embedded && <footer>Measured starting rigs · render and listen · tone similarity unverified. <a href="/">Return to the browser amp</a></footer>}
   </Container>;

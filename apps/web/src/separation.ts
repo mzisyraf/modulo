@@ -2,8 +2,10 @@
 import { parsePreset, type Preset } from "@modulo/contracts";
 import type { SourceCalibration } from "./recordingCalibration";
 import { validToneFeatures, type ToneFeatures } from "./audioFeatures.ts";
+import { parseRigGeneration } from "./rigGeneration.ts";
 
 export interface PresetGeneration {
+  kind?: "preset" | "rig_proposal";
   request_id: string;
   reference_revision: number;
   status: "generating" | "ready" | "failed";
@@ -111,7 +113,8 @@ export function parseSeparationJob(value: unknown): SeparationJob {
     if (!Number.isInteger(revision) || revision < 0) throw new Error("The reference revision is invalid.");
     if (job.generation !== undefined) {
       if (!result.reference) throw new Error("A preset requires a confirmed reference.");
-      job.generation = parsePresetGeneration(job.generation, revision);
+      if (job.generation.kind === "rig_proposal") parseRigGeneration(job.generation, revision);
+      else job.generation = parsePresetGeneration(job.generation, revision);
     }
   } else if (job.result !== undefined) throw new Error("Unfinished separation must not contain a result.");
   return job;

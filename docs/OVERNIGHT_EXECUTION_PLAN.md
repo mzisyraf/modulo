@@ -1,6 +1,6 @@
 # Overnight integration plan — 30 October 2026
 
-Status: **proposed; awaiting Isyraf's approval of this plan**. Preparation and the requested published-baseline merge are complete. No new full-rig AI generation, file-calibration implementation or paid tests were started during planning.
+Status: **approved by Isyraf in chat on 30 October 2026; implementation in progress**. The revised US$10 per-service ceilings and individual-parameter generation requirement apply. Preparation and the published-baseline merge were completed before approval.
 
 ## Approved policy and intended result
 

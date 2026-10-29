@@ -112,6 +112,7 @@ async (page) => {
   await page.getByRole("heading", { name: "Compare the same passage" }).waitFor();
   check(uploads === 1, "duplicate upload starts one job");
   await page.getByRole("button", { name: "Confirm reference", exact: true }).click();
+  await page.getByText("Legacy six-control starting preset", { exact: true }).evaluate(node => { node.closest("details").open = true; });
   await page.getByText("Reference confirmed:", { exact: false }).waitFor();
   await page.getByRole("button", { name: "Generate starting preset", exact: true }).click();
   await page.getByRole("button", { name: "Apply starting preset", exact: true }).waitFor();
@@ -149,6 +150,7 @@ async (page) => {
   check(await page.locator("#amp-title").innerText() !== preset.name, "changed bounds invalidate applied generated preset");
   await calibrate();
   await page.getByRole("button", { name: "Confirm reference", exact: true }).click();
+  await page.getByText("Legacy six-control starting preset", { exact: true }).evaluate(node => { node.closest("details").open = true; });
   await page.getByRole("button", { name: "Generate starting preset", exact: true }).waitFor();
   failGeneration = true;
   await page.getByRole("button", { name: "Generate starting preset", exact: true }).click();
@@ -179,6 +181,7 @@ async (page) => {
   await page.getByRole("button", { name: "Separate guitar", exact: true }).click();
   await page.getByRole("heading", { name: "Compare the same passage" }).waitFor();
   await page.getByRole("button", { name: "Confirm reference", exact: true }).click();
+  await page.getByText("Legacy six-control starting preset", { exact: true }).evaluate(node => { node.closest("details").open = true; });
   await page.getByText("Generation is disabled:", { exact: false }).waitFor();
   check(await page.getByRole("button", { name: "Generate starting preset", exact: true }).isDisabled(), "zero allowance keeps main generation disabled");
   await page.getByRole("button", { name: "Cloud API", exact: true }).click();

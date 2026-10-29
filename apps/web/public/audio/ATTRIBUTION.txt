@@ -1,0 +1,9 @@
+Guitar-TECHS (2025)
+Creators: Pedroza Villalobos, Hegel Emmanuel; Taheri, Termeh; Abreu, Wallace; Corey, Ryan; Roman, Iran R.
+Source: https://zenodo.org/records/14963133
+Recording setup: https://guitar-techs.github.io/
+License: Creative Commons Attribution 4.0 International (CC BY 4.0)
+License URL: https://creativecommons.org/licenses/by/4.0/
+Selected archive members: P3_music/audio/directinput/directinput_03.wav.
+Derived audition copies: stronger channel selected, mono PCM16 WAV at 44.1 kHz; full 29.3-second performance; no amp, effects or normalization added. Original recordings retained locally.
+Credit the creators and identify these format/excerpt changes if redistributing the audition copies.

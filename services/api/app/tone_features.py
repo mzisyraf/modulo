@@ -74,7 +74,7 @@ def tone_features(samples, rate):
         "crest_db":20*math.log10(max(map(abs,samples))/math.sqrt(energy))}).model_dump()
 
 
-def wav_tone_features(path, start, end):
+def wav_tone_features(path, start, end, *, temporal=False):
     if path.stat().st_size > 50*1024*1024: raise ValueError("WAV exceeds analysis bound")
     with wave.open(str(path)) as audio:
         rate, channels = audio.getframerate(), audio.getnchannels()
@@ -86,4 +86,8 @@ def wav_tone_features(path, start, end):
     if sys.byteorder != "little": samples.byteswap()
     choices = [samples[i::channels] for i in range(channels)]
     selected = max(choices, key=lambda x:math.sumprod(x,x))
-    return tone_features([x/32768 for x in selected], rate)
+    normalized = [x/32768 for x in selected]
+    if temporal:
+        from .temporal_features import temporal_features
+        return temporal_features(normalized, rate)
+    return tone_features(normalized, rate)

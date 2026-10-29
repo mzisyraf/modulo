@@ -10,6 +10,7 @@ from starlette.middleware.trustedhost import TrustedHostMiddleware
 from .contracts import example_preset
 from .jobs import JobError, JobStore, MAX_UPLOAD_BYTES
 from .preset_generation import PresetError, PresetGenerator
+from .rig_generation import RigGenerator
 from .source_calibration import SourceCalibration
 
 
@@ -25,7 +26,7 @@ class PresetRequest(BaseModel):
     source_calibration: SourceCalibration | None = None
 
 
-def create_app(store=None, generator=None):
+def create_app(store=None, generator=None, rig_generator=None):
     @asynccontextmanager
     async def lifespan(app):
         jobs = store if store is not None else JobStore()
@@ -37,6 +38,12 @@ def create_app(store=None, generator=None):
         except PresetError as failure:
             app.state.generator = None
             app.state.preset_error = failure
+        app.state.rig_error = None
+        try:
+            app.state.rig_generator = rig_generator if rig_generator is not None else RigGenerator.from_env()
+        except PresetError as failure:
+            app.state.rig_generator = None
+            app.state.rig_error = failure
 
         async def expire_jobs():
             while True:
@@ -74,7 +81,7 @@ def create_app(store=None, generator=None):
 
     @app.exception_handler(RequestValidationError)
     async def validation_error(request, _failure):
-        if request.url.path.endswith("/preset"):
+        if request.url.path.endswith(("/preset", "/rig")):
             return JSONResponse(status_code=422, content={"error": {
                 "code": "invalid_generation_request", "message": "Supply a whole-number reference_revision and optional valid numeric source_calibration.", "retryable": False,
             }})
@@ -91,9 +98,11 @@ def create_app(store=None, generator=None):
     @app.get("/api/health")
     def health(request: Request):
         provider = getattr(request.app.state, "generator", None)
+        rig_provider = getattr(request.app.state, "rig_generator", None)
         return {"status": "ok", "mode": "scaffold", "analysis_available": False,
                 "separation_available": True, "preset_generation_available": bool(provider and provider.available),
-                "preset_budget_unlimited": bool(provider and provider.budget is None)}
+                "preset_budget_unlimited": bool(provider and provider.budget is None),
+                "rig_generation_available": bool(rig_provider and rig_provider.available)}
 
     @app.get("/api/presets/example")
     def preset_example():
@@ -162,6 +171,17 @@ def create_app(store=None, generator=None):
     @app.get("/api/jobs/{job_id}/audio/{name}")
     def audio_artifact(job_id: str, name: str, request: Request):
         return FileResponse(request.app.state.jobs.artifact(job_id, name), media_type="audio/wav")
+
+    @app.post("/api/jobs/{job_id}/rig", status_code=202)
+    def generate_rig(job_id: str, selection: PresetRequest, request: Request):
+        jobs = request.app.state.jobs
+        if request.app.state.rig_error:
+            jobs.get(job_id)
+            raise request.app.state.rig_error
+        if not selection.source_calibration or not selection.source_calibration.tone_features:
+            raise PresetError("calibration_required", "Calibrate live guitar or a dry recording first.", 422)
+        return jobs.start_generation(job_id, selection.reference_revision, request.app.state.rig_generator,
+                                     selection.source_calibration.model_dump(exclude_none=True))
 
     return app
 

@@ -16,6 +16,7 @@ export * from "./rig/preset.ts";
 export * from "./rig/control.ts";
 export { factoryRigPresets } from "./rig/factory.ts";
 export * from "./rig/models.ts";
+export * from "./rig/proposal.ts";
 import { modelFor, parameterToDSP } from "./rig/models.ts";
 export { editRig, recommendedModels, type RigEdit } from "./rig/editor.ts";
 export { CabinetIRLibrary } from "./rig/impulses.ts";

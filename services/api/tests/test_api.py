@@ -16,6 +16,7 @@ def test_health_and_example_are_explicitly_scaffolded():
         "status": "ok", "mode": "scaffold", "analysis_available": False,
         "separation_available": True, "preset_generation_available": False,
         "preset_budget_unlimited": False,
+        "rig_generation_available": False,
     }
     response = client.get("/api/presets/example")
     assert response.status_code == 200

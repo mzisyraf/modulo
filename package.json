@@ -16,7 +16,7 @@
     "build": "npm run build --workspace @modulo/web",
     "typecheck": "tsc --noEmit",
     "test": "node --test contracts/test/*.test.ts packages/audio/test/*.test.ts apps/web/test/*.test.ts",
-    "check": "npm run typecheck && npm test && npm run build"
+    "check": "node tools/evaluation/export-rig-catalog.ts --check && npm run typecheck && npm test && npm run build"
   },
   "devDependencies": {
     "@types/node": "24.19.2",

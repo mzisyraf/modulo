@@ -112,6 +112,7 @@ class JobStore:
                 job["generation"].update(status="failed", error={"code": "generation_interrupted",
                     "message": "The API restarted during generation. The attempt may have been billed; its budget reservation is retained.", "retryable": True})
                 job["generation"].pop("preset", None)
+                job["generation"].pop("rig_proposal", None)
                 self.save(job)
         self.prune()
         with self.lock:
@@ -362,7 +363,8 @@ class JobStore:
             if revision != result.get("reference_revision", 0):
                 raise JobError("reference_changed", "The confirmed passage changed. Review and confirm it again.", 409)
             previous = job.get("generation")
-            if previous and previous["reference_revision"] == revision and previous.get("source_calibration") == source_calibration and previous["status"] in {"generating", "ready"}:
+            kind = getattr(generator, "output_field", "preset")
+            if previous and previous.get("kind", "preset") == kind and previous["reference_revision"] == revision and previous.get("source_calibration") == source_calibration and previous["status"] in {"generating", "ready"}:
                 return previous
             if job_id in self.preset_running:
                 raise JobError("generation_busy", "The previous attempt is finishing. Wait before generating for the new passage.", 409, True)
@@ -370,6 +372,8 @@ class JobStore:
                 raise PresetError("generation_disabled", "Starting-preset generation is disabled. A separate approved backend request/budget allowance is required.")
             request_id = str(uuid4())
             generation = {"request_id": request_id, "reference_revision": revision, "status": "generating"}
+            if kind != "preset":
+                generation["kind"] = kind
             if source_calibration is not None:
                 generation["source_calibration"] = source_calibration
             self.jobs[job_id]["generation"] = generation
@@ -390,6 +394,8 @@ class JobStore:
                 reference = deepcopy(reference)
                 try:
                     reference["tone_features"] = wav_tone_features(self.directory(job_id)/"guitar.wav", reference["start_seconds"], reference["end_seconds"])
+                    if getattr(generator, "output_field", "preset") == "rig_proposal":
+                        reference["temporal_features"] = wav_tone_features(self.directory(job_id)/"guitar.wav", reference["start_seconds"], reference["end_seconds"], temporal=True)
                 except (OSError, ValueError, wave.Error):
                     raise PresetError("target_spectral_unavailable", "The target spectrum could not be measured. Choose a clearer guitar passage.", 422) from None
                 # Analysis adds time before billing; recheck reference/expiry after it finishes.
@@ -399,11 +405,14 @@ class JobStore:
                             or current["result"].get("reference_revision", 0) != revision):
                         self.preset_running.pop(job_id, None)
                         return
-            preset = validate_preset(generator.generate(reference, source_calibration) if source_calibration is not None else generator.generate(reference))
-            outcome = {"status": "ready", "preset": preset}
+            value = generator.generate(reference, source_calibration) if source_calibration is not None else generator.generate(reference)
+            value = getattr(generator, "validate_result", validate_preset)(value)
+            outcome = {"status": "ready", getattr(generator, "output_field", "preset"): value}
             if source_calibration and source_calibration.get("tone_features"):
                 outcome["target_tone_features"] = reference["tone_features"]
                 outcome["target_rms_dbfs"] = reference["metrics"]["guitar_rms_dbfs"]
+                if "temporal_features" in reference:
+                    outcome["target_temporal_features"] = reference["temporal_features"]
         except PresetError as failure:
             outcome = {"status": "failed", "error": {"code": failure.code, "message": failure.message, "retryable": True}}
         except Exception:
@@ -422,6 +431,7 @@ class JobStore:
                     job["generation"].update(status="failed", error={"code": "generation_storage_failed",
                         "message": "The preset could not be saved. Its budget reservation is retained; review local storage before retrying.", "retryable": False})
                     job["generation"].pop("preset", None)
+                    job["generation"].pop("rig_proposal", None)
             finally:
                 self.preset_running.pop(job_id, None)
 

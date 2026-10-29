@@ -46,12 +46,12 @@ class NoRedirect(urllib.request.HTTPRedirectHandler):
         return None
 
 
-def post_completion(key, payload):
+def post_completion(key, payload, *, timeout=30):
     request = urllib.request.Request(BASE_URL + "/chat/completions", method="POST",
         headers={"Authorization": "Bearer " + key, "Content-Type": "application/json"},
         data=json.dumps(payload, allow_nan=False).encode("utf-8"))
     try:
-        with urllib.request.build_opener(NoRedirect()).open(request, timeout=30) as response:
+        with urllib.request.build_opener(NoRedirect()).open(request, timeout=timeout) as response:
             content = response.read(65537)
         if len(content) > 65536:
             raise ValueError("Oversized provider response.")
@@ -71,11 +71,11 @@ class PresetGenerator:
         self.transport = transport
         try:
             self.budget = None if str(budget_usd).strip().lower() == "unlimited" else Decimal(str(budget_usd))
-            if (self.budget is not None and (not self.budget.is_finite() or not 0 <= self.budget <= Decimal("1"))
+            if (self.budget is not None and (not self.budget.is_finite() or not 0 <= self.budget <= Decimal("10"))
                     or type(max_requests) is not int or not 0 <= max_requests <= 100):
                 raise ValueError()
         except (ValueError, InvalidOperation):
-            raise PresetError("provider_configuration", "Use a local budget of US$0–1 or explicit 'unlimited', and 0–100 requests.") from None
+            raise PresetError("provider_configuration", "Use a local budget of US$0–10 or explicit 'unlimited', and 0–100 requests.") from None
         self.max_requests = max_requests
 
     @classmethod
@@ -113,10 +113,20 @@ class PresetGenerator:
                 attempts, spent = ledger["attempts"], Decimal(ledger["reserved_usd"])
                 if type(attempts) is not int or attempts < 0 or not spent.is_finite() or spent < 0:
                     raise ValueError()
-                if attempts >= self.max_requests or (self.budget is not None and spent + RESERVATION_USD > self.budget):
+                reservation = getattr(self, "reservation_usd", RESERVATION_USD)
+                model = getattr(self, "reservation_model", None)
+                counts = ledger.get("model_attempts", {})
+                if not isinstance(counts, dict) or any(type(count) is not int or count < 0 for count in counts.values()):
+                    raise ValueError()
+                if model and counts.get(model, 0) >= self.max_model_requests:
+                    raise PresetError("budget_exhausted", "The approved request allowance for this model is used.", 429)
+                if attempts >= self.max_requests or (self.budget is not None and spent + reservation > self.budget):
                     raise PresetError("budget_exhausted", "The local preset-generation allowance is used. Ask the operator to review the budget.", 429)
                 temporary = self.directory / "budget.tmp"
-                temporary.write_text(json.dumps({"attempts": attempts + 1, "reserved_usd": str(spent + RESERVATION_USD)}), encoding="utf-8")
+                updated = {**ledger, "attempts": attempts + 1, "reserved_usd": str(spent + reservation)}
+                if model:
+                    updated["model_attempts"] = {**counts, model: counts.get(model, 0) + 1}
+                temporary.write_text(json.dumps(updated), encoding="utf-8")
                 temporary.replace(path)
         except PresetError:
             raise

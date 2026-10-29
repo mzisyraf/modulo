@@ -1,5 +1,6 @@
 import { encodeMonoWav } from "./localAudio.ts";
 import { toneFeatures, type ToneFeatures } from "./audioFeatures.ts";
+import { temporalFeatures, type TemporalFeatures } from "./temporalFeatures.ts";
 
 export interface SourceCalibration {
   id: string;
@@ -9,6 +10,8 @@ export interface SourceCalibration {
   peak_dbfs: number;
   clipped_fraction: number;
   tone_features?: ToneFeatures;
+  origin?: "live" | "file";
+  temporal_features?: TemporalFeatures;
 }
 export interface CalibratedRecording {
   file: File;
@@ -21,8 +24,8 @@ export interface CalibratedRecording {
 export function calibrationKey(source?: SourceCalibration): string {
   if(!source)return "";
   const tone=source.tone_features;
-  return JSON.stringify([source.id,source.method,source.duration_seconds,source.rms_dbfs,source.peak_dbfs,source.clipped_fraction,
-    tone?[tone.method,...tone.bands,tone.centroid_hz,tone.flatness,tone.crest_db]:null]);
+  return JSON.stringify([source.id,source.method,source.origin,source.duration_seconds,source.rms_dbfs,source.peak_dbfs,source.clipped_fraction,
+    tone?[tone.method,...tone.bands,tone.centroid_hz,tone.flatness,tone.crest_db]:null, source.temporal_features ?? null]);
 }
 
 export function recordingLevels(samples: Float32Array, rate: number) {
@@ -58,5 +61,15 @@ export async function calibrateLiveInput(samples: Float32Array, sampleRate: numb
   const id = Array.from(new Uint8Array(digest), value => value.toString(16).padStart(2, "0")).join("");
   return { file: new File([prepared], "live-calibration.wav", { type: "audio/wav" }), originalName: "Live guitar calibration",
     skippedSeconds: measured.skippedSeconds, inputGainDb: measured.inputGainDb,
-    measurements: { id, method: "browser_level_v1", ...measured.levels, tone_features: toneFeatures(measured.trimmed, sampleRate) } };
+    measurements: { id, method: "browser_level_v1", ...measured.levels, tone_features: toneFeatures(measured.trimmed, sampleRate), temporal_features: temporalFeatures(measured.trimmed, sampleRate) } };
+}
+
+/** Decode locally and keep the exact prepared dry channel for all subsequent comparisons. */
+export async function calibrateGuitarFile(file: File, channel: 0 | 1 = 0): Promise<CalibratedRecording> {
+  if (!file.size || file.size > 20 * 1024 * 1024) throw Error("Choose guitar audio up to 20 MiB.");
+  const decoded = await new OfflineAudioContext(1, 1, 44100).decodeAudioData(await file.arrayBuffer());
+  if (decoded.numberOfChannels > 2 || channel >= decoded.numberOfChannels) throw Error("Choose an available channel from a mono/stereo dry recording.");
+  const calibrated = await calibrateLiveInput(decoded.getChannelData(channel), decoded.sampleRate);
+  return { ...calibrated, originalName: file.name, file: new File([calibrated.file], "guitar-calibration.wav", { type: "audio/wav" }),
+    measurements: { ...calibrated.measurements, origin: "file" } };
 }
