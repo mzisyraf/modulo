@@ -114,7 +114,7 @@ def create_app(store=None, generator=None):
             if length > MAX_UPLOAD_BYTES:
                 raise JobError("upload_too_large", "Choose a song no larger than 50 MiB.", 413)
         jobs = request.app.state.jobs
-        job, created = jobs.reserve(request.headers.get("idempotency-key", ""))
+        job, created = jobs.reserve(request.headers.get("idempotency-key", ""), request.headers.get("x-separation-backend", "local"))
         job_id = job["job_id"]
         if created:
             try:

@@ -1,6 +1,6 @@
 # Local separation checkpoint
 
-The main **Tone Match** view at **http://127.0.0.1:5173** and standalone **/separation.html** connect real local upload to cached `htdemucs_6s` CUDA separation. Both provide original mix, guitar and guitar-reduced backing players, explicit 10–20-second reference confirmation and budget-gated starting presets. Neither needs a guitar/interface for sample audition. Tone Match preserves calibration, projects and recordings; generation still lacks source-guitar features and calibrated matching.
+The main **Tone Match** view at **http://127.0.0.1:5173** connects real local upload to cached `htdemucs_6s` CUDA separation. It provides original mix, guitar and guitar-reduced backing players, explicit 10–20-second reference confirmation and budget-gated starting presets. It does not need a guitar/interface for sample audition. Tone Match preserves calibration, projects and recordings; generation still lacks source-guitar features and calibrated matching.
 
 This is an Isyraf integration preview for #2/#3/#6, with the proposed job boundary in #1/#6 awaiting Shazlin's review. The confirmed passage now connects to [budget-gated starting presets](PRESET_GENERATION.md), editable Apply and browser audition. It does not freeze the shared contract or establish broad separation quality, calibrated tone matching, real source features, recording or synchronized live play-along acceptance. No extra paid call is enabled by the integration.
 
@@ -10,10 +10,10 @@ Follow [DEVELOPMENT.md](DEVELOPMENT.md) for Node and the API venv, and [DEMUCS.m
 
 1. From the root, run `npm ci` and `npm run dev`.
 2. From `services/api`, run `.\.venv\Scripts\python.exe -m uvicorn app.main:app --host 127.0.0.1 --port 8000`. Use one API worker and no reload during a job.
-3. Open **Tone Match** (or `/separation.html`), choose a rights-cleared WAV/MP3, and select **Separate guitar**.
+3. Open **Tone Match**, choose a rights-cleared WAV/MP3, and select **Separate guitar**.
 4. Compare the tracks, then choose **Suggested passages** or **Manual selection** on the shared full-song waveform. Suggested regions have fixed bounds; Manual permits drag/move/resize, keyboard and timestamp editing. Select the listening source, preview, then select **Confirm reference**. The starting-preset panel then exposes provider availability, Generate, editable controls, deliberate Apply and separate Play; generation stays disabled until a separately approved runtime allowance is configured.
 
-The standalone page remembers its job ID in session storage and reconnects after refresh. Tone Match saves a job ID with each in-tab project; navigation keeps the current job, and reopening another project reconnects to its own job. Refresh clears these in-memory projects, files and calibration takes. Starting another project during an upload aborts the browser request; an already accepted server job may continue until expiry. Changing bounds clears the displayed confirmation; invalid selections never silently choose another passage. Native players can audition the entire tracks; the passage buttons start at the chosen time and stop near its end using browser time updates. Only one of this page's players plays at a time. Tracks go directly to the browser output, outside the guitar amp.
+Tone Match saves a job ID with each in-tab project; navigation keeps the current job, and reopening another project reconnects to its own job. Refresh clears these in-memory projects, files and calibration takes. Starting another project during an upload aborts the browser request; an already accepted server job may continue until expiry. Changing bounds clears the displayed confirmation; invalid selections never silently choose another passage. Native players can audition the entire tracks; the passage buttons start at the chosen time and stop near its end using browser time updates. Only one of this page's players plays at a time. Tracks go directly to the browser output, outside the guitar amp.
 
 ## Limits and storage
 
@@ -48,7 +48,7 @@ The 27 October browser check uploaded the creator-provided **Exhilarate by Kevin
 
 ## Main Tone Match integration
 
-`App` owns the single amp engine for sample audition and live input. Embedded `StartingPresetPanel` delegates deliberate Apply to that owner and exposes no second audition graph. Proposal edits require Apply again; after Apply, the shared amp controls update its sound directly. Reference/backing players stay outside the amp. Source previews, navigation and project switches stop prior playback/capture; reference changes or known job expiry invalidate a generated preset. Calibration remains local and is not sent to generation. The standalone page retains its own deliberate Apply/Play controls.
+`App` owns the single amp engine for sample audition and live input. Embedded `StartingPresetPanel` delegates deliberate Apply to that owner and exposes no second audition graph. Proposal edits require Apply again; after Apply, the shared amp controls update its sound directly. Reference/backing players stay outside the amp. Source previews, navigation and project switches stop prior playback/capture; reference changes or known job expiry invalidate a generated preset. Calibration remains local and is not sent to generation.
 
 The repeatable browser regression is `tools/verification/tone-match.browser.js`, run through Playwright's `browser_run_code_unsafe` filename argument against a dev server on `127.0.0.1:5174`. It intercepts all API requests with labelled TEST ONLY data and uses real Web Audio for graph checks; it makes no GPU/model call or automatic microphone request. Run `npm ci` and `npm run check` as normal; use an isolated tracked-source copy when a running Windows dev server locks dependencies.
 
@@ -58,7 +58,7 @@ The waveform/suggestion details and limitations are in [ANALYSIS.md](ANALYSIS.md
 
 ## Live guitar calibration and comparison
 
-Open the main Tone Match page at `http://127.0.0.1:5173/`, or the standalone `/separation.html` workflow. Choose the physical guitar interface and instrument channel in **Calibrate your live guitar**. Press **Calibrate live guitar**, allow capture, and play single notes across the strings followed by normal and strong chords for 10 seconds. The app measures dry input before effects with monitoring disabled, then releases capture. Quiet, clipped, invalid or short input requires retry; lower hardware gain if clipping occurs. No guitar recording upload is accepted for calibration.
+Open Tone Match at `http://127.0.0.1:5173/`. Choose the physical guitar interface and instrument channel in **Calibrate your live guitar**. Press **Calibrate live guitar**, allow capture, and play single notes across the strings followed by normal and strong chords for 10 seconds. The app measures dry input before effects with monitoring disabled, then releases capture. Quiet, clipped, invalid or short input requires retry; lower hardware gain if clipping occurs. No guitar recording upload is accepted for calibration.
 
 The existing bounded capture worklet supplies temporary PCM for level/spectral analysis and optional comparison; no audio file preparation is required. A successful calibration supplies the existing source metadata to deliberate preset generation. Changing the calibration device/channel, starting a new calibration or a device-change event clears the old calibration and preset. Main live monitoring adopts the calibrated device/channel; changing its selection invalidates calibration too. Stop, navigation and project changes cancel pending capture and release late permission grants. Recalibrate manually after changing guitar, pickup, guitar volume or physical interface gain.
 

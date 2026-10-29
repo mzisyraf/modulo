@@ -1,6 +1,6 @@
 # Private Modal Demucs API
 
-Deploy only the separator, keeping the web app, browser audio and Nemotron Token Factory integration separate. This checkpoint uses Modal's authenticated Python API, not a public HTTP URL. Credentials stay on the backend/operator machine. The existing web app still uses its local separator until a separately tested adapter is connected.
+Deploy only the separator, keeping the web app, browser audio and Nemotron Token Factory integration separate. This checkpoint uses Modal's authenticated Python API, not a public HTTP URL. Credentials stay on the backend/operator machine. The main app selects Local or Cloud API per upload; the local API invokes this client for Cloud API and retains the usual job/artifact URLs. See [shared hackathon setup](../../docs/TEAM_CLOUD_SETUP.md).
 
 The Modal app is `modulo-demucs`, with a private volume `modulo-demucs-jobs`. It runs one GPU job at a time, preferring L4 with T4 as a compatible capacity fallback. It scales to zero with a two-second idle window, has a 600-second execution timeout and no configured automatic retries. The existing isolated worker retains the tested model, checkpoint hash, five-second segments and shared output scaling. Its model loads per invocation; measure before optimizing reuse.
 

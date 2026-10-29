@@ -1,0 +1,16 @@
+{$MODULO_DOMAIN} {
+    basic_auth {
+        judge {$MODULO_PASSWORD_HASH}
+    }
+    request_body {
+        max_size 50MB
+    }
+    handle /api/* {
+        reverse_proxy api:8000 {
+            header_up Host localhost
+        }
+    }
+    handle {
+        respond "Inference API: use /api/health or /api/jobs" 404
+    }
+}

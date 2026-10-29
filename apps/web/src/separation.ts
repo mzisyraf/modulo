@@ -22,6 +22,7 @@ export interface ReferencePassage {
 }
 
 export interface SeparationJob {
+  backend?: "local" | "modal";
   job_id: string;
   status: "queued" | "running" | "ready" | "failed";
   stage: string;
@@ -32,7 +33,7 @@ export interface SeparationJob {
     duration_seconds: number;
     sample_rate: number;
     artifacts: Record<"mix" | "guitar" | "backing", string>;
-    provenance: { kind: "local_separation"; model: string; device: string };
+    provenance: { kind: "local_separation" | "cloud_separation"; provider?: "modal"; model: string; device: string };
     common_gain_linear: number;
     quality_flags: string[];
     reference: ReferencePassage | null;
@@ -87,11 +88,14 @@ export function parseSeparationJob(value: unknown): SeparationJob {
   if (!job || !isJobId(job.job_id) || !["queued", "running", "ready", "failed"].includes(job.status) || typeof job.stage !== "string" || !Number.isFinite(job.expires_at)) {
     throw new Error("The API returned an invalid separation job.");
   }
+  if (job.backend !== undefined && !["local", "modal"].includes(job.backend)) throw new Error("Invalid separation backend.");
   if (job.status === "failed" && (!job.error || typeof job.error.message !== "string")) throw new Error("The API returned an invalid job error.");
   if (job.status === "ready") {
     const result = job.result;
     if (!result || !Number.isFinite(result.duration_seconds) || result.duration_seconds < 10 || result.duration_seconds > 295
-      || result.sample_rate !== 44100 || result.provenance?.kind !== "local_separation"
+      || result.sample_rate !== 44100 || !["local_separation", "cloud_separation"].includes(result.provenance?.kind)
+      || (result.provenance.kind === "cloud_separation" && (result.provenance.provider !== "modal" || job.backend !== "modal"))
+      || (result.provenance.kind === "local_separation" && (job.backend === "modal" || result.provenance.provider !== undefined))
       || typeof result.provenance.model !== "string" || typeof result.provenance.device !== "string"
       || !Number.isFinite(result.common_gain_linear) || result.common_gain_linear <= 0 || result.common_gain_linear > 1 || !strings(result.quality_flags)
       || ["mix", "guitar", "backing"].some((name) => result.artifacts?.[name as keyof typeof result.artifacts] !== `/api/jobs/${job.job_id}/audio/${name}`)) {

@@ -6,7 +6,8 @@ async (page) => {
   page.on("pageerror", (error) => errors.push(error.message));
   const check = (ok, label) => { if (!ok) throw new Error(label); checks.push(label); };
   const jobs = new Map();
-  let uploads = 0, generations = 0, enabled = true, failGeneration = false;
+  let uploads = 0, generations = 0, enabled = true, failGeneration = false, lastBackend = "local", holdJob = false;
+  let heldResult;
   const preset = {
     schema_version: "1", name: "TEST ONLY injected preset", description: "Synthetic browser regression; no model inference.",
     provenance: { kind: "generated", provider: "nebius", model: "TEST ONLY" },
@@ -57,12 +58,14 @@ async (page) => {
     if (url.pathname === "/api/health") return json({ status: "ok", mode: "scaffold", separation_available: true, preset_generation_available: enabled });
     if (url.pathname === "/api/jobs" && method === "POST") {
       uploads++;
+      lastBackend = request.headers()["x-separation-backend"] ?? "local";
       const id = `11111111-1111-4111-8111-${String(uploads).padStart(12, "0")}`;
-      jobs.set(id, { job_id: id, status: "ready", stage: "ready", expires_at: Date.now() / 1000 + 3600,
+      jobs.set(id, { job_id: id, backend: lastBackend, status: holdJob ? "running" : "ready", stage: "ready", expires_at: Date.now() / 1000 + 3600,
         result: { duration_seconds: 12, sample_rate: 44100, common_gain_linear: 1,
-          provenance: { kind: "local_separation", model: "TEST ONLY", device: "Synthetic test" },
+          provenance: { kind: lastBackend === "modal" ? "cloud_separation" : "local_separation", ...(lastBackend === "modal" ? { provider: "modal" } : {}), model: "TEST ONLY", device: "Synthetic test" },
           artifacts: Object.fromEntries(["mix", "guitar", "backing"].map((name) => [name, `/api/jobs/${id}/audio/${name}`])),
           reference: null, reference_revision: 0, suggestion: null, quality_flags: ["separation_quality_unverified"] } });
+      if (holdJob) { heldResult = jobs.get(id).result; delete jobs.get(id).result; }
       return json({ job_id: id, status: "queued" }, 202);
     }
     const [, id, action] = url.pathname.match(/^\/api\/jobs\/([^/]+)(?:\/(.*))?$/) ?? [];
@@ -99,7 +102,7 @@ async (page) => {
   }
   await page.goto("http://127.0.0.1:5173");
   await page.getByRole("button", { name: "Tone Match", exact: true }).click();
-  check(await page.getByText("Real local separation", { exact: true }).isVisible(), "main Tone Match uses real API workflow");
+  check(await page.getByText("Local or Cloud API separation", { exact: true }).isVisible(), "main Tone Match uses real API workflow");
   check(await page.getByLabel("Demo result").count() === 0, "fixture stage controls removed");
   await calibrate();
   await page.getByLabel("Mixed-song audio", { exact: true }).setInputFiles({ name: "test-only.wav", mimeType: "audio/wav", buffer: wav });
@@ -177,43 +180,22 @@ async (page) => {
   await page.getByRole("button", { name: "Confirm reference", exact: true }).click();
   await page.getByText("Generation is disabled:", { exact: false }).waitFor();
   check(await page.getByRole("button", { name: "Generate starting preset", exact: true }).isDisabled(), "zero allowance keeps main generation disabled");
-  await page.goto("http://127.0.0.1:5173/separation.html");
-  check(await page.getByRole("main").count() === 1, "standalone preview retains main landmark");
-  await calibrate();
-  await page.getByLabel("Mixed-song audio", { exact: true }).setInputFiles({ name: "standalone-test.wav", mimeType: "audio/wav", buffer: wav });
+  await page.getByRole("button", { name: "Cloud API", exact: true }).click();
+  check(await page.getByRole("button", { name: "Cloud API", exact: true }).getAttribute("aria-pressed") === "true", "cloud backend is explicitly selected");
+  check(await page.getByRole("heading", { name: "Compare the same passage" }).count() === 0, "changing backend clears the old result");
+  await page.getByLabel("Mixed-song audio", { exact: true }).setInputFiles({ name: "cloud-test.wav", mimeType: "audio/wav", buffer: wav });
+  holdJob = true;
   await page.getByRole("button", { name: "Separate guitar", exact: true }).click();
+  // Unfinished jobs cannot expose results; hold the fixture briefly to inspect disabled controls.
+  await page.getByText("Running Cloud API guitar separation", { exact: false }).waitFor();
+  const latestJob = [...jobs.values()].at(-1);
+  check(await page.getByRole("button", { name: "Local", exact: true }).isDisabled(), "backend cannot change while cloud job runs");
+  latestJob.result = heldResult; latestJob.status = "ready";
   await page.getByRole("heading", { name: "Compare the same passage" }).waitFor();
-  await page.getByRole("button", { name: "Confirm reference", exact: true }).click();
-  await page.getByText("Generation is disabled:", { exact: false }).waitFor();
-  enabled = true;
-  await page.getByRole("button", { name: "Reconnect preset status", exact: true }).click();
-  await page.waitForFunction(() => ![...document.querySelectorAll("button")].find((b) => b.textContent === "Generate starting preset").disabled);
-  await page.getByRole("button", { name: "Generate starting preset", exact: true }).click();
-  await page.getByRole("button", {name:"Refine locally",exact:true}).click();
-  await page.getByRole("button", {name:"Cancel refinement",exact:true}).click();
-  await page.waitForFunction(()=>![...document.querySelectorAll("button")].find(b=>b.textContent==="Refine locally").disabled);
-  check(await page.getByRole("button", {name:"Use refined controls",exact:true}).count()===0,"cancelled refinement discards its result");
-  await page.getByRole("button", {name:"Refine locally",exact:true}).click();
-  await page.getByRole("button", {name:"Use refined controls",exact:true}).waitFor({timeout:60000});
-  check(await page.evaluate(()=>window.__contexts.length)===0,"local refinement creates no audible context");
-  await page.getByRole("button", {name:"Use refined controls",exact:true}).click();
-  check(await page.getByText("Review or edit the controls, then Apply.",{exact:false}).isVisible(),"refined controls require a separate Apply");
-  await page.getByRole("button", { name: "Apply starting preset", exact: true }).click();
-  await page.getByRole("button", { name: "Replay calibration exercise", exact: true }).click();
-  await page.waitForFunction(() => window.__contexts.length === 1);
-  await page.waitForFunction(() => document.querySelector('progress[aria-label="Guitar playback progress"]').value > .2);
-  check(await page.getByText("Replaying your live calibration", { exact: false }).isVisible(), "standalone plays selected calibration recording with advancing progress");
-  await page.getByRole("button", { name: "Original guitar", exact: true }).click();
-  check(await page.getByRole("button", { name: "Original guitar", exact: true }).getAttribute("aria-pressed") === "true", "original comparison selects without restarting playback");
-  await page.getByRole("button", { name: "Rig applied", exact: true }).click();
-  check(await page.getByRole("button", { name: "Stop preset audio", exact: true }).isVisible(), "standalone keeps its deliberate audition controls");
-  await page.getByRole("button", { name: "Stop preset audio", exact: true }).click();
-  const beforeSourceChange = generations;
-  await page.evaluate(() => { window.__testFrequency=440; });
-  await calibrate();
-  check(await page.getByRole("button", { name: "Apply starting preset", exact: true }).count() === 0, "recalibrating live input removes stale generated rig");
-  check(!await page.getByRole("button", { name: "Generate starting preset", exact: true }).isDisabled(), "new live calibration enables a fresh deliberate generation");
-  check(generations === beforeSourceChange, "recalibrating live input never auto-generates");
+  check(lastBackend === "modal", "Cloud API upload selects the cloud backend without browser credentials");
+  check(await page.getByText("Cloud API separation ready", { exact: false }).isVisible(), "cloud result is labelled honestly");
+  await page.getByRole("button", { name: "Local", exact: true }).click();
+  check(await page.getByRole("heading", { name: "Compare the same passage" }).count() === 0, "returning to Local clears cloud artifacts");
   check(errors.length === 0, `no page errors: ${errors.join("; ")}`);
   await page.unroute("**/api/**");
   return { synthetic: true, checks, uploads, generations, errors };

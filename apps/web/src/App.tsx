@@ -126,7 +126,7 @@ export function App() {
       .then((response) => { if (!response.ok) throw new Error(); return response.json(); })
       .then((health) => {
         if (health.status !== "ok" || health.mode !== "scaffold") throw new Error();
-        setApiState(health.separation_available ? "API connected · local separation" : "API connected · separation unavailable");
+        setApiState(health.separation_available ? "API connected · separation available" : "API connected · separation unavailable");
       })
       .catch(() => { if (!controller.signal.aborted) setApiState("API unavailable · local amp still works"); else setApiState("API check timed out · local amp still works"); })
       .finally(() => window.clearTimeout(timeout));
@@ -443,7 +443,7 @@ export function App() {
     <div className="tone-match-view" hidden={view !== "tone-match"}>
       <header className="hero">
         <div><span className="eyebrow">TONE MATCH</span><h2 className="display-title">Find the sound.<br /><em>Make it yours.</em></h2><p>Choose a song, confirm the reference and apply a starting preset to your browser amp.</p></div>
-        <div className="mode-badge"><strong>Real local separation</strong><span>Tone match remains unverified</span></div>
+        <div className="mode-badge"><strong>Local or Cloud API separation</strong><span>Tone match remains unverified</span></div>
       </header>
       <SeparationPage key={activeProjectId} ref={workflow} embedded active={view === "tone-match"} onInputChosen={(device, inputChannel) => { setSelectedDeviceId(device); setChannel(inputChannel); }} initialJobId={jobId} initialFile={songFile}
         onJobChange={(id, file, status) => { setJobId(id); setSongFile(file); setJobStage(status); }}

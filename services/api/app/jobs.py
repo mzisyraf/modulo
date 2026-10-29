@@ -96,6 +96,8 @@ class JobStore:
                 job = json.loads((directory / "state.json").read_text(encoding="utf-8"))
                 if job["job_id"] != job_id or job["status"] not in {"queued", "running", "ready", "failed"}:
                     raise ValueError("Invalid job identity or state.")
+                if job.get("backend", "local") not in {"local", "modal"}:
+                    raise ValueError("Invalid persisted separation backend.")
                 canonical_id(job["idempotency_key"])
                 if any(type(job[key]) not in (int, float) or not math.isfinite(job[key]) for key in ("created_at", "expires_at")):
                     raise ValueError("Invalid job lifetime.")
@@ -151,12 +153,16 @@ class JobStore:
         del self.jobs[job_id]
         self.reference_cache.pop(job_id, None)
 
-    def reserve(self, key):
+    def reserve(self, key, backend="local"):
+        if backend not in {"local", "modal"}:
+            raise JobError("invalid_backend", "Choose Local or Cloud API separation.")
         canonical_id(key)
         with self.lock:
             self.prune()
             for job in self.jobs.values():
                 if job["idempotency_key"] == key:
+                    if job.get("backend", "local") != backend:
+                        raise JobError("backend_conflict", "This upload key belongs to a different separation backend.", 409)
                     return deepcopy(job), False
             if any(job["status"] in {"queued", "running"} for job in self.jobs.values()):
                 raise JobError("worker_busy", "One local song is already processing. Wait for it to finish.", 429, True)
@@ -168,7 +174,7 @@ class JobStore:
             created = time.time()
             job_id = str(uuid4())
             self.directory(job_id).mkdir()
-            job = {"job_id": job_id, "idempotency_key": key, "status": "queued", "stage": "uploading",
+            job = {"job_id": job_id, "idempotency_key": key, "backend": backend, "status": "queued", "stage": "uploading",
                    "created_at": created, "expires_at": created + RETENTION_SECONDS}
             self.jobs[job_id] = job
             self.save(job)
@@ -224,14 +230,42 @@ class JobStore:
         if process.returncode:
             raise errors.get(process.returncode, JobError("separation_failed", "Local separation failed. Inspect this job's worker.log and retry.", retryable=True))
 
+    def run_modal_worker(self, directory):
+        python = ROOT / "tools/modal/.venv" / ("Scripts/python.exe" if os.name == "nt" else "bin/python")
+        if not python.is_file():
+            raise JobError("cloud_unavailable", "Install the Modal client and private credentials using tools/modal/README.md.", 503)
+        command = [str(python), str(ROOT / "tools/modal/client.py")]
+        env = {**os.environ, "PYTHONIOENCODING": "utf-8"}
+        with (directory / "worker.log").open("w", encoding="utf-8") as log:
+            try:
+                process = subprocess.run(command + [str(directory / "source.bin"), str(directory)],
+                                         cwd=ROOT, env=env, stdout=log, stderr=subprocess.STDOUT, timeout=1200)
+            except subprocess.TimeoutExpired as failure:
+                try:
+                    cancellation = subprocess.run(command + ["--cancel", str(directory)], cwd=ROOT, env=env,
+                                                  stdout=log, stderr=subprocess.STDOUT, timeout=30)
+                    if cancellation.returncode:
+                        logger.error("Modal cancellation unconfirmed for job %s; inspect worker.log", directory.name)
+                except (OSError, subprocess.TimeoutExpired):
+                    logger.exception("Modal cancellation unconfirmed for job %s", directory.name)
+                raise JobError("cloud_timeout", "Cloud separation timed out. Check Modal before retrying; the attempt may be billed.", 504, True) from failure
+        if process.returncode:
+            raise JobError("cloud_failed", "Cloud separation failed. Check Modal access, remaining attempts and worker.log; no Local fallback was used.", 502, True)
+
     def execute(self, job_id):
         directory = self.directory(job_id)
         try:
             with self.lock:
                 self.jobs[job_id].update(status="running", stage="separating")
                 self.save(self.jobs[job_id])
-            self.run_worker(directory)
+            backend = self.jobs[job_id].get("backend", "local")
+            if backend == "modal":
+                self.run_modal_worker(directory)
+            else:
+                self.run_worker(directory)
             report = json.loads((directory / "result.json").read_text(encoding="utf-8"))
+            if backend == "modal" and (report.get("provider") != "modal" or report.get("model") != "htdemucs_6s"):
+                raise ValueError("Invalid cloud separation provenance.")
             formats = []
             for name in ARTIFACTS:
                 with wave.open(str(directory / f"{name}.wav"), "rb") as audio:
@@ -247,7 +281,9 @@ class JobStore:
                 raise ValueError("Invalid worker provenance.")
             result = {"duration_seconds": frames / rate, "sample_rate": rate,
                       "artifacts": {name: f"/api/jobs/{job_id}/audio/{name}" for name in sorted(ARTIFACTS)},
-                      "provenance": {"kind": "local_separation", "model": "htdemucs_6s", "device": report["device"]},
+                      "provenance": {"kind": "cloud_separation" if backend == "modal" else "local_separation",
+                                     "model": "htdemucs_6s", "device": report["device"],
+                                     **({"provider": "modal"} if backend == "modal" else {})},
                       "common_gain_linear": report["common_gain_linear"],
                       "quality_flags": ["separation_quality_unverified"], "reference": None, "reference_revision": 0, "suggestion": None}
             try:

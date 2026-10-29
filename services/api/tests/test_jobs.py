@@ -359,3 +359,54 @@ def test_expired_open_file_is_unavailable_until_cleanup_can_retry(local_api, mon
         assert store.directory(job_id).exists()
     store.prune()
     assert not store.directory(job_id).exists()
+
+
+def test_modal_job_routes_remotely_and_preserves_provenance(local_api, monkeypatch):
+    client, store = local_api
+    monkeypatch.setattr(store, 'run_worker', lambda _: pytest.fail('No local GPU fallback'))
+    def cloud(directory):
+        success(directory)
+        report = {'device': 'TEST ONLY cloud GPU', 'common_gain_linear': .9,
+                  'provider': 'modal', 'model': 'htdemucs_6s'}
+        (directory / 'result.json').write_text(json.dumps(report))
+    monkeypatch.setattr(store, 'run_modal_worker', cloud)
+    key = str(uuid4())
+    response = upload(client, key=key, **{'x-separation-backend': 'modal'})
+    assert response.status_code == 202
+    job = terminal(client, response.json()['job_id'])
+    assert job['backend'] == 'modal' and job['status'] == 'ready'
+    assert job['result']['provenance']['kind'] == 'cloud_separation'
+    assert job['result']['provenance']['provider'] == 'modal'
+    assert upload(client, key=key).status_code == 409
+    assert upload(client, key=key, **{'x-separation-backend': 'modal'}).json()['job_id'] == job['job_id']
+
+
+def test_backend_validation_and_cloud_failure_do_not_fall_back(local_api, monkeypatch):
+    client, store = local_api
+    assert upload(client, **{'x-separation-backend': 'invented'}).status_code == 400
+    assert not store.jobs
+    def broken(_):
+        raise JobError('cloud_failed', 'TEST ONLY credentials unavailable', 502)
+    monkeypatch.setattr(store, 'run_modal_worker', broken)
+    monkeypatch.setattr(store, 'run_worker', lambda _: pytest.fail('No local GPU fallback'))
+    response = upload(client, **{'x-separation-backend': 'modal'})
+    job = terminal(client, response.json()['job_id'])
+    assert job['status'] == 'failed' and job['backend'] == 'modal'
+    assert job['error']['code'] == 'cloud_failed'
+
+
+def test_cloud_timeout_attempts_remote_cancellation(tmp_path, monkeypatch):
+    store = JobStore(tmp_path)
+    monkeypatch.setattr('app.jobs.Path.is_file', lambda _: True)
+    calls = []
+    def timeout_then_cancel(command, **kwargs):
+        calls.append(command)
+        if len(calls) == 1:
+            raise subprocess.TimeoutExpired(command, kwargs['timeout'])
+        return subprocess.CompletedProcess(command, 0)
+    monkeypatch.setattr('app.jobs.subprocess.run', timeout_then_cancel)
+    with pytest.raises(JobError) as error:
+        store.run_modal_worker(tmp_path)
+    assert error.value.code == 'cloud_timeout'
+    assert calls[0][-2] == str(tmp_path / 'source.bin')
+    assert calls[1][-2:] == ['--cancel', str(tmp_path)]

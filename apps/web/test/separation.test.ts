@@ -33,6 +33,11 @@ test("job parser rejects invented preset success and foreign artifact URLs", () 
     quality_flags: ["separation_quality_unverified"], reference: null, suggestion: null,
   };
   assert.equal(parseSeparationJob({ ...pending, status: "ready", result }).result?.reference, null);
+  const cloud = { ...pending, backend: "modal", status: "ready", result: { ...result, provenance: { ...result.provenance, kind: "cloud_separation", provider: "modal" } } };
+  assert.equal(parseSeparationJob(cloud).result?.provenance.provider, "modal");
+  assert.throws(() => parseSeparationJob({ ...cloud, backend: "local" }));
+  assert.throws(() => parseSeparationJob({ ...cloud, result }));
+  assert.throws(() => parseSeparationJob({ ...cloud, result: { ...cloud.result, provenance: { ...cloud.result.provenance, provider: "unknown" } } }));
   assert.throws(() => parseSeparationJob({ ...pending, status: "ready", result: { ...result, artifacts: { ...result.artifacts, guitar: "https://other.example/audio" } } }));
   assert.throws(() => parseSeparationJob({ ...pending, status: "ready", result: { ...result, provenance: { ...result.provenance, kind: "generated" } } }));
 });

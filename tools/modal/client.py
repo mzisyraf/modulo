@@ -74,13 +74,24 @@ def run(source, output):
         raise
 
 
+def cancel(output):
+    metadata = json.loads((output / "modal-call.json").read_text())
+    modal.FunctionCall.from_id(metadata["call_id"]).cancel(terminate_containers=True)
+
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("source", type=Path)
-    parser.add_argument("output", type=Path)
+    parser.add_argument("output", type=Path, nargs="?")
+    parser.add_argument("--cancel", action="store_true", help="Cancel the saved Modal call in the source directory.")
     args = parser.parse_args()
     try:
-        print(json.dumps(run(args.source, args.output), allow_nan=False))
+        if args.cancel:
+            cancel(args.source)
+        elif args.output is None:
+            parser.error("An output directory is required.")
+        else:
+            print(json.dumps(run(args.source, args.output), allow_nan=False))
     except Exception as failure:
         print(f"Modal separation failed: {failure}", file=sys.stderr)
         raise SystemExit(1)
