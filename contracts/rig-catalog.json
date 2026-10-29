@@ -1,0 +1,5220 @@
+[
+  {
+    "id": "gate.gentle",
+    "version": 1,
+    "name": "Gentle gate",
+    "type": "gate",
+    "model": "gentle",
+    "category": "gate",
+    "description": "Smooth note tails",
+    "parameters": [
+      {
+        "id": "threshold_db",
+        "label": "Threshold",
+        "type": "number",
+        "widget": "knob",
+        "min": -90,
+        "max": -10,
+        "defaultValue": -55,
+        "unit": "dBFS",
+        "scaling": {
+          "type": "linear"
+        },
+        "choices": [],
+        "binding": {
+          "target": "threshold_db",
+          "scale": 1,
+          "offset": 0
+        },
+        "realtime": true
+      },
+      {
+        "id": "release_ms",
+        "label": "Release",
+        "type": "number",
+        "widget": "knob",
+        "min": 10,
+        "max": 1000,
+        "defaultValue": 150,
+        "unit": "ms",
+        "scaling": {
+          "type": "log"
+        },
+        "choices": [],
+        "binding": {
+          "target": "release_ms",
+          "scale": 1,
+          "offset": 0
+        },
+        "realtime": true
+      },
+      {
+        "id": "depth_db",
+        "label": "Depth",
+        "type": "number",
+        "widget": "knob",
+        "min": -90,
+        "max": 0,
+        "defaultValue": -60,
+        "unit": "dB",
+        "scaling": {
+          "type": "linear"
+        },
+        "choices": [],
+        "binding": {
+          "target": "depth_db",
+          "scale": 1,
+          "offset": 0
+        },
+        "realtime": true
+      }
+    ],
+    "dsp": {
+      "factory": "legacy.gate.gentle",
+      "backend": "audio-worklet",
+      "approximation": "Original algorithmic model; not a hardware capture or circuit emulation."
+    }
+  },
+  {
+    "id": "gate.tight",
+    "version": 1,
+    "name": "Tight gate",
+    "type": "gate",
+    "model": "tight",
+    "category": "gate",
+    "description": "Faster envelope tracking",
+    "parameters": [
+      {
+        "id": "threshold_db",
+        "label": "Threshold",
+        "type": "number",
+        "widget": "knob",
+        "min": -90,
+        "max": -10,
+        "defaultValue": -55,
+        "unit": "dBFS",
+        "scaling": {
+          "type": "linear"
+        },
+        "choices": [],
+        "binding": {
+          "target": "threshold_db",
+          "scale": 1,
+          "offset": 0
+        },
+        "realtime": true
+      },
+      {
+        "id": "attack_ms",
+        "label": "Attack",
+        "type": "number",
+        "widget": "knob",
+        "min": 0.1,
+        "max": 50,
+        "defaultValue": 3,
+        "unit": "ms",
+        "scaling": {
+          "type": "log"
+        },
+        "choices": [],
+        "binding": {
+          "target": "attack_ms",
+          "scale": 1,
+          "offset": 0
+        },
+        "realtime": true
+      },
+      {
+        "id": "hold_ms",
+        "label": "Hold",
+        "type": "number",
+        "widget": "knob",
+        "min": 0,
+        "max": 500,
+        "defaultValue": 50,
+        "unit": "ms",
+        "scaling": {
+          "type": "linear"
+        },
+        "choices": [],
+        "binding": {
+          "target": "hold_ms",
+          "scale": 1,
+          "offset": 0
+        },
+        "realtime": true
+      },
+      {
+        "id": "release_ms",
+        "label": "Release",
+        "type": "number",
+        "widget": "knob",
+        "min": 10,
+        "max": 1000,
+        "defaultValue": 150,
+        "unit": "ms",
+        "scaling": {
+          "type": "log"
+        },
+        "choices": [],
+        "binding": {
+          "target": "release_ms",
+          "scale": 1,
+          "offset": 0
+        },
+        "realtime": true
+      },
+      {
+        "id": "hysteresis_db",
+        "label": "Hysteresis",
+        "type": "number",
+        "widget": "knob",
+        "min": 0,
+        "max": 18,
+        "defaultValue": 6,
+        "unit": "dB",
+        "scaling": {
+          "type": "linear"
+        },
+        "choices": [],
+        "binding": {
+          "target": "hysteresis_db",
+          "scale": 1,
+          "offset": 0
+        },
+        "realtime": true
+      }
+    ],
+    "dsp": {
+      "factory": "legacy.gate.tight",
+      "backend": "audio-worklet",
+      "approximation": "Original algorithmic model; not a hardware capture or circuit emulation."
+    }
+  },
+  {
+    "id": "gate.soft",
+    "version": 1,
+    "name": "Soft expander",
+    "type": "gate",
+    "model": "soft",
+    "category": "gate",
+    "description": "Progressive attenuation below threshold",
+    "parameters": [
+      {
+        "id": "threshold_db",
+        "label": "Threshold",
+        "type": "number",
+        "widget": "knob",
+        "min": -90,
+        "max": -10,
+        "defaultValue": -55,
+        "unit": "dBFS",
+        "scaling": {
+          "type": "linear"
+        },
+        "choices": [],
+        "binding": {
+          "target": "threshold_db",
+          "scale": 1,
+          "offset": 0
+        },
+        "realtime": true
+      },
+      {
+        "id": "release_ms",
+        "label": "Release",
+        "type": "number",
+        "widget": "knob",
+        "min": 10,
+        "max": 1000,
+        "defaultValue": 150,
+        "unit": "ms",
+        "scaling": {
+          "type": "log"
+        },
+        "choices": [],
+        "binding": {
+          "target": "release_ms",
+          "scale": 1,
+          "offset": 0
+        },
+        "realtime": true
+      },
+      {
+        "id": "depth_db",
+        "label": "Floor",
+        "type": "number",
+        "widget": "knob",
+        "min": -90,
+        "max": 0,
+        "defaultValue": -60,
+        "unit": "dB",
+        "scaling": {
+          "type": "linear"
+        },
+        "choices": [],
+        "binding": {
+          "target": "depth_db",
+          "scale": 1,
+          "offset": 0
+        },
+        "realtime": true
+      }
+    ],
+    "dsp": {
+      "factory": "legacy.gate.soft",
+      "backend": "audio-worklet",
+      "approximation": "Original algorithmic model; not a hardware capture or circuit emulation."
+    }
+  },
+  {
+    "id": "compressor.studio",
+    "version": 1,
+    "name": "Studio compressor",
+    "type": "compressor",
+    "model": "studio",
+    "category": "compressor",
+    "description": "Neutral native dynamics",
+    "parameters": [
+      {
+        "id": "threshold_db",
+        "label": "Threshold",
+        "type": "number",
+        "widget": "knob",
+        "min": -60,
+        "max": 0,
+        "defaultValue": -24,
+        "unit": "dBFS",
+        "scaling": {
+          "type": "linear"
+        },
+        "choices": [],
+        "binding": {
+          "target": "threshold_db",
+          "scale": 1,
+          "offset": 0
+        },
+        "realtime": true
+      },
+      {
+        "id": "ratio",
+        "label": "Ratio",
+        "type": "number",
+        "widget": "knob",
+        "min": 1,
+        "max": 20,
+        "defaultValue": 4,
+        "unit": "",
+        "scaling": {
+          "type": "linear"
+        },
+        "choices": [],
+        "binding": {
+          "target": "ratio",
+          "scale": 1,
+          "offset": 0
+        },
+        "realtime": true
+      },
+      {
+        "id": "attack_ms",
+        "label": "Attack",
+        "type": "number",
+        "widget": "knob",
+        "min": 0,
+        "max": 100,
+        "defaultValue": 10,
+        "unit": "ms",
+        "scaling": {
+          "type": "linear"
+        },
+        "choices": [],
+        "binding": {
+          "target": "attack_ms",
+          "scale": 1,
+          "offset": 0
+        },
+        "realtime": true
+      },
+      {
+        "id": "release_ms",
+        "label": "Release",
+        "type": "number",
+        "widget": "knob",
+        "min": 10,
+        "max": 1000,
+        "defaultValue": 150,
+        "unit": "ms",
+        "scaling": {
+          "type": "log"
+        },
+        "choices": [],
+        "binding": {
+          "target": "release_ms",
+          "scale": 1,
+          "offset": 0
+        },
+        "realtime": true
+      },
+      {
+        "id": "knee_db",
+        "label": "Knee",
+        "type": "number",
+        "widget": "knob",
+        "min": 0,
+        "max": 40,
+        "defaultValue": 12,
+        "unit": "dB",
+        "scaling": {
+          "type": "linear"
+        },
+        "choices": [],
+        "binding": {
+          "target": "knee_db",
+          "scale": 1,
+          "offset": 0
+        },
+        "realtime": true
+      },
+      {
+        "id": "makeup_db",
+        "label": "Makeup",
+        "type": "number",
+        "widget": "knob",
+        "min": 0,
+        "max": 12,
+        "defaultValue": 0,
+        "unit": "dB",
+        "scaling": {
+          "type": "linear"
+        },
+        "choices": [],
+        "binding": {
+          "target": "makeup_db",
+          "scale": 1,
+          "offset": 0
+        },
+        "realtime": true
+      },
+      {
+        "id": "mix",
+        "label": "Mix",
+        "type": "number",
+        "widget": "knob",
+        "min": 0,
+        "max": 1,
+        "defaultValue": 1,
+        "unit": "",
+        "scaling": {
+          "type": "linear"
+        },
+        "choices": [],
+        "binding": {
+          "target": "mix",
+          "scale": 1,
+          "offset": 0
+        },
+        "realtime": true
+      }
+    ],
+    "dsp": {
+      "factory": "legacy.compressor.studio",
+      "backend": "native",
+      "approximation": "Original algorithmic model; not a hardware capture or circuit emulation."
+    }
+  },
+  {
+    "id": "compressor.sustain",
+    "version": 1,
+    "name": "Pedal sustain",
+    "type": "compressor",
+    "model": "sustain",
+    "category": "compressor",
+    "description": "Softer knee and fuller body",
+    "parameters": [
+      {
+        "id": "sustain",
+        "label": "Sustain",
+        "type": "number",
+        "widget": "knob",
+        "min": 0,
+        "max": 1,
+        "defaultValue": 0.4,
+        "unit": "",
+        "scaling": {
+          "type": "linear"
+        },
+        "choices": [],
+        "binding": {
+          "target": "threshold_db",
+          "scale": -60,
+          "offset": 0
+        },
+        "realtime": true
+      },
+      {
+        "id": "makeup_db",
+        "label": "Level",
+        "type": "number",
+        "widget": "knob",
+        "min": 0,
+        "max": 12,
+        "defaultValue": 0,
+        "unit": "dB",
+        "scaling": {
+          "type": "linear"
+        },
+        "choices": [],
+        "binding": {
+          "target": "makeup_db",
+          "scale": 1,
+          "offset": 0
+        },
+        "realtime": true
+      },
+      {
+        "id": "mix",
+        "label": "Mix",
+        "type": "number",
+        "widget": "knob",
+        "min": 0,
+        "max": 1,
+        "defaultValue": 1,
+        "unit": "",
+        "scaling": {
+          "type": "linear"
+        },
+        "choices": [],
+        "binding": {
+          "target": "mix",
+          "scale": 1,
+          "offset": 0
+        },
+        "realtime": true
+      }
+    ],
+    "dsp": {
+      "factory": "legacy.compressor.sustain",
+      "backend": "native",
+      "approximation": "Original algorithmic model; not a hardware capture or circuit emulation."
+    }
+  },
+  {
+    "id": "compressor.punch",
+    "version": 1,
+    "name": "Punch compressor",
+    "type": "compressor",
+    "model": "punch",
+    "category": "compressor",
+    "description": "Harder knee with transient emphasis",
+    "parameters": [
+      {
+        "id": "threshold_db",
+        "label": "Threshold",
+        "type": "number",
+        "widget": "knob",
+        "min": -60,
+        "max": 0,
+        "defaultValue": -24,
+        "unit": "dBFS",
+        "scaling": {
+          "type": "linear"
+        },
+        "choices": [],
+        "binding": {
+          "target": "threshold_db",
+          "scale": 1,
+          "offset": 0
+        },
+        "realtime": true
+      },
+      {
+        "id": "attack_ms",
+        "label": "Attack",
+        "type": "number",
+        "widget": "knob",
+        "min": 0,
+        "max": 100,
+        "defaultValue": 10,
+        "unit": "ms",
+        "scaling": {
+          "type": "linear"
+        },
+        "choices": [],
+        "binding": {
+          "target": "attack_ms",
+          "scale": 1,
+          "offset": 0
+        },
+        "realtime": true
+      },
+      {
+        "id": "release_ms",
+        "label": "Release",
+        "type": "number",
+        "widget": "knob",
+        "min": 10,
+        "max": 1000,
+        "defaultValue": 150,
+        "unit": "ms",
+        "scaling": {
+          "type": "log"
+        },
+        "choices": [],
+        "binding": {
+          "target": "release_ms",
+          "scale": 1,
+          "offset": 0
+        },
+        "realtime": true
+      },
+      {
+        "id": "ratio",
+        "label": "Ratio",
+        "type": "number",
+        "widget": "knob",
+        "min": 1,
+        "max": 20,
+        "defaultValue": 4,
+        "unit": "",
+        "scaling": {
+          "type": "linear"
+        },
+        "choices": [],
+        "binding": {
+          "target": "ratio",
+          "scale": 1,
+          "offset": 0
+        },
+        "realtime": true
+      },
+      {
+        "id": "makeup_db",
+        "label": "Output",
+        "type": "number",
+        "widget": "knob",
+        "min": 0,
+        "max": 12,
+        "defaultValue": 0,
+        "unit": "dB",
+        "scaling": {
+          "type": "linear"
+        },
+        "choices": [],
+        "binding": {
+          "target": "makeup_db",
+          "scale": 1,
+          "offset": 0
+        },
+        "realtime": true
+      }
+    ],
+    "dsp": {
+      "factory": "legacy.compressor.punch",
+      "backend": "native",
+      "approximation": "Original algorithmic model; not a hardware capture or circuit emulation."
+    }
+  },
+  {
+    "id": "boost.clean",
+    "version": 1,
+    "name": "Clean boost",
+    "type": "boost",
+    "model": "clean",
+    "category": "utility",
+    "description": "Broadband level",
+    "parameters": [
+      {
+        "id": "gain_db",
+        "label": "Boost",
+        "type": "number",
+        "widget": "knob",
+        "min": 0,
+        "max": 18,
+        "defaultValue": 3,
+        "unit": "dB",
+        "scaling": {
+          "type": "linear"
+        },
+        "choices": [],
+        "binding": {
+          "target": "gain_db",
+          "scale": 1,
+          "offset": 0
+        },
+        "realtime": true
+      }
+    ],
+    "dsp": {
+      "factory": "legacy.boost.clean",
+      "backend": "native",
+      "approximation": "Original algorithmic model; not a hardware capture or circuit emulation."
+    }
+  },
+  {
+    "id": "boost.treble",
+    "version": 1,
+    "name": "Treble boost",
+    "type": "boost",
+    "model": "treble",
+    "category": "utility",
+    "description": "Reduced bass and raised upper mids",
+    "parameters": [
+      {
+        "id": "gain_db",
+        "label": "Boost",
+        "type": "number",
+        "widget": "knob",
+        "min": 0,
+        "max": 18,
+        "defaultValue": 3,
+        "unit": "dB",
+        "scaling": {
+          "type": "linear"
+        },
+        "choices": [],
+        "binding": {
+          "target": "gain_db",
+          "scale": 1,
+          "offset": 0
+        },
+        "realtime": true
+      },
+      {
+        "id": "tone",
+        "label": "Tone",
+        "type": "number",
+        "widget": "knob",
+        "min": 0,
+        "max": 1,
+        "defaultValue": 0.5,
+        "unit": "",
+        "scaling": {
+          "type": "linear"
+        },
+        "choices": [],
+        "binding": {
+          "target": "tone",
+          "scale": 1,
+          "offset": 0
+        },
+        "realtime": true
+      }
+    ],
+    "dsp": {
+      "factory": "legacy.boost.treble",
+      "backend": "native",
+      "approximation": "Original algorithmic model; not a hardware capture or circuit emulation."
+    }
+  },
+  {
+    "id": "boost.mid",
+    "version": 1,
+    "name": "Mid boost",
+    "type": "boost",
+    "model": "mid",
+    "category": "utility",
+    "description": "Midrange emphasis",
+    "parameters": [
+      {
+        "id": "gain_db",
+        "label": "Boost",
+        "type": "number",
+        "widget": "knob",
+        "min": 0,
+        "max": 18,
+        "defaultValue": 3,
+        "unit": "dB",
+        "scaling": {
+          "type": "linear"
+        },
+        "choices": [],
+        "binding": {
+          "target": "gain_db",
+          "scale": 1,
+          "offset": 0
+        },
+        "realtime": true
+      },
+      {
+        "id": "focus",
+        "label": "Focus",
+        "type": "number",
+        "widget": "knob",
+        "min": 0,
+        "max": 1,
+        "defaultValue": 0.5,
+        "unit": "",
+        "scaling": {
+          "type": "linear"
+        },
+        "choices": [],
+        "binding": {
+          "target": "tone",
+          "scale": 1,
+          "offset": 0
+        },
+        "realtime": true
+      }
+    ],
+    "dsp": {
+      "factory": "legacy.boost.mid",
+      "backend": "native",
+      "approximation": "Original algorithmic model; not a hardware capture or circuit emulation."
+    }
+  },
+  {
+    "id": "wah.classic",
+    "version": 1,
+    "name": "Classic wah",
+    "type": "wah",
+    "model": "classic",
+    "category": "wah",
+    "description": "Traditional mid sweep",
+    "parameters": [
+      {
+        "id": "position",
+        "label": "Pedal",
+        "type": "number",
+        "widget": "slider",
+        "min": 0,
+        "max": 1,
+        "defaultValue": 0.5,
+        "unit": "",
+        "scaling": {
+          "type": "linear"
+        },
+        "choices": [],
+        "binding": {
+          "target": "position",
+          "scale": 1,
+          "offset": 0
+        },
+        "realtime": true
+      },
+      {
+        "id": "q",
+        "label": "Resonance",
+        "type": "number",
+        "widget": "knob",
+        "min": 0.5,
+        "max": 12,
+        "defaultValue": 5,
+        "unit": "",
+        "scaling": {
+          "type": "linear"
+        },
+        "choices": [],
+        "binding": {
+          "target": "q",
+          "scale": 1,
+          "offset": 0
+        },
+        "realtime": true
+      },
+      {
+        "id": "level_db",
+        "label": "Level",
+        "type": "number",
+        "widget": "knob",
+        "min": -24,
+        "max": 12,
+        "defaultValue": 0,
+        "unit": "dB",
+        "scaling": {
+          "type": "linear"
+        },
+        "choices": [],
+        "binding": {
+          "target": "level_db",
+          "scale": 1,
+          "offset": 0
+        },
+        "realtime": true
+      }
+    ],
+    "dsp": {
+      "factory": "legacy.wah.classic",
+      "backend": "native",
+      "approximation": "Original algorithmic model; not a hardware capture or circuit emulation."
+    }
+  },
+  {
+    "id": "wah.wide",
+    "version": 1,
+    "name": "Wide wah",
+    "type": "wah",
+    "model": "wide",
+    "category": "wah",
+    "description": "Extended sweep",
+    "parameters": [
+      {
+        "id": "position",
+        "label": "Sweep",
+        "type": "number",
+        "widget": "knob",
+        "min": 0,
+        "max": 1,
+        "defaultValue": 0.5,
+        "unit": "",
+        "scaling": {
+          "type": "linear"
+        },
+        "choices": [],
+        "binding": {
+          "target": "position",
+          "scale": 1,
+          "offset": 0
+        },
+        "realtime": true
+      },
+      {
+        "id": "q",
+        "label": "Resonance",
+        "type": "number",
+        "widget": "knob",
+        "min": 0.5,
+        "max": 12,
+        "defaultValue": 5,
+        "unit": "",
+        "scaling": {
+          "type": "linear"
+        },
+        "choices": [],
+        "binding": {
+          "target": "q",
+          "scale": 1,
+          "offset": 0
+        },
+        "realtime": true
+      },
+      {
+        "id": "mix",
+        "label": "Mix",
+        "type": "number",
+        "widget": "knob",
+        "min": 0,
+        "max": 1,
+        "defaultValue": 1,
+        "unit": "",
+        "scaling": {
+          "type": "linear"
+        },
+        "choices": [],
+        "binding": {
+          "target": "mix",
+          "scale": 1,
+          "offset": 0
+        },
+        "realtime": true
+      },
+      {
+        "id": "level_db",
+        "label": "Level",
+        "type": "number",
+        "widget": "knob",
+        "min": -24,
+        "max": 12,
+        "defaultValue": 0,
+        "unit": "dB",
+        "scaling": {
+          "type": "linear"
+        },
+        "choices": [],
+        "binding": {
+          "target": "level_db",
+          "scale": 1,
+          "offset": 0
+        },
+        "realtime": true
+      }
+    ],
+    "dsp": {
+      "factory": "legacy.wah.wide",
+      "backend": "native",
+      "approximation": "Original algorithmic model; not a hardware capture or circuit emulation."
+    }
+  },
+  {
+    "id": "wah.vocal",
+    "version": 1,
+    "name": "Vocal wah",
+    "type": "wah",
+    "model": "vocal",
+    "category": "wah",
+    "description": "Narrow vocal-range sweep",
+    "parameters": [
+      {
+        "id": "position",
+        "label": "Vowel",
+        "type": "number",
+        "widget": "knob",
+        "min": 0,
+        "max": 1,
+        "defaultValue": 0.5,
+        "unit": "",
+        "scaling": {
+          "type": "linear"
+        },
+        "choices": [],
+        "binding": {
+          "target": "position",
+          "scale": 1,
+          "offset": 0
+        },
+        "realtime": true
+      },
+      {
+        "id": "q",
+        "label": "Voice width",
+        "type": "number",
+        "widget": "knob",
+        "min": 0.5,
+        "max": 12,
+        "defaultValue": 5,
+        "unit": "",
+        "scaling": {
+          "type": "linear"
+        },
+        "choices": [],
+        "binding": {
+          "target": "q",
+          "scale": 1,
+          "offset": 0
+        },
+        "realtime": true
+      },
+      {
+        "id": "level_db",
+        "label": "Level",
+        "type": "number",
+        "widget": "knob",
+        "min": -24,
+        "max": 12,
+        "defaultValue": 0,
+        "unit": "dB",
+        "scaling": {
+          "type": "linear"
+        },
+        "choices": [],
+        "binding": {
+          "target": "level_db",
+          "scale": 1,
+          "offset": 0
+        },
+        "realtime": true
+      }
+    ],
+    "dsp": {
+      "factory": "legacy.wah.vocal",
+      "backend": "native",
+      "approximation": "Original algorithmic model; not a hardware capture or circuit emulation."
+    }
+  },
+  {
+    "id": "overdrive.green",
+    "version": 1,
+    "name": "TS808-inspired Green OD",
+    "type": "overdrive",
+    "model": "green",
+    "category": "overdrive",
+    "description": "Mid-forward soft-clipping character; approximate",
+    "parameters": [
+      {
+        "id": "drive",
+        "label": "Drive",
+        "type": "number",
+        "widget": "knob",
+        "min": 0,
+        "max": 1,
+        "defaultValue": 0.25,
+        "unit": "",
+        "scaling": {
+          "type": "power",
+          "exponent": 2
+        },
+        "choices": [],
+        "binding": {
+          "target": "drive",
+          "scale": 1,
+          "offset": 0
+        },
+        "realtime": true
+      },
+      {
+        "id": "tone",
+        "label": "Tone",
+        "type": "number",
+        "widget": "knob",
+        "min": 0,
+        "max": 1,
+        "defaultValue": 0.5,
+        "unit": "",
+        "scaling": {
+          "type": "linear"
+        },
+        "choices": [],
+        "binding": {
+          "target": "tone",
+          "scale": 1,
+          "offset": 0
+        },
+        "realtime": true
+      },
+      {
+        "id": "level_db",
+        "label": "Level",
+        "type": "number",
+        "widget": "knob",
+        "min": -24,
+        "max": 12,
+        "defaultValue": 0,
+        "unit": "dB",
+        "scaling": {
+          "type": "linear"
+        },
+        "choices": [],
+        "binding": {
+          "target": "level_db",
+          "scale": 1,
+          "offset": 0
+        },
+        "realtime": true
+      }
+    ],
+    "dsp": {
+      "factory": "legacy.overdrive.green",
+      "backend": "native",
+      "approximation": "Approximate character model; not a measured circuit or endorsed hardware model."
+    },
+    "reference": "Ibanez TS808",
+    "source": "https://www.ibanez.com/eu/products/detail/ts808_99.html"
+  },
+  {
+    "id": "overdrive.gold",
+    "version": 1,
+    "name": "BOSS SD-1-inspired Yellow OD",
+    "type": "overdrive",
+    "model": "gold",
+    "category": "overdrive",
+    "description": "Asymmetric mid-forward saturation; approximate",
+    "parameters": [
+      {
+        "id": "drive",
+        "label": "Drive",
+        "type": "number",
+        "widget": "knob",
+        "min": 0,
+        "max": 1,
+        "defaultValue": 0.25,
+        "unit": "",
+        "scaling": {
+          "type": "power",
+          "exponent": 2
+        },
+        "choices": [],
+        "binding": {
+          "target": "drive",
+          "scale": 1,
+          "offset": 0
+        },
+        "realtime": true
+      },
+      {
+        "id": "tone",
+        "label": "Tone",
+        "type": "number",
+        "widget": "knob",
+        "min": 0,
+        "max": 1,
+        "defaultValue": 0.5,
+        "unit": "",
+        "scaling": {
+          "type": "linear"
+        },
+        "choices": [],
+        "binding": {
+          "target": "tone",
+          "scale": 1,
+          "offset": 0
+        },
+        "realtime": true
+      },
+      {
+        "id": "level_db",
+        "label": "Level",
+        "type": "number",
+        "widget": "knob",
+        "min": -24,
+        "max": 12,
+        "defaultValue": 0,
+        "unit": "dB",
+        "scaling": {
+          "type": "linear"
+        },
+        "choices": [],
+        "binding": {
+          "target": "level_db",
+          "scale": 1,
+          "offset": 0
+        },
+        "realtime": true
+      }
+    ],
+    "dsp": {
+      "factory": "legacy.overdrive.gold",
+      "backend": "native",
+      "approximation": "Approximate character model; not a measured circuit or endorsed hardware model."
+    },
+    "reference": "BOSS SD-1",
+    "source": "https://support.roland.com/hc/en-us/articles/201952119-SD-1-Specifications"
+  },
+  {
+    "id": "overdrive.blue",
+    "version": 1,
+    "name": "BOSS BD-2-inspired Blue OD",
+    "type": "overdrive",
+    "model": "blue",
+    "category": "overdrive",
+    "description": "Bright open clipping character; approximate",
+    "parameters": [
+      {
+        "id": "gain",
+        "label": "Gain",
+        "type": "number",
+        "widget": "knob",
+        "min": 0,
+        "max": 1,
+        "defaultValue": 0.25,
+        "unit": "",
+        "scaling": {
+          "type": "power",
+          "exponent": 2
+        },
+        "choices": [],
+        "binding": {
+          "target": "drive",
+          "scale": 1,
+          "offset": 0
+        },
+        "realtime": true
+      },
+      {
+        "id": "tone",
+        "label": "Tone",
+        "type": "number",
+        "widget": "knob",
+        "min": 0,
+        "max": 1,
+        "defaultValue": 0.5,
+        "unit": "",
+        "scaling": {
+          "type": "linear"
+        },
+        "choices": [],
+        "binding": {
+          "target": "tone",
+          "scale": 1,
+          "offset": 0
+        },
+        "realtime": true
+      },
+      {
+        "id": "level_db",
+        "label": "Level",
+        "type": "number",
+        "widget": "knob",
+        "min": -24,
+        "max": 12,
+        "defaultValue": 0,
+        "unit": "dB",
+        "scaling": {
+          "type": "linear"
+        },
+        "choices": [],
+        "binding": {
+          "target": "level_db",
+          "scale": 1,
+          "offset": 0
+        },
+        "realtime": true
+      }
+    ],
+    "dsp": {
+      "factory": "legacy.overdrive.blue",
+      "backend": "native",
+      "approximation": "Approximate character model; not a measured circuit or endorsed hardware model."
+    },
+    "reference": "BOSS BD-2",
+    "source": "https://static.roland.com/assets/media/pdf/BD-2_M_eng02_W.pdf"
+  },
+  {
+    "id": "distortion.orange",
+    "version": 1,
+    "name": "DS-1-inspired Orange Distortion",
+    "type": "distortion",
+    "model": "orange",
+    "category": "distortion",
+    "description": "Scooped hard-clip character; approximate",
+    "parameters": [
+      {
+        "id": "distortion",
+        "label": "Distortion",
+        "type": "number",
+        "widget": "knob",
+        "min": 0,
+        "max": 1,
+        "defaultValue": 0.25,
+        "unit": "",
+        "scaling": {
+          "type": "power",
+          "exponent": 2
+        },
+        "choices": [],
+        "binding": {
+          "target": "drive",
+          "scale": 1,
+          "offset": 0
+        },
+        "realtime": true
+      },
+      {
+        "id": "tone",
+        "label": "Tone",
+        "type": "number",
+        "widget": "knob",
+        "min": 0,
+        "max": 1,
+        "defaultValue": 0.5,
+        "unit": "",
+        "scaling": {
+          "type": "linear"
+        },
+        "choices": [],
+        "binding": {
+          "target": "tone",
+          "scale": 1,
+          "offset": 0
+        },
+        "realtime": true
+      },
+      {
+        "id": "level_db",
+        "label": "Level",
+        "type": "number",
+        "widget": "knob",
+        "min": -24,
+        "max": 12,
+        "defaultValue": 0,
+        "unit": "dB",
+        "scaling": {
+          "type": "linear"
+        },
+        "choices": [],
+        "binding": {
+          "target": "level_db",
+          "scale": 1,
+          "offset": 0
+        },
+        "realtime": true
+      }
+    ],
+    "dsp": {
+      "factory": "legacy.distortion.orange",
+      "backend": "native",
+      "approximation": "Approximate character model; not a measured circuit or endorsed hardware model."
+    },
+    "reference": "BOSS DS-1",
+    "source": "https://www.boss.info/global/products/ds-1/"
+  },
+  {
+    "id": "distortion.rodent",
+    "version": 1,
+    "name": "Pro Co RAT2-inspired Rodent",
+    "type": "distortion",
+    "model": "rodent",
+    "category": "distortion",
+    "description": "Rounded high-gain clipping and darker filter; approximate",
+    "parameters": [
+      {
+        "id": "distortion",
+        "label": "Distortion",
+        "type": "number",
+        "widget": "knob",
+        "min": 0,
+        "max": 1,
+        "defaultValue": 0.25,
+        "unit": "",
+        "scaling": {
+          "type": "power",
+          "exponent": 2
+        },
+        "choices": [],
+        "binding": {
+          "target": "drive",
+          "scale": 1,
+          "offset": 0
+        },
+        "realtime": true
+      },
+      {
+        "id": "filter",
+        "label": "Filter",
+        "type": "number",
+        "widget": "knob",
+        "min": 0,
+        "max": 1,
+        "defaultValue": 0.5,
+        "unit": "",
+        "scaling": {
+          "type": "linear"
+        },
+        "choices": [],
+        "binding": {
+          "target": "tone",
+          "scale": -1,
+          "offset": 1
+        },
+        "realtime": true
+      },
+      {
+        "id": "level_db",
+        "label": "Volume",
+        "type": "number",
+        "widget": "knob",
+        "min": -24,
+        "max": 12,
+        "defaultValue": 0,
+        "unit": "dB",
+        "scaling": {
+          "type": "linear"
+        },
+        "choices": [],
+        "binding": {
+          "target": "level_db",
+          "scale": 1,
+          "offset": 0
+        },
+        "realtime": true
+      }
+    ],
+    "dsp": {
+      "factory": "legacy.distortion.rodent",
+      "backend": "native",
+      "approximation": "Approximate character model; not a measured circuit or endorsed hardware model."
+    },
+    "reference": "Pro Co RAT2",
+    "source": "https://actentertainment.com/rat-2-distortion-pedal/"
+  },
+  {
+    "id": "distortion.gold",
+    "version": 1,
+    "name": "MXR Distortion+-inspired Gold",
+    "type": "distortion",
+    "model": "gold",
+    "category": "distortion",
+    "description": "Bright soft clipping; approximate",
+    "parameters": [
+      {
+        "id": "distortion",
+        "label": "Distortion",
+        "type": "number",
+        "widget": "knob",
+        "min": 0,
+        "max": 1,
+        "defaultValue": 0.25,
+        "unit": "",
+        "scaling": {
+          "type": "power",
+          "exponent": 2
+        },
+        "choices": [],
+        "binding": {
+          "target": "drive",
+          "scale": 1,
+          "offset": 0
+        },
+        "realtime": true
+      },
+      {
+        "id": "level_db",
+        "label": "Output",
+        "type": "number",
+        "widget": "knob",
+        "min": -24,
+        "max": 12,
+        "defaultValue": 0,
+        "unit": "dB",
+        "scaling": {
+          "type": "linear"
+        },
+        "choices": [],
+        "binding": {
+          "target": "level_db",
+          "scale": 1,
+          "offset": 0
+        },
+        "realtime": true
+      }
+    ],
+    "dsp": {
+      "factory": "legacy.distortion.gold",
+      "backend": "native",
+      "approximation": "Approximate character model; not a measured circuit or endorsed hardware model."
+    },
+    "reference": "MXR Distortion+",
+    "source": "https://www.jimdunlop.com/mxr-distortion/"
+  },
+  {
+    "id": "fuzz.round",
+    "version": 1,
+    "name": "Round vintage fuzz",
+    "type": "fuzz",
+    "model": "round",
+    "category": "fuzz",
+    "description": "Rounded asymmetric breakup",
+    "parameters": [
+      {
+        "id": "drive",
+        "label": "Fuzz",
+        "type": "number",
+        "widget": "knob",
+        "min": 0,
+        "max": 1,
+        "defaultValue": 0.25,
+        "unit": "",
+        "scaling": {
+          "type": "power",
+          "exponent": 2
+        },
+        "choices": [],
+        "binding": {
+          "target": "drive",
+          "scale": 1,
+          "offset": 0
+        },
+        "realtime": true
+      },
+      {
+        "id": "level_db",
+        "label": "Volume",
+        "type": "number",
+        "widget": "knob",
+        "min": -24,
+        "max": 12,
+        "defaultValue": 0,
+        "unit": "dB",
+        "scaling": {
+          "type": "linear"
+        },
+        "choices": [],
+        "binding": {
+          "target": "level_db",
+          "scale": 1,
+          "offset": 0
+        },
+        "realtime": true
+      }
+    ],
+    "dsp": {
+      "factory": "legacy.fuzz.round",
+      "backend": "native",
+      "approximation": "Original algorithmic model; not a hardware capture or circuit emulation."
+    }
+  },
+  {
+    "id": "fuzz.sustain",
+    "version": 1,
+    "name": "Sustain fuzz",
+    "type": "fuzz",
+    "model": "sustain",
+    "category": "fuzz",
+    "description": "Dense clipped sustain and scooped mids",
+    "parameters": [
+      {
+        "id": "drive",
+        "label": "Sustain",
+        "type": "number",
+        "widget": "knob",
+        "min": 0,
+        "max": 1,
+        "defaultValue": 0.25,
+        "unit": "",
+        "scaling": {
+          "type": "power",
+          "exponent": 2
+        },
+        "choices": [],
+        "binding": {
+          "target": "drive",
+          "scale": 1,
+          "offset": 0
+        },
+        "realtime": true
+      },
+      {
+        "id": "tone",
+        "label": "Tone",
+        "type": "number",
+        "widget": "knob",
+        "min": 0,
+        "max": 1,
+        "defaultValue": 0.5,
+        "unit": "",
+        "scaling": {
+          "type": "linear"
+        },
+        "choices": [],
+        "binding": {
+          "target": "tone",
+          "scale": 1,
+          "offset": 0
+        },
+        "realtime": true
+      },
+      {
+        "id": "level_db",
+        "label": "Volume",
+        "type": "number",
+        "widget": "knob",
+        "min": -24,
+        "max": 12,
+        "defaultValue": 0,
+        "unit": "dB",
+        "scaling": {
+          "type": "linear"
+        },
+        "choices": [],
+        "binding": {
+          "target": "level_db",
+          "scale": 1,
+          "offset": 0
+        },
+        "realtime": true
+      }
+    ],
+    "dsp": {
+      "factory": "legacy.fuzz.sustain",
+      "backend": "native",
+      "approximation": "Original algorithmic model; not a hardware capture or circuit emulation."
+    }
+  },
+  {
+    "id": "fuzz.velcro",
+    "version": 1,
+    "name": "Velcro fuzz",
+    "type": "fuzz",
+    "model": "velcro",
+    "category": "fuzz",
+    "description": "Sharper asymmetric clipping",
+    "parameters": [
+      {
+        "id": "drive",
+        "label": "Fuzz",
+        "type": "number",
+        "widget": "knob",
+        "min": 0,
+        "max": 1,
+        "defaultValue": 0.25,
+        "unit": "",
+        "scaling": {
+          "type": "power",
+          "exponent": 2
+        },
+        "choices": [],
+        "binding": {
+          "target": "drive",
+          "scale": 1,
+          "offset": 0
+        },
+        "realtime": true
+      },
+      {
+        "id": "bias",
+        "label": "Bias",
+        "type": "number",
+        "widget": "knob",
+        "min": -0.4,
+        "max": 0.4,
+        "defaultValue": 0,
+        "unit": "",
+        "scaling": {
+          "type": "linear"
+        },
+        "choices": [],
+        "binding": {
+          "target": "bias",
+          "scale": 1,
+          "offset": 0
+        },
+        "realtime": true
+      },
+      {
+        "id": "tone",
+        "label": "Tone",
+        "type": "number",
+        "widget": "knob",
+        "min": 0,
+        "max": 1,
+        "defaultValue": 0.5,
+        "unit": "",
+        "scaling": {
+          "type": "linear"
+        },
+        "choices": [],
+        "binding": {
+          "target": "tone",
+          "scale": 1,
+          "offset": 0
+        },
+        "realtime": true
+      },
+      {
+        "id": "level_db",
+        "label": "Level",
+        "type": "number",
+        "widget": "knob",
+        "min": -24,
+        "max": 12,
+        "defaultValue": 0,
+        "unit": "dB",
+        "scaling": {
+          "type": "linear"
+        },
+        "choices": [],
+        "binding": {
+          "target": "level_db",
+          "scale": 1,
+          "offset": 0
+        },
+        "realtime": true
+      }
+    ],
+    "dsp": {
+      "factory": "legacy.fuzz.velcro",
+      "backend": "native",
+      "approximation": "Original algorithmic model; not a hardware capture or circuit emulation."
+    }
+  },
+  {
+    "id": "amp.american_clean",
+    "version": 1,
+    "name": "American Clean",
+    "type": "amp",
+    "model": "american_clean",
+    "category": "amplifiers",
+    "description": "High-headroom clean amp character",
+    "parameters": [
+      {
+        "id": "input_drive",
+        "label": "Input drive",
+        "type": "number",
+        "widget": "knob",
+        "min": 0,
+        "max": 1,
+        "defaultValue": 0.35,
+        "unit": "",
+        "scaling": {
+          "type": "power",
+          "exponent": 2
+        },
+        "choices": [],
+        "binding": {
+          "target": "gain",
+          "scale": 1,
+          "offset": 0
+        },
+        "realtime": true
+      },
+      {
+        "id": "bass_db",
+        "label": "Bass",
+        "type": "number",
+        "widget": "knob",
+        "min": -12,
+        "max": 12,
+        "defaultValue": 0,
+        "unit": "dB",
+        "scaling": {
+          "type": "linear"
+        },
+        "choices": [],
+        "binding": {
+          "target": "bass_db",
+          "scale": 1,
+          "offset": 0
+        },
+        "realtime": true
+      },
+      {
+        "id": "treble_db",
+        "label": "Treble",
+        "type": "number",
+        "widget": "knob",
+        "min": -12,
+        "max": 12,
+        "defaultValue": 0,
+        "unit": "dB",
+        "scaling": {
+          "type": "linear"
+        },
+        "choices": [],
+        "binding": {
+          "target": "treble_db",
+          "scale": 1,
+          "offset": 0
+        },
+        "realtime": true
+      },
+      {
+        "id": "master_db",
+        "label": "Master",
+        "type": "number",
+        "widget": "knob",
+        "min": -24,
+        "max": 0,
+        "defaultValue": -6,
+        "unit": "dB",
+        "scaling": {
+          "type": "linear"
+        },
+        "choices": [],
+        "binding": {
+          "target": "master_db",
+          "scale": 1,
+          "offset": 0
+        },
+        "realtime": true
+      },
+      {
+        "id": "bright",
+        "label": "Bright",
+        "type": "boolean",
+        "widget": "switch",
+        "defaultValue": false,
+        "unit": "",
+        "scaling": {
+          "type": "linear"
+        },
+        "choices": [],
+        "binding": {
+          "target": "bright",
+          "scale": 1,
+          "offset": 0
+        },
+        "realtime": true
+      }
+    ],
+    "dsp": {
+      "factory": "legacy.amp.american_clean",
+      "backend": "native",
+      "approximation": "Original algorithmic model; not a hardware capture or circuit emulation."
+    }
+  },
+  {
+    "id": "amp.british_crunch",
+    "version": 1,
+    "name": "British Crunch",
+    "type": "amp",
+    "model": "british_crunch",
+    "category": "amplifiers",
+    "description": "Mid-forward crunch amp character",
+    "parameters": [
+      {
+        "id": "gain",
+        "label": "Gain",
+        "type": "number",
+        "widget": "knob",
+        "min": 0,
+        "max": 1,
+        "defaultValue": 0.35,
+        "unit": "",
+        "scaling": {
+          "type": "power",
+          "exponent": 2
+        },
+        "choices": [],
+        "binding": {
+          "target": "gain",
+          "scale": 1,
+          "offset": 0
+        },
+        "realtime": true
+      },
+      {
+        "id": "bass_db",
+        "label": "Bass",
+        "type": "number",
+        "widget": "knob",
+        "min": -12,
+        "max": 12,
+        "defaultValue": 0,
+        "unit": "dB",
+        "scaling": {
+          "type": "linear"
+        },
+        "choices": [],
+        "binding": {
+          "target": "bass_db",
+          "scale": 1,
+          "offset": 0
+        },
+        "realtime": true
+      },
+      {
+        "id": "mid_db",
+        "label": "Middle",
+        "type": "number",
+        "widget": "knob",
+        "min": -12,
+        "max": 12,
+        "defaultValue": 0,
+        "unit": "dB",
+        "scaling": {
+          "type": "linear"
+        },
+        "choices": [],
+        "binding": {
+          "target": "mid_db",
+          "scale": 1,
+          "offset": 0
+        },
+        "realtime": true
+      },
+      {
+        "id": "treble_db",
+        "label": "Treble",
+        "type": "number",
+        "widget": "knob",
+        "min": -12,
+        "max": 12,
+        "defaultValue": 0,
+        "unit": "dB",
+        "scaling": {
+          "type": "linear"
+        },
+        "choices": [],
+        "binding": {
+          "target": "treble_db",
+          "scale": 1,
+          "offset": 0
+        },
+        "realtime": true
+      },
+      {
+        "id": "presence_db",
+        "label": "Presence",
+        "type": "number",
+        "widget": "knob",
+        "min": -6,
+        "max": 6,
+        "defaultValue": 0,
+        "unit": "dB",
+        "scaling": {
+          "type": "linear"
+        },
+        "choices": [],
+        "binding": {
+          "target": "presence_db",
+          "scale": 1,
+          "offset": 0
+        },
+        "realtime": true
+      },
+      {
+        "id": "master_db",
+        "label": "Master",
+        "type": "number",
+        "widget": "knob",
+        "min": -24,
+        "max": 0,
+        "defaultValue": -6,
+        "unit": "dB",
+        "scaling": {
+          "type": "linear"
+        },
+        "choices": [],
+        "binding": {
+          "target": "master_db",
+          "scale": 1,
+          "offset": 0
+        },
+        "realtime": true
+      }
+    ],
+    "dsp": {
+      "factory": "legacy.amp.british_crunch",
+      "backend": "native",
+      "approximation": "Original algorithmic model; not a hardware capture or circuit emulation."
+    }
+  },
+  {
+    "id": "amp.modern_high_gain",
+    "version": 1,
+    "name": "Modern High Gain",
+    "type": "amp",
+    "model": "modern_high_gain",
+    "category": "amplifiers",
+    "description": "Tighter bass and cascaded high-gain character",
+    "parameters": [
+      {
+        "id": "gain",
+        "label": "Gain",
+        "type": "number",
+        "widget": "knob",
+        "min": 0,
+        "max": 1,
+        "defaultValue": 0.35,
+        "unit": "",
+        "scaling": {
+          "type": "power",
+          "exponent": 2
+        },
+        "choices": [],
+        "binding": {
+          "target": "gain",
+          "scale": 1,
+          "offset": 0
+        },
+        "realtime": true
+      },
+      {
+        "id": "bass_db",
+        "label": "Bass",
+        "type": "number",
+        "widget": "knob",
+        "min": -12,
+        "max": 12,
+        "defaultValue": 0,
+        "unit": "dB",
+        "scaling": {
+          "type": "linear"
+        },
+        "choices": [],
+        "binding": {
+          "target": "bass_db",
+          "scale": 1,
+          "offset": 0
+        },
+        "realtime": true
+      },
+      {
+        "id": "mid_db",
+        "label": "Middle",
+        "type": "number",
+        "widget": "knob",
+        "min": -12,
+        "max": 12,
+        "defaultValue": 0,
+        "unit": "dB",
+        "scaling": {
+          "type": "linear"
+        },
+        "choices": [],
+        "binding": {
+          "target": "mid_db",
+          "scale": 1,
+          "offset": 0
+        },
+        "realtime": true
+      },
+      {
+        "id": "treble_db",
+        "label": "Treble",
+        "type": "number",
+        "widget": "knob",
+        "min": -12,
+        "max": 12,
+        "defaultValue": 0,
+        "unit": "dB",
+        "scaling": {
+          "type": "linear"
+        },
+        "choices": [],
+        "binding": {
+          "target": "treble_db",
+          "scale": 1,
+          "offset": 0
+        },
+        "realtime": true
+      },
+      {
+        "id": "presence_db",
+        "label": "Presence",
+        "type": "number",
+        "widget": "knob",
+        "min": -6,
+        "max": 6,
+        "defaultValue": 0,
+        "unit": "dB",
+        "scaling": {
+          "type": "linear"
+        },
+        "choices": [],
+        "binding": {
+          "target": "presence_db",
+          "scale": 1,
+          "offset": 0
+        },
+        "realtime": true
+      },
+      {
+        "id": "resonance_db",
+        "label": "Resonance",
+        "type": "number",
+        "widget": "knob",
+        "min": -6,
+        "max": 6,
+        "defaultValue": 0,
+        "unit": "dB",
+        "scaling": {
+          "type": "linear"
+        },
+        "choices": [],
+        "binding": {
+          "target": "resonance_db",
+          "scale": 1,
+          "offset": 0
+        },
+        "realtime": true
+      },
+      {
+        "id": "master_db",
+        "label": "Master",
+        "type": "number",
+        "widget": "knob",
+        "min": -24,
+        "max": 0,
+        "defaultValue": -6,
+        "unit": "dB",
+        "scaling": {
+          "type": "linear"
+        },
+        "choices": [],
+        "binding": {
+          "target": "master_db",
+          "scale": 1,
+          "offset": 0
+        },
+        "realtime": true
+      },
+      {
+        "id": "bright",
+        "label": "Bright",
+        "type": "boolean",
+        "widget": "switch",
+        "defaultValue": false,
+        "unit": "",
+        "scaling": {
+          "type": "linear"
+        },
+        "choices": [],
+        "binding": {
+          "target": "bright",
+          "scale": 1,
+          "offset": 0
+        },
+        "realtime": true
+      }
+    ],
+    "dsp": {
+      "factory": "legacy.amp.modern_high_gain",
+      "backend": "native",
+      "approximation": "Original algorithmic model; not a hardware capture or circuit emulation."
+    }
+  },
+  {
+    "id": "amp.studio_clean",
+    "version": 1,
+    "name": "Studio Clean Preamp",
+    "type": "amp",
+    "model": "studio_clean",
+    "category": "amplifiers",
+    "description": "Original linear preamp and two-band EQ; no amp/hardware emulation",
+    "parameters": [
+      {
+        "id": "volume_db",
+        "label": "Volume",
+        "type": "number",
+        "widget": "knob",
+        "min": -24,
+        "max": 0,
+        "defaultValue": -6,
+        "unit": "dB",
+        "scaling": {
+          "type": "linear"
+        },
+        "choices": [],
+        "binding": {
+          "target": "master_db",
+          "scale": 1,
+          "offset": 0
+        },
+        "realtime": true
+      },
+      {
+        "id": "bass_db",
+        "label": "Bass",
+        "type": "number",
+        "widget": "knob",
+        "min": -12,
+        "max": 12,
+        "defaultValue": 0,
+        "unit": "dB",
+        "scaling": {
+          "type": "linear"
+        },
+        "choices": [],
+        "binding": {
+          "target": "bass_db",
+          "scale": 1,
+          "offset": 0
+        },
+        "realtime": true
+      },
+      {
+        "id": "treble_db",
+        "label": "Treble",
+        "type": "number",
+        "widget": "knob",
+        "min": -12,
+        "max": 12,
+        "defaultValue": 0,
+        "unit": "dB",
+        "scaling": {
+          "type": "linear"
+        },
+        "choices": [],
+        "binding": {
+          "target": "treble_db",
+          "scale": 1,
+          "offset": 0
+        },
+        "realtime": true
+      },
+      {
+        "id": "bright",
+        "label": "Bright",
+        "type": "boolean",
+        "widget": "switch",
+        "defaultValue": false,
+        "unit": "",
+        "scaling": {
+          "type": "linear"
+        },
+        "choices": [],
+        "binding": {
+          "target": "bright",
+          "scale": 1,
+          "offset": 0
+        },
+        "realtime": true
+      }
+    ],
+    "dsp": {
+      "factory": "native.studio-clean.v1",
+      "backend": "native",
+      "approximation": "Original algorithmic model; not a hardware capture or circuit emulation."
+    }
+  },
+  {
+    "id": "cabinet.open_112",
+    "version": 1,
+    "name": "Open 1×12 / synthetic IR",
+    "type": "cabinet",
+    "model": "open_112",
+    "category": "cabinets",
+    "description": "Open-backed, lighter bass",
+    "parameters": [
+      {
+        "id": "mic",
+        "label": "Microphone",
+        "type": "choice",
+        "widget": "dropdown",
+        "defaultValue": "dynamic",
+        "unit": "",
+        "scaling": {
+          "type": "linear"
+        },
+        "choices": [
+          {
+            "value": "dynamic",
+            "label": "dynamic"
+          },
+          {
+            "value": "ribbon",
+            "label": "ribbon"
+          },
+          {
+            "value": "condenser",
+            "label": "condenser"
+          }
+        ],
+        "binding": {
+          "target": "mic",
+          "scale": 1,
+          "offset": 0
+        },
+        "realtime": false
+      },
+      {
+        "id": "position",
+        "label": "Mic position",
+        "type": "number",
+        "widget": "knob",
+        "min": 0,
+        "max": 1,
+        "defaultValue": 0.4,
+        "unit": "",
+        "scaling": {
+          "type": "linear"
+        },
+        "choices": [],
+        "binding": {
+          "target": "position",
+          "scale": 1,
+          "offset": 0
+        },
+        "realtime": false
+      },
+      {
+        "id": "distance",
+        "label": "Mic distance",
+        "type": "number",
+        "widget": "knob",
+        "min": 0,
+        "max": 1,
+        "defaultValue": 0.1,
+        "unit": "",
+        "scaling": {
+          "type": "linear"
+        },
+        "choices": [],
+        "binding": {
+          "target": "distance",
+          "scale": 1,
+          "offset": 0
+        },
+        "realtime": false
+      },
+      {
+        "id": "low_cut_hz",
+        "label": "Low cut",
+        "type": "number",
+        "widget": "knob",
+        "min": 20,
+        "max": 500,
+        "defaultValue": 70,
+        "unit": "Hz",
+        "scaling": {
+          "type": "log"
+        },
+        "choices": [],
+        "binding": {
+          "target": "low_cut_hz",
+          "scale": 1,
+          "offset": 0
+        },
+        "realtime": true
+      },
+      {
+        "id": "high_cut_hz",
+        "label": "High cut",
+        "type": "number",
+        "widget": "knob",
+        "min": 1000,
+        "max": 16000,
+        "defaultValue": 6500,
+        "unit": "Hz",
+        "scaling": {
+          "type": "log"
+        },
+        "choices": [],
+        "binding": {
+          "target": "high_cut_hz",
+          "scale": 1,
+          "offset": 0
+        },
+        "realtime": true
+      },
+      {
+        "id": "level_db",
+        "label": "Level",
+        "type": "number",
+        "widget": "knob",
+        "min": -24,
+        "max": 12,
+        "defaultValue": 0,
+        "unit": "dB",
+        "scaling": {
+          "type": "linear"
+        },
+        "choices": [],
+        "binding": {
+          "target": "level_db",
+          "scale": 1,
+          "offset": 0
+        },
+        "realtime": true
+      }
+    ],
+    "dsp": {
+      "factory": "legacy.cabinet.open_112",
+      "backend": "native",
+      "approximation": "Original algorithmic model; not a hardware capture or circuit emulation."
+    }
+  },
+  {
+    "id": "cabinet.british_212",
+    "version": 1,
+    "name": "British 2×12 / synthetic IR",
+    "type": "cabinet",
+    "model": "british_212",
+    "category": "cabinets",
+    "description": "Balanced mid-forward cabinet",
+    "parameters": [
+      {
+        "id": "mic",
+        "label": "Microphone",
+        "type": "choice",
+        "widget": "dropdown",
+        "defaultValue": "dynamic",
+        "unit": "",
+        "scaling": {
+          "type": "linear"
+        },
+        "choices": [
+          {
+            "value": "dynamic",
+            "label": "dynamic"
+          },
+          {
+            "value": "ribbon",
+            "label": "ribbon"
+          },
+          {
+            "value": "condenser",
+            "label": "condenser"
+          }
+        ],
+        "binding": {
+          "target": "mic",
+          "scale": 1,
+          "offset": 0
+        },
+        "realtime": false
+      },
+      {
+        "id": "position",
+        "label": "Mic position",
+        "type": "number",
+        "widget": "knob",
+        "min": 0,
+        "max": 1,
+        "defaultValue": 0.4,
+        "unit": "",
+        "scaling": {
+          "type": "linear"
+        },
+        "choices": [],
+        "binding": {
+          "target": "position",
+          "scale": 1,
+          "offset": 0
+        },
+        "realtime": false
+      },
+      {
+        "id": "mic2",
+        "label": "Second microphone",
+        "type": "choice",
+        "widget": "dropdown",
+        "defaultValue": "ribbon",
+        "unit": "",
+        "scaling": {
+          "type": "linear"
+        },
+        "choices": [
+          {
+            "value": "dynamic",
+            "label": "dynamic"
+          },
+          {
+            "value": "ribbon",
+            "label": "ribbon"
+          },
+          {
+            "value": "condenser",
+            "label": "condenser"
+          }
+        ],
+        "binding": {
+          "target": "mic2",
+          "scale": 1,
+          "offset": 0
+        },
+        "realtime": false
+      },
+      {
+        "id": "mic_blend",
+        "label": "Second mic blend",
+        "type": "number",
+        "widget": "knob",
+        "min": 0,
+        "max": 1,
+        "defaultValue": 0,
+        "unit": "",
+        "scaling": {
+          "type": "linear"
+        },
+        "choices": [],
+        "binding": {
+          "target": "mic_blend",
+          "scale": 1,
+          "offset": 0
+        },
+        "realtime": true
+      },
+      {
+        "id": "low_cut_hz",
+        "label": "Low cut",
+        "type": "number",
+        "widget": "knob",
+        "min": 20,
+        "max": 500,
+        "defaultValue": 70,
+        "unit": "Hz",
+        "scaling": {
+          "type": "log"
+        },
+        "choices": [],
+        "binding": {
+          "target": "low_cut_hz",
+          "scale": 1,
+          "offset": 0
+        },
+        "realtime": true
+      },
+      {
+        "id": "high_cut_hz",
+        "label": "High cut",
+        "type": "number",
+        "widget": "knob",
+        "min": 1000,
+        "max": 16000,
+        "defaultValue": 6500,
+        "unit": "Hz",
+        "scaling": {
+          "type": "log"
+        },
+        "choices": [],
+        "binding": {
+          "target": "high_cut_hz",
+          "scale": 1,
+          "offset": 0
+        },
+        "realtime": true
+      },
+      {
+        "id": "level_db",
+        "label": "Level",
+        "type": "number",
+        "widget": "knob",
+        "min": -24,
+        "max": 12,
+        "defaultValue": 0,
+        "unit": "dB",
+        "scaling": {
+          "type": "linear"
+        },
+        "choices": [],
+        "binding": {
+          "target": "level_db",
+          "scale": 1,
+          "offset": 0
+        },
+        "realtime": true
+      }
+    ],
+    "dsp": {
+      "factory": "legacy.cabinet.british_212",
+      "backend": "native",
+      "approximation": "Original algorithmic model; not a hardware capture or circuit emulation."
+    }
+  },
+  {
+    "id": "cabinet.closed_412",
+    "version": 1,
+    "name": "Closed 4×12 / synthetic IR",
+    "type": "cabinet",
+    "model": "closed_412",
+    "category": "cabinets",
+    "description": "Deeper closed-cabinet resonance",
+    "parameters": [
+      {
+        "id": "mic",
+        "label": "Microphone",
+        "type": "choice",
+        "widget": "dropdown",
+        "defaultValue": "dynamic",
+        "unit": "",
+        "scaling": {
+          "type": "linear"
+        },
+        "choices": [
+          {
+            "value": "dynamic",
+            "label": "dynamic"
+          },
+          {
+            "value": "ribbon",
+            "label": "ribbon"
+          },
+          {
+            "value": "condenser",
+            "label": "condenser"
+          }
+        ],
+        "binding": {
+          "target": "mic",
+          "scale": 1,
+          "offset": 0
+        },
+        "realtime": false
+      },
+      {
+        "id": "position",
+        "label": "Mic position",
+        "type": "number",
+        "widget": "knob",
+        "min": 0,
+        "max": 1,
+        "defaultValue": 0.4,
+        "unit": "",
+        "scaling": {
+          "type": "linear"
+        },
+        "choices": [],
+        "binding": {
+          "target": "position",
+          "scale": 1,
+          "offset": 0
+        },
+        "realtime": false
+      },
+      {
+        "id": "distance",
+        "label": "Mic distance",
+        "type": "number",
+        "widget": "knob",
+        "min": 0,
+        "max": 1,
+        "defaultValue": 0.1,
+        "unit": "",
+        "scaling": {
+          "type": "linear"
+        },
+        "choices": [],
+        "binding": {
+          "target": "distance",
+          "scale": 1,
+          "offset": 0
+        },
+        "realtime": false
+      },
+      {
+        "id": "mic2",
+        "label": "Second microphone",
+        "type": "choice",
+        "widget": "dropdown",
+        "defaultValue": "ribbon",
+        "unit": "",
+        "scaling": {
+          "type": "linear"
+        },
+        "choices": [
+          {
+            "value": "dynamic",
+            "label": "dynamic"
+          },
+          {
+            "value": "ribbon",
+            "label": "ribbon"
+          },
+          {
+            "value": "condenser",
+            "label": "condenser"
+          }
+        ],
+        "binding": {
+          "target": "mic2",
+          "scale": 1,
+          "offset": 0
+        },
+        "realtime": false
+      },
+      {
+        "id": "mic2_position",
+        "label": "Second mic position",
+        "type": "number",
+        "widget": "knob",
+        "min": 0,
+        "max": 1,
+        "defaultValue": 0.7,
+        "unit": "",
+        "scaling": {
+          "type": "linear"
+        },
+        "choices": [],
+        "binding": {
+          "target": "mic2_position",
+          "scale": 1,
+          "offset": 0
+        },
+        "realtime": false
+      },
+      {
+        "id": "mic2_distance",
+        "label": "Second mic distance",
+        "type": "number",
+        "widget": "knob",
+        "min": 0,
+        "max": 1,
+        "defaultValue": 0.2,
+        "unit": "",
+        "scaling": {
+          "type": "linear"
+        },
+        "choices": [],
+        "binding": {
+          "target": "mic2_distance",
+          "scale": 1,
+          "offset": 0
+        },
+        "realtime": false
+      },
+      {
+        "id": "mic_blend",
+        "label": "Second mic blend",
+        "type": "number",
+        "widget": "knob",
+        "min": 0,
+        "max": 1,
+        "defaultValue": 0,
+        "unit": "",
+        "scaling": {
+          "type": "linear"
+        },
+        "choices": [],
+        "binding": {
+          "target": "mic_blend",
+          "scale": 1,
+          "offset": 0
+        },
+        "realtime": true
+      },
+      {
+        "id": "mic2_delay_ms",
+        "label": "Second mic offset",
+        "type": "number",
+        "widget": "knob",
+        "min": 0,
+        "max": 10,
+        "defaultValue": 0,
+        "unit": "ms",
+        "scaling": {
+          "type": "linear"
+        },
+        "choices": [],
+        "binding": {
+          "target": "mic2_delay_ms",
+          "scale": 1,
+          "offset": 0
+        },
+        "realtime": true
+      },
+      {
+        "id": "mic2_invert",
+        "label": "Invert second mic",
+        "type": "boolean",
+        "widget": "switch",
+        "defaultValue": false,
+        "unit": "",
+        "scaling": {
+          "type": "linear"
+        },
+        "choices": [],
+        "binding": {
+          "target": "mic2_invert",
+          "scale": 1,
+          "offset": 0
+        },
+        "realtime": true
+      },
+      {
+        "id": "low_cut_hz",
+        "label": "Low cut",
+        "type": "number",
+        "widget": "knob",
+        "min": 20,
+        "max": 500,
+        "defaultValue": 70,
+        "unit": "Hz",
+        "scaling": {
+          "type": "log"
+        },
+        "choices": [],
+        "binding": {
+          "target": "low_cut_hz",
+          "scale": 1,
+          "offset": 0
+        },
+        "realtime": true
+      },
+      {
+        "id": "high_cut_hz",
+        "label": "High cut",
+        "type": "number",
+        "widget": "knob",
+        "min": 1000,
+        "max": 16000,
+        "defaultValue": 6500,
+        "unit": "Hz",
+        "scaling": {
+          "type": "log"
+        },
+        "choices": [],
+        "binding": {
+          "target": "high_cut_hz",
+          "scale": 1,
+          "offset": 0
+        },
+        "realtime": true
+      },
+      {
+        "id": "level_db",
+        "label": "Level",
+        "type": "number",
+        "widget": "knob",
+        "min": -24,
+        "max": 12,
+        "defaultValue": 0,
+        "unit": "dB",
+        "scaling": {
+          "type": "linear"
+        },
+        "choices": [],
+        "binding": {
+          "target": "level_db",
+          "scale": 1,
+          "offset": 0
+        },
+        "realtime": true
+      }
+    ],
+    "dsp": {
+      "factory": "legacy.cabinet.closed_412",
+      "backend": "native",
+      "approximation": "Original algorithmic model; not a hardware capture or circuit emulation."
+    }
+  },
+  {
+    "id": "eq.neutral",
+    "version": 1,
+    "name": "Neutral EQ",
+    "type": "eq",
+    "model": "neutral",
+    "category": "eq",
+    "description": "Transparent shelving and one parametric band",
+    "parameters": [
+      {
+        "id": "low_cut_hz",
+        "label": "Low cut",
+        "type": "number",
+        "widget": "knob",
+        "min": 20,
+        "max": 500,
+        "defaultValue": 25,
+        "unit": "Hz",
+        "scaling": {
+          "type": "log"
+        },
+        "choices": [],
+        "binding": {
+          "target": "low_cut_hz",
+          "scale": 1,
+          "offset": 0
+        },
+        "realtime": true
+      },
+      {
+        "id": "bass_db",
+        "label": "Bass",
+        "type": "number",
+        "widget": "knob",
+        "min": -12,
+        "max": 12,
+        "defaultValue": 0,
+        "unit": "dB",
+        "scaling": {
+          "type": "linear"
+        },
+        "choices": [],
+        "binding": {
+          "target": "bass_db",
+          "scale": 1,
+          "offset": 0
+        },
+        "realtime": true
+      },
+      {
+        "id": "mid_hz",
+        "label": "Mid frequency",
+        "type": "number",
+        "widget": "knob",
+        "min": 100,
+        "max": 6000,
+        "defaultValue": 1000,
+        "unit": "Hz",
+        "scaling": {
+          "type": "log"
+        },
+        "choices": [],
+        "binding": {
+          "target": "mid_hz",
+          "scale": 1,
+          "offset": 0
+        },
+        "realtime": true
+      },
+      {
+        "id": "mid_q",
+        "label": "Mid width (Q)",
+        "type": "number",
+        "widget": "knob",
+        "min": 0.2,
+        "max": 10,
+        "defaultValue": 0.8,
+        "unit": "",
+        "scaling": {
+          "type": "linear"
+        },
+        "choices": [],
+        "binding": {
+          "target": "mid_q",
+          "scale": 1,
+          "offset": 0
+        },
+        "realtime": true
+      },
+      {
+        "id": "mid_db",
+        "label": "Mid gain",
+        "type": "number",
+        "widget": "knob",
+        "min": -18,
+        "max": 18,
+        "defaultValue": 0,
+        "unit": "dB",
+        "scaling": {
+          "type": "linear"
+        },
+        "choices": [],
+        "binding": {
+          "target": "mid_db",
+          "scale": 1,
+          "offset": 0
+        },
+        "realtime": true
+      },
+      {
+        "id": "treble_db",
+        "label": "Treble",
+        "type": "number",
+        "widget": "knob",
+        "min": -12,
+        "max": 12,
+        "defaultValue": 0,
+        "unit": "dB",
+        "scaling": {
+          "type": "linear"
+        },
+        "choices": [],
+        "binding": {
+          "target": "treble_db",
+          "scale": 1,
+          "offset": 0
+        },
+        "realtime": true
+      },
+      {
+        "id": "high_cut_hz",
+        "label": "High cut",
+        "type": "number",
+        "widget": "knob",
+        "min": 1000,
+        "max": 20000,
+        "defaultValue": 16000,
+        "unit": "Hz",
+        "scaling": {
+          "type": "log"
+        },
+        "choices": [],
+        "binding": {
+          "target": "high_cut_hz",
+          "scale": 1,
+          "offset": 0
+        },
+        "realtime": true
+      }
+    ],
+    "dsp": {
+      "factory": "legacy.eq.neutral",
+      "backend": "native",
+      "approximation": "Original algorithmic model; not a hardware capture or circuit emulation."
+    }
+  },
+  {
+    "id": "eq.warm",
+    "version": 1,
+    "name": "Warm EQ",
+    "type": "eq",
+    "model": "warm",
+    "category": "eq",
+    "description": "Lower shelf pivot",
+    "parameters": [
+      {
+        "id": "bass_db",
+        "label": "Bass",
+        "type": "number",
+        "widget": "knob",
+        "min": -12,
+        "max": 12,
+        "defaultValue": 0,
+        "unit": "dB",
+        "scaling": {
+          "type": "linear"
+        },
+        "choices": [],
+        "binding": {
+          "target": "bass_db",
+          "scale": 1,
+          "offset": 0
+        },
+        "realtime": true
+      },
+      {
+        "id": "mid_hz",
+        "label": "Mid frequency",
+        "type": "number",
+        "widget": "knob",
+        "min": 100,
+        "max": 6000,
+        "defaultValue": 1000,
+        "unit": "Hz",
+        "scaling": {
+          "type": "log"
+        },
+        "choices": [],
+        "binding": {
+          "target": "mid_hz",
+          "scale": 1,
+          "offset": 0
+        },
+        "realtime": true
+      },
+      {
+        "id": "mid_q",
+        "label": "Mid width (Q)",
+        "type": "number",
+        "widget": "knob",
+        "min": 0.2,
+        "max": 10,
+        "defaultValue": 0.8,
+        "unit": "",
+        "scaling": {
+          "type": "linear"
+        },
+        "choices": [],
+        "binding": {
+          "target": "mid_q",
+          "scale": 1,
+          "offset": 0
+        },
+        "realtime": true
+      },
+      {
+        "id": "mid_db",
+        "label": "Mid gain",
+        "type": "number",
+        "widget": "knob",
+        "min": -18,
+        "max": 18,
+        "defaultValue": 0,
+        "unit": "dB",
+        "scaling": {
+          "type": "linear"
+        },
+        "choices": [],
+        "binding": {
+          "target": "mid_db",
+          "scale": 1,
+          "offset": 0
+        },
+        "realtime": true
+      },
+      {
+        "id": "treble_db",
+        "label": "Treble",
+        "type": "number",
+        "widget": "knob",
+        "min": -12,
+        "max": 12,
+        "defaultValue": 0,
+        "unit": "dB",
+        "scaling": {
+          "type": "linear"
+        },
+        "choices": [],
+        "binding": {
+          "target": "treble_db",
+          "scale": 1,
+          "offset": 0
+        },
+        "realtime": true
+      }
+    ],
+    "dsp": {
+      "factory": "legacy.eq.warm",
+      "backend": "native",
+      "approximation": "Original algorithmic model; not a hardware capture or circuit emulation."
+    }
+  },
+  {
+    "id": "eq.bright",
+    "version": 1,
+    "name": "Bright EQ",
+    "type": "eq",
+    "model": "bright",
+    "category": "eq",
+    "description": "Higher shelf pivot",
+    "parameters": [
+      {
+        "id": "bass_db",
+        "label": "Bass",
+        "type": "number",
+        "widget": "knob",
+        "min": -12,
+        "max": 12,
+        "defaultValue": 0,
+        "unit": "dB",
+        "scaling": {
+          "type": "linear"
+        },
+        "choices": [],
+        "binding": {
+          "target": "bass_db",
+          "scale": 1,
+          "offset": 0
+        },
+        "realtime": true
+      },
+      {
+        "id": "mid_hz",
+        "label": "Mid frequency",
+        "type": "number",
+        "widget": "knob",
+        "min": 100,
+        "max": 6000,
+        "defaultValue": 1000,
+        "unit": "Hz",
+        "scaling": {
+          "type": "log"
+        },
+        "choices": [],
+        "binding": {
+          "target": "mid_hz",
+          "scale": 1,
+          "offset": 0
+        },
+        "realtime": true
+      },
+      {
+        "id": "mid_q",
+        "label": "Mid width (Q)",
+        "type": "number",
+        "widget": "knob",
+        "min": 0.2,
+        "max": 10,
+        "defaultValue": 0.8,
+        "unit": "",
+        "scaling": {
+          "type": "linear"
+        },
+        "choices": [],
+        "binding": {
+          "target": "mid_q",
+          "scale": 1,
+          "offset": 0
+        },
+        "realtime": true
+      },
+      {
+        "id": "mid_db",
+        "label": "Mid gain",
+        "type": "number",
+        "widget": "knob",
+        "min": -18,
+        "max": 18,
+        "defaultValue": 0,
+        "unit": "dB",
+        "scaling": {
+          "type": "linear"
+        },
+        "choices": [],
+        "binding": {
+          "target": "mid_db",
+          "scale": 1,
+          "offset": 0
+        },
+        "realtime": true
+      },
+      {
+        "id": "treble_db",
+        "label": "Treble",
+        "type": "number",
+        "widget": "knob",
+        "min": -12,
+        "max": 12,
+        "defaultValue": 0,
+        "unit": "dB",
+        "scaling": {
+          "type": "linear"
+        },
+        "choices": [],
+        "binding": {
+          "target": "treble_db",
+          "scale": 1,
+          "offset": 0
+        },
+        "realtime": true
+      },
+      {
+        "id": "high_cut_hz",
+        "label": "Air cut",
+        "type": "number",
+        "widget": "knob",
+        "min": 1000,
+        "max": 20000,
+        "defaultValue": 16000,
+        "unit": "Hz",
+        "scaling": {
+          "type": "log"
+        },
+        "choices": [],
+        "binding": {
+          "target": "high_cut_hz",
+          "scale": 1,
+          "offset": 0
+        },
+        "realtime": true
+      }
+    ],
+    "dsp": {
+      "factory": "legacy.eq.bright",
+      "backend": "native",
+      "approximation": "Original algorithmic model; not a hardware capture or circuit emulation."
+    }
+  },
+  {
+    "id": "eq.tilt",
+    "version": 1,
+    "name": "Tilt EQ",
+    "type": "eq",
+    "model": "tilt",
+    "category": "eq",
+    "description": "Original complementary low/high shelves with movable pivot",
+    "parameters": [
+      {
+        "id": "tilt_db",
+        "label": "Tilt",
+        "type": "number",
+        "widget": "knob",
+        "min": -12,
+        "max": 12,
+        "defaultValue": 0,
+        "unit": "dB",
+        "scaling": {
+          "type": "linear"
+        },
+        "choices": [],
+        "binding": {
+          "target": "bass_db",
+          "scale": 1,
+          "offset": 0
+        },
+        "realtime": true
+      },
+      {
+        "id": "pivot_hz",
+        "label": "Pivot",
+        "type": "number",
+        "widget": "knob",
+        "min": 100,
+        "max": 6000,
+        "defaultValue": 800,
+        "unit": "Hz",
+        "scaling": {
+          "type": "log"
+        },
+        "choices": [],
+        "binding": {
+          "target": "mid_hz",
+          "scale": 1,
+          "offset": 0
+        },
+        "realtime": true
+      }
+    ],
+    "dsp": {
+      "factory": "native.tilt-eq.v1",
+      "backend": "native",
+      "approximation": "Original algorithmic model; not a hardware capture or circuit emulation."
+    }
+  },
+  {
+    "id": "chorus.classic",
+    "version": 1,
+    "name": "Classic chorus",
+    "type": "chorus",
+    "model": "classic",
+    "category": "modulation",
+    "description": "Single modulated voice",
+    "parameters": [
+      {
+        "id": "rate_hz",
+        "label": "Rate",
+        "type": "number",
+        "widget": "knob",
+        "min": 0.05,
+        "max": 12,
+        "defaultValue": 1,
+        "unit": "Hz",
+        "scaling": {
+          "type": "log"
+        },
+        "choices": [],
+        "binding": {
+          "target": "rate_hz",
+          "scale": 1,
+          "offset": 0
+        },
+        "realtime": true
+      },
+      {
+        "id": "depth_ms",
+        "label": "Depth",
+        "type": "number",
+        "widget": "knob",
+        "min": 0,
+        "max": 8,
+        "defaultValue": 3,
+        "unit": "ms",
+        "scaling": {
+          "type": "linear"
+        },
+        "choices": [],
+        "binding": {
+          "target": "depth_ms",
+          "scale": 1,
+          "offset": 0
+        },
+        "realtime": true
+      },
+      {
+        "id": "mix",
+        "label": "Mix",
+        "type": "number",
+        "widget": "knob",
+        "min": 0,
+        "max": 1,
+        "defaultValue": 0.3,
+        "unit": "",
+        "scaling": {
+          "type": "linear"
+        },
+        "choices": [],
+        "binding": {
+          "target": "mix",
+          "scale": 1,
+          "offset": 0
+        },
+        "realtime": true
+      }
+    ],
+    "dsp": {
+      "factory": "legacy.chorus.classic",
+      "backend": "native",
+      "approximation": "Original algorithmic model; not a hardware capture or circuit emulation."
+    }
+  },
+  {
+    "id": "chorus.wide",
+    "version": 1,
+    "name": "Wide chorus",
+    "type": "chorus",
+    "model": "wide",
+    "category": "modulation",
+    "description": "Stereo spread",
+    "parameters": [
+      {
+        "id": "rate_hz",
+        "label": "Rate",
+        "type": "number",
+        "widget": "knob",
+        "min": 0.05,
+        "max": 12,
+        "defaultValue": 1,
+        "unit": "Hz",
+        "scaling": {
+          "type": "log"
+        },
+        "choices": [],
+        "binding": {
+          "target": "rate_hz",
+          "scale": 1,
+          "offset": 0
+        },
+        "realtime": true
+      },
+      {
+        "id": "depth_ms",
+        "label": "Depth",
+        "type": "number",
+        "widget": "knob",
+        "min": 0,
+        "max": 8,
+        "defaultValue": 3,
+        "unit": "ms",
+        "scaling": {
+          "type": "linear"
+        },
+        "choices": [],
+        "binding": {
+          "target": "depth_ms",
+          "scale": 1,
+          "offset": 0
+        },
+        "realtime": true
+      },
+      {
+        "id": "delay_ms",
+        "label": "Base delay",
+        "type": "number",
+        "widget": "knob",
+        "min": 10,
+        "max": 35,
+        "defaultValue": 18,
+        "unit": "ms",
+        "scaling": {
+          "type": "linear"
+        },
+        "choices": [],
+        "binding": {
+          "target": "delay_ms",
+          "scale": 1,
+          "offset": 0
+        },
+        "realtime": true
+      },
+      {
+        "id": "mix",
+        "label": "Mix",
+        "type": "number",
+        "widget": "knob",
+        "min": 0,
+        "max": 1,
+        "defaultValue": 0.3,
+        "unit": "",
+        "scaling": {
+          "type": "linear"
+        },
+        "choices": [],
+        "binding": {
+          "target": "mix",
+          "scale": 1,
+          "offset": 0
+        },
+        "realtime": true
+      }
+    ],
+    "dsp": {
+      "factory": "legacy.chorus.wide",
+      "backend": "native",
+      "approximation": "Original algorithmic model; not a hardware capture or circuit emulation."
+    }
+  },
+  {
+    "id": "chorus.dark",
+    "version": 1,
+    "name": "Dark chorus",
+    "type": "chorus",
+    "model": "dark",
+    "category": "modulation",
+    "description": "Damped modulation",
+    "parameters": [
+      {
+        "id": "rate_hz",
+        "label": "Rate",
+        "type": "number",
+        "widget": "knob",
+        "min": 0.05,
+        "max": 12,
+        "defaultValue": 1,
+        "unit": "Hz",
+        "scaling": {
+          "type": "log"
+        },
+        "choices": [],
+        "binding": {
+          "target": "rate_hz",
+          "scale": 1,
+          "offset": 0
+        },
+        "realtime": true
+      },
+      {
+        "id": "depth_ms",
+        "label": "Depth",
+        "type": "number",
+        "widget": "knob",
+        "min": 0,
+        "max": 8,
+        "defaultValue": 3,
+        "unit": "ms",
+        "scaling": {
+          "type": "linear"
+        },
+        "choices": [],
+        "binding": {
+          "target": "depth_ms",
+          "scale": 1,
+          "offset": 0
+        },
+        "realtime": true
+      },
+      {
+        "id": "mix",
+        "label": "Mix",
+        "type": "number",
+        "widget": "knob",
+        "min": 0,
+        "max": 1,
+        "defaultValue": 0.3,
+        "unit": "",
+        "scaling": {
+          "type": "linear"
+        },
+        "choices": [],
+        "binding": {
+          "target": "mix",
+          "scale": 1,
+          "offset": 0
+        },
+        "realtime": true
+      }
+    ],
+    "dsp": {
+      "factory": "legacy.chorus.dark",
+      "backend": "native",
+      "approximation": "Original algorithmic model; not a hardware capture or circuit emulation."
+    }
+  },
+  {
+    "id": "flanger.positive",
+    "version": 1,
+    "name": "Positive flange",
+    "type": "flanger",
+    "model": "positive",
+    "category": "modulation",
+    "description": "Positive-polarity comb sweep",
+    "parameters": [
+      {
+        "id": "rate_hz",
+        "label": "Rate",
+        "type": "number",
+        "widget": "knob",
+        "min": 0.05,
+        "max": 12,
+        "defaultValue": 1,
+        "unit": "Hz",
+        "scaling": {
+          "type": "log"
+        },
+        "choices": [],
+        "binding": {
+          "target": "rate_hz",
+          "scale": 1,
+          "offset": 0
+        },
+        "realtime": true
+      },
+      {
+        "id": "depth_ms",
+        "label": "Depth",
+        "type": "number",
+        "widget": "knob",
+        "min": 0,
+        "max": 3,
+        "defaultValue": 1.5,
+        "unit": "ms",
+        "scaling": {
+          "type": "linear"
+        },
+        "choices": [],
+        "binding": {
+          "target": "depth_ms",
+          "scale": 1,
+          "offset": 0
+        },
+        "realtime": true
+      },
+      {
+        "id": "feedback",
+        "label": "Feedback",
+        "type": "number",
+        "widget": "knob",
+        "min": -0.75,
+        "max": 0.75,
+        "defaultValue": 0.3,
+        "unit": "",
+        "scaling": {
+          "type": "linear"
+        },
+        "choices": [],
+        "binding": {
+          "target": "feedback",
+          "scale": 1,
+          "offset": 0
+        },
+        "realtime": true
+      },
+      {
+        "id": "mix",
+        "label": "Mix",
+        "type": "number",
+        "widget": "knob",
+        "min": 0,
+        "max": 1,
+        "defaultValue": 0.5,
+        "unit": "",
+        "scaling": {
+          "type": "linear"
+        },
+        "choices": [],
+        "binding": {
+          "target": "mix",
+          "scale": 1,
+          "offset": 0
+        },
+        "realtime": true
+      }
+    ],
+    "dsp": {
+      "factory": "legacy.flanger.positive",
+      "backend": "native",
+      "approximation": "Original algorithmic model; not a hardware capture or circuit emulation."
+    }
+  },
+  {
+    "id": "flanger.negative",
+    "version": 1,
+    "name": "Negative flange",
+    "type": "flanger",
+    "model": "negative",
+    "category": "modulation",
+    "description": "Inverted wet comb sweep",
+    "parameters": [
+      {
+        "id": "rate_hz",
+        "label": "Rate",
+        "type": "number",
+        "widget": "knob",
+        "min": 0.05,
+        "max": 12,
+        "defaultValue": 1,
+        "unit": "Hz",
+        "scaling": {
+          "type": "log"
+        },
+        "choices": [],
+        "binding": {
+          "target": "rate_hz",
+          "scale": 1,
+          "offset": 0
+        },
+        "realtime": true
+      },
+      {
+        "id": "depth_ms",
+        "label": "Depth",
+        "type": "number",
+        "widget": "knob",
+        "min": 0,
+        "max": 3,
+        "defaultValue": 1.5,
+        "unit": "ms",
+        "scaling": {
+          "type": "linear"
+        },
+        "choices": [],
+        "binding": {
+          "target": "depth_ms",
+          "scale": 1,
+          "offset": 0
+        },
+        "realtime": true
+      },
+      {
+        "id": "delay_ms",
+        "label": "Base delay",
+        "type": "number",
+        "widget": "knob",
+        "min": 3,
+        "max": 12,
+        "defaultValue": 3,
+        "unit": "ms",
+        "scaling": {
+          "type": "linear"
+        },
+        "choices": [],
+        "binding": {
+          "target": "delay_ms",
+          "scale": 1,
+          "offset": 0
+        },
+        "realtime": true
+      },
+      {
+        "id": "feedback",
+        "label": "Feedback",
+        "type": "number",
+        "widget": "knob",
+        "min": -0.75,
+        "max": 0.75,
+        "defaultValue": 0.3,
+        "unit": "",
+        "scaling": {
+          "type": "linear"
+        },
+        "choices": [],
+        "binding": {
+          "target": "feedback",
+          "scale": 1,
+          "offset": 0
+        },
+        "realtime": true
+      },
+      {
+        "id": "mix",
+        "label": "Mix",
+        "type": "number",
+        "widget": "knob",
+        "min": 0,
+        "max": 1,
+        "defaultValue": 0.5,
+        "unit": "",
+        "scaling": {
+          "type": "linear"
+        },
+        "choices": [],
+        "binding": {
+          "target": "mix",
+          "scale": 1,
+          "offset": 0
+        },
+        "realtime": true
+      }
+    ],
+    "dsp": {
+      "factory": "legacy.flanger.negative",
+      "backend": "native",
+      "approximation": "Original algorithmic model; not a hardware capture or circuit emulation."
+    }
+  },
+  {
+    "id": "flanger.wide",
+    "version": 1,
+    "name": "Wide flange",
+    "type": "flanger",
+    "model": "wide",
+    "category": "modulation",
+    "description": "Stereo comb motion",
+    "parameters": [
+      {
+        "id": "rate_hz",
+        "label": "Rate",
+        "type": "number",
+        "widget": "knob",
+        "min": 0.05,
+        "max": 12,
+        "defaultValue": 1,
+        "unit": "Hz",
+        "scaling": {
+          "type": "log"
+        },
+        "choices": [],
+        "binding": {
+          "target": "rate_hz",
+          "scale": 1,
+          "offset": 0
+        },
+        "realtime": true
+      },
+      {
+        "id": "depth_ms",
+        "label": "Depth",
+        "type": "number",
+        "widget": "knob",
+        "min": 0,
+        "max": 3,
+        "defaultValue": 1.5,
+        "unit": "ms",
+        "scaling": {
+          "type": "linear"
+        },
+        "choices": [],
+        "binding": {
+          "target": "depth_ms",
+          "scale": 1,
+          "offset": 0
+        },
+        "realtime": true
+      },
+      {
+        "id": "feedback",
+        "label": "Feedback",
+        "type": "number",
+        "widget": "knob",
+        "min": -0.75,
+        "max": 0.75,
+        "defaultValue": 0.3,
+        "unit": "",
+        "scaling": {
+          "type": "linear"
+        },
+        "choices": [],
+        "binding": {
+          "target": "feedback",
+          "scale": 1,
+          "offset": 0
+        },
+        "realtime": true
+      },
+      {
+        "id": "mix",
+        "label": "Mix",
+        "type": "number",
+        "widget": "knob",
+        "min": 0,
+        "max": 1,
+        "defaultValue": 0.5,
+        "unit": "",
+        "scaling": {
+          "type": "linear"
+        },
+        "choices": [],
+        "binding": {
+          "target": "mix",
+          "scale": 1,
+          "offset": 0
+        },
+        "realtime": true
+      }
+    ],
+    "dsp": {
+      "factory": "legacy.flanger.wide",
+      "backend": "native",
+      "approximation": "Original algorithmic model; not a hardware capture or circuit emulation."
+    }
+  },
+  {
+    "id": "phaser.four",
+    "version": 1,
+    "name": "Four-stage phase",
+    "type": "phaser",
+    "model": "four",
+    "category": "modulation",
+    "description": "Gentle notches",
+    "parameters": [
+      {
+        "id": "rate_hz",
+        "label": "Rate",
+        "type": "number",
+        "widget": "knob",
+        "min": 0.05,
+        "max": 12,
+        "defaultValue": 1,
+        "unit": "Hz",
+        "scaling": {
+          "type": "log"
+        },
+        "choices": [],
+        "binding": {
+          "target": "rate_hz",
+          "scale": 1,
+          "offset": 0
+        },
+        "realtime": true
+      },
+      {
+        "id": "depth",
+        "label": "Depth",
+        "type": "number",
+        "widget": "knob",
+        "min": 0,
+        "max": 1,
+        "defaultValue": 0.6,
+        "unit": "",
+        "scaling": {
+          "type": "linear"
+        },
+        "choices": [],
+        "binding": {
+          "target": "depth",
+          "scale": 1,
+          "offset": 0
+        },
+        "realtime": true
+      },
+      {
+        "id": "mix",
+        "label": "Mix",
+        "type": "number",
+        "widget": "knob",
+        "min": 0,
+        "max": 1,
+        "defaultValue": 0.5,
+        "unit": "",
+        "scaling": {
+          "type": "linear"
+        },
+        "choices": [],
+        "binding": {
+          "target": "mix",
+          "scale": 1,
+          "offset": 0
+        },
+        "realtime": true
+      }
+    ],
+    "dsp": {
+      "factory": "legacy.phaser.four",
+      "backend": "native",
+      "approximation": "Original algorithmic model; not a hardware capture or circuit emulation."
+    }
+  },
+  {
+    "id": "phaser.six",
+    "version": 1,
+    "name": "Six-stage phase",
+    "type": "phaser",
+    "model": "six",
+    "category": "modulation",
+    "description": "Deeper sweep",
+    "parameters": [
+      {
+        "id": "rate_hz",
+        "label": "Rate",
+        "type": "number",
+        "widget": "knob",
+        "min": 0.05,
+        "max": 12,
+        "defaultValue": 1,
+        "unit": "Hz",
+        "scaling": {
+          "type": "log"
+        },
+        "choices": [],
+        "binding": {
+          "target": "rate_hz",
+          "scale": 1,
+          "offset": 0
+        },
+        "realtime": true
+      },
+      {
+        "id": "depth",
+        "label": "Depth",
+        "type": "number",
+        "widget": "knob",
+        "min": 0,
+        "max": 1,
+        "defaultValue": 0.6,
+        "unit": "",
+        "scaling": {
+          "type": "linear"
+        },
+        "choices": [],
+        "binding": {
+          "target": "depth",
+          "scale": 1,
+          "offset": 0
+        },
+        "realtime": true
+      },
+      {
+        "id": "center_hz",
+        "label": "Center",
+        "type": "number",
+        "widget": "knob",
+        "min": 200,
+        "max": 2500,
+        "defaultValue": 800,
+        "unit": "Hz",
+        "scaling": {
+          "type": "log"
+        },
+        "choices": [],
+        "binding": {
+          "target": "center_hz",
+          "scale": 1,
+          "offset": 0
+        },
+        "realtime": true
+      },
+      {
+        "id": "mix",
+        "label": "Mix",
+        "type": "number",
+        "widget": "knob",
+        "min": 0,
+        "max": 1,
+        "defaultValue": 0.5,
+        "unit": "",
+        "scaling": {
+          "type": "linear"
+        },
+        "choices": [],
+        "binding": {
+          "target": "mix",
+          "scale": 1,
+          "offset": 0
+        },
+        "realtime": true
+      }
+    ],
+    "dsp": {
+      "factory": "legacy.phaser.six",
+      "backend": "native",
+      "approximation": "Original algorithmic model; not a hardware capture or circuit emulation."
+    }
+  },
+  {
+    "id": "phaser.eight",
+    "version": 1,
+    "name": "Eight-stage phase",
+    "type": "phaser",
+    "model": "eight",
+    "category": "modulation",
+    "description": "Dense notches",
+    "parameters": [
+      {
+        "id": "rate_hz",
+        "label": "Rate",
+        "type": "number",
+        "widget": "knob",
+        "min": 0.05,
+        "max": 12,
+        "defaultValue": 1,
+        "unit": "Hz",
+        "scaling": {
+          "type": "log"
+        },
+        "choices": [],
+        "binding": {
+          "target": "rate_hz",
+          "scale": 1,
+          "offset": 0
+        },
+        "realtime": true
+      },
+      {
+        "id": "depth",
+        "label": "Depth",
+        "type": "number",
+        "widget": "knob",
+        "min": 0,
+        "max": 1,
+        "defaultValue": 0.6,
+        "unit": "",
+        "scaling": {
+          "type": "linear"
+        },
+        "choices": [],
+        "binding": {
+          "target": "depth",
+          "scale": 1,
+          "offset": 0
+        },
+        "realtime": true
+      },
+      {
+        "id": "center_hz",
+        "label": "Center",
+        "type": "number",
+        "widget": "knob",
+        "min": 200,
+        "max": 2500,
+        "defaultValue": 800,
+        "unit": "Hz",
+        "scaling": {
+          "type": "log"
+        },
+        "choices": [],
+        "binding": {
+          "target": "center_hz",
+          "scale": 1,
+          "offset": 0
+        },
+        "realtime": true
+      },
+      {
+        "id": "mix",
+        "label": "Mix",
+        "type": "number",
+        "widget": "knob",
+        "min": 0,
+        "max": 1,
+        "defaultValue": 0.5,
+        "unit": "",
+        "scaling": {
+          "type": "linear"
+        },
+        "choices": [],
+        "binding": {
+          "target": "mix",
+          "scale": 1,
+          "offset": 0
+        },
+        "realtime": true
+      }
+    ],
+    "dsp": {
+      "factory": "legacy.phaser.eight",
+      "backend": "native",
+      "approximation": "Original algorithmic model; not a hardware capture or circuit emulation."
+    }
+  },
+  {
+    "id": "tremolo.sine",
+    "version": 1,
+    "name": "Sine tremolo",
+    "type": "tremolo",
+    "model": "sine",
+    "category": "modulation",
+    "description": "Smooth amplitude motion",
+    "parameters": [
+      {
+        "id": "rate_hz",
+        "label": "Speed",
+        "type": "number",
+        "widget": "knob",
+        "min": 0.1,
+        "max": 20,
+        "defaultValue": 4,
+        "unit": "Hz",
+        "scaling": {
+          "type": "log"
+        },
+        "choices": [],
+        "binding": {
+          "target": "rate_hz",
+          "scale": 1,
+          "offset": 0
+        },
+        "realtime": true
+      },
+      {
+        "id": "depth",
+        "label": "Depth",
+        "type": "number",
+        "widget": "knob",
+        "min": 0,
+        "max": 1,
+        "defaultValue": 0.5,
+        "unit": "",
+        "scaling": {
+          "type": "linear"
+        },
+        "choices": [],
+        "binding": {
+          "target": "depth",
+          "scale": 1,
+          "offset": 0
+        },
+        "realtime": true
+      }
+    ],
+    "dsp": {
+      "factory": "legacy.tremolo.sine",
+      "backend": "native",
+      "approximation": "Original algorithmic model; not a hardware capture or circuit emulation."
+    }
+  },
+  {
+    "id": "tremolo.triangle",
+    "version": 1,
+    "name": "Triangle tremolo",
+    "type": "tremolo",
+    "model": "triangle",
+    "category": "modulation",
+    "description": "Linear amplitude motion",
+    "parameters": [
+      {
+        "id": "rate_hz",
+        "label": "Speed",
+        "type": "number",
+        "widget": "knob",
+        "min": 0.1,
+        "max": 20,
+        "defaultValue": 4,
+        "unit": "Hz",
+        "scaling": {
+          "type": "log"
+        },
+        "choices": [],
+        "binding": {
+          "target": "rate_hz",
+          "scale": 1,
+          "offset": 0
+        },
+        "realtime": true
+      },
+      {
+        "id": "depth",
+        "label": "Depth",
+        "type": "number",
+        "widget": "knob",
+        "min": 0,
+        "max": 1,
+        "defaultValue": 0.5,
+        "unit": "",
+        "scaling": {
+          "type": "linear"
+        },
+        "choices": [],
+        "binding": {
+          "target": "depth",
+          "scale": 1,
+          "offset": 0
+        },
+        "realtime": true
+      },
+      {
+        "id": "mix",
+        "label": "Mix",
+        "type": "number",
+        "widget": "knob",
+        "min": 0,
+        "max": 1,
+        "defaultValue": 1,
+        "unit": "",
+        "scaling": {
+          "type": "linear"
+        },
+        "choices": [],
+        "binding": {
+          "target": "mix",
+          "scale": 1,
+          "offset": 0
+        },
+        "realtime": true
+      }
+    ],
+    "dsp": {
+      "factory": "legacy.tremolo.triangle",
+      "backend": "native",
+      "approximation": "Original algorithmic model; not a hardware capture or circuit emulation."
+    }
+  },
+  {
+    "id": "tremolo.square",
+    "version": 1,
+    "name": "Chop tremolo",
+    "type": "tremolo",
+    "model": "square",
+    "category": "modulation",
+    "description": "Square amplitude motion",
+    "parameters": [
+      {
+        "id": "rate_hz",
+        "label": "Chop rate",
+        "type": "number",
+        "widget": "knob",
+        "min": 0.1,
+        "max": 20,
+        "defaultValue": 4,
+        "unit": "Hz",
+        "scaling": {
+          "type": "log"
+        },
+        "choices": [],
+        "binding": {
+          "target": "rate_hz",
+          "scale": 1,
+          "offset": 0
+        },
+        "realtime": true
+      },
+      {
+        "id": "depth",
+        "label": "Depth",
+        "type": "number",
+        "widget": "knob",
+        "min": 0,
+        "max": 1,
+        "defaultValue": 0.5,
+        "unit": "",
+        "scaling": {
+          "type": "linear"
+        },
+        "choices": [],
+        "binding": {
+          "target": "depth",
+          "scale": 1,
+          "offset": 0
+        },
+        "realtime": true
+      }
+    ],
+    "dsp": {
+      "factory": "legacy.tremolo.square",
+      "backend": "native",
+      "approximation": "Original algorithmic model; not a hardware capture or circuit emulation."
+    }
+  },
+  {
+    "id": "pitch.fast",
+    "version": 1,
+    "name": "Fast pitch",
+    "type": "pitch",
+    "model": "fast",
+    "category": "pitch",
+    "description": "Short crossfaded delay grains; artifacts possible",
+    "parameters": [
+      {
+        "id": "semitones",
+        "label": "Transpose",
+        "type": "number",
+        "widget": "knob",
+        "min": -12,
+        "max": 12,
+        "defaultValue": 0,
+        "unit": "semitones",
+        "scaling": {
+          "type": "linear"
+        },
+        "choices": [],
+        "binding": {
+          "target": "semitones",
+          "scale": 1,
+          "offset": 0
+        },
+        "realtime": true
+      },
+      {
+        "id": "mix",
+        "label": "Mix",
+        "type": "number",
+        "widget": "knob",
+        "min": 0,
+        "max": 1,
+        "defaultValue": 1,
+        "unit": "",
+        "scaling": {
+          "type": "linear"
+        },
+        "choices": [],
+        "binding": {
+          "target": "mix",
+          "scale": 1,
+          "offset": 0
+        },
+        "realtime": true
+      }
+    ],
+    "dsp": {
+      "factory": "legacy.pitch.fast",
+      "backend": "audio-worklet",
+      "approximation": "Original algorithmic model; not a hardware capture or circuit emulation."
+    }
+  },
+  {
+    "id": "pitch.smooth",
+    "version": 1,
+    "name": "Smooth pitch",
+    "type": "pitch",
+    "model": "smooth",
+    "category": "pitch",
+    "description": "Longer grains; more processing delay",
+    "parameters": [
+      {
+        "id": "semitones",
+        "label": "Transpose",
+        "type": "number",
+        "widget": "knob",
+        "min": -12,
+        "max": 12,
+        "defaultValue": 0,
+        "unit": "semitones",
+        "scaling": {
+          "type": "linear"
+        },
+        "choices": [],
+        "binding": {
+          "target": "semitones",
+          "scale": 1,
+          "offset": 0
+        },
+        "realtime": true
+      },
+      {
+        "id": "cents",
+        "label": "Fine",
+        "type": "number",
+        "widget": "knob",
+        "min": -50,
+        "max": 50,
+        "defaultValue": 0,
+        "unit": "cents",
+        "scaling": {
+          "type": "linear"
+        },
+        "choices": [],
+        "binding": {
+          "target": "cents",
+          "scale": 1,
+          "offset": 0
+        },
+        "realtime": true
+      },
+      {
+        "id": "mix",
+        "label": "Mix",
+        "type": "number",
+        "widget": "knob",
+        "min": 0,
+        "max": 1,
+        "defaultValue": 1,
+        "unit": "",
+        "scaling": {
+          "type": "linear"
+        },
+        "choices": [],
+        "binding": {
+          "target": "mix",
+          "scale": 1,
+          "offset": 0
+        },
+        "realtime": true
+      }
+    ],
+    "dsp": {
+      "factory": "legacy.pitch.smooth",
+      "backend": "audio-worklet",
+      "approximation": "Original algorithmic model; not a hardware capture or circuit emulation."
+    }
+  },
+  {
+    "id": "pitch.detune",
+    "version": 1,
+    "name": "Wide detune",
+    "type": "pitch",
+    "model": "detune",
+    "category": "pitch",
+    "description": "Stereo opposing detune",
+    "parameters": [
+      {
+        "id": "cents",
+        "label": "Stereo detune",
+        "type": "number",
+        "widget": "knob",
+        "min": -50,
+        "max": 50,
+        "defaultValue": 0,
+        "unit": "cents",
+        "scaling": {
+          "type": "linear"
+        },
+        "choices": [],
+        "binding": {
+          "target": "cents",
+          "scale": 1,
+          "offset": 0
+        },
+        "realtime": true
+      },
+      {
+        "id": "mix",
+        "label": "Mix",
+        "type": "number",
+        "widget": "knob",
+        "min": 0,
+        "max": 1,
+        "defaultValue": 1,
+        "unit": "",
+        "scaling": {
+          "type": "linear"
+        },
+        "choices": [],
+        "binding": {
+          "target": "mix",
+          "scale": 1,
+          "offset": 0
+        },
+        "realtime": true
+      }
+    ],
+    "dsp": {
+      "factory": "legacy.pitch.detune",
+      "backend": "audio-worklet",
+      "approximation": "Original algorithmic model; not a hardware capture or circuit emulation."
+    }
+  },
+  {
+    "id": "delay.digital",
+    "version": 1,
+    "name": "Digital delay",
+    "type": "delay",
+    "model": "digital",
+    "category": "delay",
+    "description": "Clear filtered repeats",
+    "parameters": [
+      {
+        "id": "time_ms",
+        "label": "Time",
+        "type": "number",
+        "widget": "knob",
+        "min": 10,
+        "max": 2000,
+        "defaultValue": 350,
+        "unit": "ms",
+        "scaling": {
+          "type": "log"
+        },
+        "choices": [],
+        "binding": {
+          "target": "time_ms",
+          "scale": 1,
+          "offset": 0
+        },
+        "realtime": true,
+        "visibleWhen": {
+          "parameter": "sync",
+          "equals": false
+        }
+      },
+      {
+        "id": "feedback",
+        "label": "Feedback",
+        "type": "number",
+        "widget": "knob",
+        "min": 0,
+        "max": 0.8,
+        "defaultValue": 0.25,
+        "unit": "",
+        "scaling": {
+          "type": "linear"
+        },
+        "choices": [],
+        "binding": {
+          "target": "feedback",
+          "scale": 1,
+          "offset": 0
+        },
+        "realtime": true
+      },
+      {
+        "id": "mix",
+        "label": "Mix",
+        "type": "number",
+        "widget": "knob",
+        "min": 0,
+        "max": 1,
+        "defaultValue": 0.3,
+        "unit": "",
+        "scaling": {
+          "type": "linear"
+        },
+        "choices": [],
+        "binding": {
+          "target": "mix",
+          "scale": 1,
+          "offset": 0
+        },
+        "realtime": true
+      },
+      {
+        "id": "sync",
+        "label": "Tempo sync",
+        "type": "boolean",
+        "widget": "switch",
+        "defaultValue": false,
+        "unit": "",
+        "scaling": {
+          "type": "linear"
+        },
+        "choices": [],
+        "binding": {
+          "target": "sync",
+          "scale": 1,
+          "offset": 0
+        },
+        "realtime": true
+      },
+      {
+        "id": "division",
+        "label": "Note division",
+        "type": "choice",
+        "widget": "dropdown",
+        "defaultValue": "quarter",
+        "unit": "",
+        "scaling": {
+          "type": "linear"
+        },
+        "choices": [
+          {
+            "value": "quarter",
+            "label": "quarter"
+          },
+          {
+            "value": "eighth",
+            "label": "eighth"
+          },
+          {
+            "value": "dotted_eighth",
+            "label": "dotted eighth"
+          },
+          {
+            "value": "triplet",
+            "label": "triplet"
+          }
+        ],
+        "binding": {
+          "target": "division",
+          "scale": 1,
+          "offset": 0
+        },
+        "realtime": false,
+        "visibleWhen": {
+          "parameter": "sync",
+          "equals": true
+        }
+      }
+    ],
+    "dsp": {
+      "factory": "legacy.delay.digital",
+      "backend": "native",
+      "approximation": "Original algorithmic model; not a hardware capture or circuit emulation."
+    }
+  },
+  {
+    "id": "delay.analog",
+    "version": 1,
+    "name": "Analog-style delay",
+    "type": "delay",
+    "model": "analog",
+    "category": "delay",
+    "description": "Darker repeats",
+    "parameters": [
+      {
+        "id": "time_ms",
+        "label": "Time",
+        "type": "number",
+        "widget": "knob",
+        "min": 10,
+        "max": 2000,
+        "defaultValue": 350,
+        "unit": "ms",
+        "scaling": {
+          "type": "log"
+        },
+        "choices": [],
+        "binding": {
+          "target": "time_ms",
+          "scale": 1,
+          "offset": 0
+        },
+        "realtime": true,
+        "visibleWhen": {
+          "parameter": "sync",
+          "equals": false
+        }
+      },
+      {
+        "id": "feedback",
+        "label": "Feedback",
+        "type": "number",
+        "widget": "knob",
+        "min": 0,
+        "max": 0.8,
+        "defaultValue": 0.25,
+        "unit": "",
+        "scaling": {
+          "type": "linear"
+        },
+        "choices": [],
+        "binding": {
+          "target": "feedback",
+          "scale": 1,
+          "offset": 0
+        },
+        "realtime": true
+      },
+      {
+        "id": "tone_hz",
+        "label": "Tone",
+        "type": "number",
+        "widget": "knob",
+        "min": 600,
+        "max": 12000,
+        "defaultValue": 6000,
+        "unit": "Hz",
+        "scaling": {
+          "type": "log"
+        },
+        "choices": [],
+        "binding": {
+          "target": "tone_hz",
+          "scale": 1,
+          "offset": 0
+        },
+        "realtime": true
+      },
+      {
+        "id": "mix",
+        "label": "Mix",
+        "type": "number",
+        "widget": "knob",
+        "min": 0,
+        "max": 1,
+        "defaultValue": 0.3,
+        "unit": "",
+        "scaling": {
+          "type": "linear"
+        },
+        "choices": [],
+        "binding": {
+          "target": "mix",
+          "scale": 1,
+          "offset": 0
+        },
+        "realtime": true
+      },
+      {
+        "id": "sync",
+        "label": "Tempo sync",
+        "type": "boolean",
+        "widget": "switch",
+        "defaultValue": false,
+        "unit": "",
+        "scaling": {
+          "type": "linear"
+        },
+        "choices": [],
+        "binding": {
+          "target": "sync",
+          "scale": 1,
+          "offset": 0
+        },
+        "realtime": true
+      },
+      {
+        "id": "division",
+        "label": "Note division",
+        "type": "choice",
+        "widget": "dropdown",
+        "defaultValue": "quarter",
+        "unit": "",
+        "scaling": {
+          "type": "linear"
+        },
+        "choices": [
+          {
+            "value": "quarter",
+            "label": "quarter"
+          },
+          {
+            "value": "eighth",
+            "label": "eighth"
+          },
+          {
+            "value": "dotted_eighth",
+            "label": "dotted eighth"
+          },
+          {
+            "value": "triplet",
+            "label": "triplet"
+          }
+        ],
+        "binding": {
+          "target": "division",
+          "scale": 1,
+          "offset": 0
+        },
+        "realtime": false,
+        "visibleWhen": {
+          "parameter": "sync",
+          "equals": true
+        }
+      }
+    ],
+    "dsp": {
+      "factory": "legacy.delay.analog",
+      "backend": "native",
+      "approximation": "Original algorithmic model; not a hardware capture or circuit emulation."
+    }
+  },
+  {
+    "id": "delay.ping_pong",
+    "version": 1,
+    "name": "Ping-pong delay",
+    "type": "delay",
+    "model": "ping_pong",
+    "category": "delay",
+    "description": "Alternating stereo repeats",
+    "parameters": [
+      {
+        "id": "time_ms",
+        "label": "Time",
+        "type": "number",
+        "widget": "knob",
+        "min": 10,
+        "max": 2000,
+        "defaultValue": 350,
+        "unit": "ms",
+        "scaling": {
+          "type": "log"
+        },
+        "choices": [],
+        "binding": {
+          "target": "time_ms",
+          "scale": 1,
+          "offset": 0
+        },
+        "realtime": true,
+        "visibleWhen": {
+          "parameter": "sync",
+          "equals": false
+        }
+      },
+      {
+        "id": "feedback",
+        "label": "Feedback",
+        "type": "number",
+        "widget": "knob",
+        "min": 0,
+        "max": 0.8,
+        "defaultValue": 0.25,
+        "unit": "",
+        "scaling": {
+          "type": "linear"
+        },
+        "choices": [],
+        "binding": {
+          "target": "feedback",
+          "scale": 1,
+          "offset": 0
+        },
+        "realtime": true
+      },
+      {
+        "id": "mix",
+        "label": "Mix",
+        "type": "number",
+        "widget": "knob",
+        "min": 0,
+        "max": 1,
+        "defaultValue": 0.3,
+        "unit": "",
+        "scaling": {
+          "type": "linear"
+        },
+        "choices": [],
+        "binding": {
+          "target": "mix",
+          "scale": 1,
+          "offset": 0
+        },
+        "realtime": true
+      },
+      {
+        "id": "sync",
+        "label": "Tempo sync",
+        "type": "boolean",
+        "widget": "switch",
+        "defaultValue": false,
+        "unit": "",
+        "scaling": {
+          "type": "linear"
+        },
+        "choices": [],
+        "binding": {
+          "target": "sync",
+          "scale": 1,
+          "offset": 0
+        },
+        "realtime": true
+      },
+      {
+        "id": "division",
+        "label": "Note division",
+        "type": "choice",
+        "widget": "dropdown",
+        "defaultValue": "quarter",
+        "unit": "",
+        "scaling": {
+          "type": "linear"
+        },
+        "choices": [
+          {
+            "value": "quarter",
+            "label": "quarter"
+          },
+          {
+            "value": "eighth",
+            "label": "eighth"
+          },
+          {
+            "value": "dotted_eighth",
+            "label": "dotted eighth"
+          },
+          {
+            "value": "triplet",
+            "label": "triplet"
+          }
+        ],
+        "binding": {
+          "target": "division",
+          "scale": 1,
+          "offset": 0
+        },
+        "realtime": false,
+        "visibleWhen": {
+          "parameter": "sync",
+          "equals": true
+        }
+      }
+    ],
+    "dsp": {
+      "factory": "legacy.delay.ping_pong",
+      "backend": "native",
+      "approximation": "Original algorithmic model; not a hardware capture or circuit emulation."
+    }
+  },
+  {
+    "id": "delay.single_tap",
+    "version": 1,
+    "name": "Single Tap / Slapback",
+    "type": "delay",
+    "model": "single_tap",
+    "category": "delay",
+    "description": "Original feed-forward delay: one echo, no feedback loop or tempo sync",
+    "parameters": [
+      {
+        "id": "time_ms",
+        "label": "Time",
+        "type": "number",
+        "widget": "knob",
+        "min": 10,
+        "max": 2000,
+        "defaultValue": 120,
+        "unit": "ms",
+        "scaling": {
+          "type": "log"
+        },
+        "choices": [],
+        "binding": {
+          "target": "time_ms",
+          "scale": 1,
+          "offset": 0
+        },
+        "realtime": true
+      },
+      {
+        "id": "mix",
+        "label": "Mix",
+        "type": "number",
+        "widget": "knob",
+        "min": 0,
+        "max": 1,
+        "defaultValue": 0.3,
+        "unit": "",
+        "scaling": {
+          "type": "linear"
+        },
+        "choices": [],
+        "binding": {
+          "target": "mix",
+          "scale": 1,
+          "offset": 0
+        },
+        "realtime": true
+      }
+    ],
+    "dsp": {
+      "factory": "native.single-tap.v1",
+      "backend": "native",
+      "approximation": "Original algorithmic model; not a hardware capture or circuit emulation."
+    }
+  },
+  {
+    "id": "reverb.room",
+    "version": 1,
+    "name": "Room / synthetic IR",
+    "type": "reverb",
+    "model": "room",
+    "category": "reverb",
+    "description": "Short dense reflections",
+    "parameters": [
+      {
+        "id": "decay_s",
+        "label": "Decay",
+        "type": "number",
+        "widget": "knob",
+        "min": 0.2,
+        "max": 6,
+        "defaultValue": 1.5,
+        "unit": "s",
+        "scaling": {
+          "type": "log"
+        },
+        "choices": [],
+        "binding": {
+          "target": "decay_s",
+          "scale": 1,
+          "offset": 0
+        },
+        "realtime": false
+      },
+      {
+        "id": "damping_hz",
+        "label": "Damping",
+        "type": "number",
+        "widget": "knob",
+        "min": 500,
+        "max": 12000,
+        "defaultValue": 5000,
+        "unit": "Hz",
+        "scaling": {
+          "type": "log"
+        },
+        "choices": [],
+        "binding": {
+          "target": "damping_hz",
+          "scale": 1,
+          "offset": 0
+        },
+        "realtime": true
+      },
+      {
+        "id": "mix",
+        "label": "Mix",
+        "type": "number",
+        "widget": "knob",
+        "min": 0,
+        "max": 1,
+        "defaultValue": 0.2,
+        "unit": "",
+        "scaling": {
+          "type": "linear"
+        },
+        "choices": [],
+        "binding": {
+          "target": "mix",
+          "scale": 1,
+          "offset": 0
+        },
+        "realtime": true
+      }
+    ],
+    "dsp": {
+      "factory": "legacy.reverb.room",
+      "backend": "native",
+      "approximation": "Original algorithmic model; not a hardware capture or circuit emulation."
+    }
+  },
+  {
+    "id": "reverb.plate",
+    "version": 1,
+    "name": "Plate-style / synthetic IR",
+    "type": "reverb",
+    "model": "plate",
+    "category": "reverb",
+    "description": "Dense smooth tail",
+    "parameters": [
+      {
+        "id": "decay_s",
+        "label": "Decay",
+        "type": "number",
+        "widget": "knob",
+        "min": 0.2,
+        "max": 6,
+        "defaultValue": 1.5,
+        "unit": "s",
+        "scaling": {
+          "type": "log"
+        },
+        "choices": [],
+        "binding": {
+          "target": "decay_s",
+          "scale": 1,
+          "offset": 0
+        },
+        "realtime": false
+      },
+      {
+        "id": "predelay_ms",
+        "label": "Pre-delay",
+        "type": "number",
+        "widget": "knob",
+        "min": 0,
+        "max": 250,
+        "defaultValue": 20,
+        "unit": "ms",
+        "scaling": {
+          "type": "linear"
+        },
+        "choices": [],
+        "binding": {
+          "target": "predelay_ms",
+          "scale": 1,
+          "offset": 0
+        },
+        "realtime": true
+      },
+      {
+        "id": "damping_hz",
+        "label": "Damping",
+        "type": "number",
+        "widget": "knob",
+        "min": 500,
+        "max": 12000,
+        "defaultValue": 5000,
+        "unit": "Hz",
+        "scaling": {
+          "type": "log"
+        },
+        "choices": [],
+        "binding": {
+          "target": "damping_hz",
+          "scale": 1,
+          "offset": 0
+        },
+        "realtime": true
+      },
+      {
+        "id": "mix",
+        "label": "Mix",
+        "type": "number",
+        "widget": "knob",
+        "min": 0,
+        "max": 1,
+        "defaultValue": 0.2,
+        "unit": "",
+        "scaling": {
+          "type": "linear"
+        },
+        "choices": [],
+        "binding": {
+          "target": "mix",
+          "scale": 1,
+          "offset": 0
+        },
+        "realtime": true
+      }
+    ],
+    "dsp": {
+      "factory": "legacy.reverb.plate",
+      "backend": "native",
+      "approximation": "Original algorithmic model; not a hardware capture or circuit emulation."
+    }
+  },
+  {
+    "id": "reverb.spring",
+    "version": 1,
+    "name": "Spring-style / synthetic IR",
+    "type": "reverb",
+    "model": "spring",
+    "category": "reverb",
+    "description": "Dispersive chirped tail; no physical spring model",
+    "parameters": [
+      {
+        "id": "decay_s",
+        "label": "Decay",
+        "type": "number",
+        "widget": "knob",
+        "min": 0.2,
+        "max": 6,
+        "defaultValue": 1.5,
+        "unit": "s",
+        "scaling": {
+          "type": "log"
+        },
+        "choices": [],
+        "binding": {
+          "target": "decay_s",
+          "scale": 1,
+          "offset": 0
+        },
+        "realtime": false
+      },
+      {
+        "id": "predelay_ms",
+        "label": "Pre-delay",
+        "type": "number",
+        "widget": "knob",
+        "min": 0,
+        "max": 250,
+        "defaultValue": 20,
+        "unit": "ms",
+        "scaling": {
+          "type": "linear"
+        },
+        "choices": [],
+        "binding": {
+          "target": "predelay_ms",
+          "scale": 1,
+          "offset": 0
+        },
+        "realtime": true
+      },
+      {
+        "id": "mix",
+        "label": "Mix",
+        "type": "number",
+        "widget": "knob",
+        "min": 0,
+        "max": 1,
+        "defaultValue": 0.2,
+        "unit": "",
+        "scaling": {
+          "type": "linear"
+        },
+        "choices": [],
+        "binding": {
+          "target": "mix",
+          "scale": 1,
+          "offset": 0
+        },
+        "realtime": true
+      }
+    ],
+    "dsp": {
+      "factory": "legacy.reverb.spring",
+      "backend": "native",
+      "approximation": "Original algorithmic model; not a hardware capture or circuit emulation."
+    }
+  }
+]

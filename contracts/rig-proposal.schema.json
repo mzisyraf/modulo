@@ -1,0 +1,2833 @@
+{
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "proposal_version",
+    "name",
+    "description",
+    "tempo_bpm",
+    "modules"
+  ],
+  "properties": {
+    "proposal_version": {
+      "type": "string",
+      "enum": [
+        "1"
+      ]
+    },
+    "name": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 80
+    },
+    "description": {
+      "type": "string",
+      "maxLength": 1200
+    },
+    "tempo_bpm": {
+      "type": "number",
+      "minimum": 30,
+      "maximum": 300
+    },
+    "modules": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 8,
+      "items": {
+        "anyOf": [
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "model_id",
+              "enabled",
+              "parameters"
+            ],
+            "properties": {
+              "model_id": {
+                "type": "string",
+                "enum": [
+                  "gate.gentle"
+                ]
+              },
+              "enabled": {
+                "type": "boolean"
+              },
+              "parameters": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "threshold_db",
+                  "release_ms",
+                  "depth_db"
+                ],
+                "properties": {
+                  "threshold_db": {
+                    "type": "number",
+                    "minimum": -90,
+                    "maximum": -10
+                  },
+                  "release_ms": {
+                    "type": "number",
+                    "minimum": 10,
+                    "maximum": 1000
+                  },
+                  "depth_db": {
+                    "type": "number",
+                    "minimum": -90,
+                    "maximum": 0
+                  }
+                }
+              }
+            }
+          },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "model_id",
+              "enabled",
+              "parameters"
+            ],
+            "properties": {
+              "model_id": {
+                "type": "string",
+                "enum": [
+                  "gate.tight"
+                ]
+              },
+              "enabled": {
+                "type": "boolean"
+              },
+              "parameters": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "threshold_db",
+                  "attack_ms",
+                  "hold_ms",
+                  "release_ms",
+                  "hysteresis_db"
+                ],
+                "properties": {
+                  "threshold_db": {
+                    "type": "number",
+                    "minimum": -90,
+                    "maximum": -10
+                  },
+                  "attack_ms": {
+                    "type": "number",
+                    "minimum": 0.1,
+                    "maximum": 50
+                  },
+                  "hold_ms": {
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 500
+                  },
+                  "release_ms": {
+                    "type": "number",
+                    "minimum": 10,
+                    "maximum": 1000
+                  },
+                  "hysteresis_db": {
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 18
+                  }
+                }
+              }
+            }
+          },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "model_id",
+              "enabled",
+              "parameters"
+            ],
+            "properties": {
+              "model_id": {
+                "type": "string",
+                "enum": [
+                  "gate.soft"
+                ]
+              },
+              "enabled": {
+                "type": "boolean"
+              },
+              "parameters": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "threshold_db",
+                  "release_ms",
+                  "depth_db"
+                ],
+                "properties": {
+                  "threshold_db": {
+                    "type": "number",
+                    "minimum": -90,
+                    "maximum": -10
+                  },
+                  "release_ms": {
+                    "type": "number",
+                    "minimum": 10,
+                    "maximum": 1000
+                  },
+                  "depth_db": {
+                    "type": "number",
+                    "minimum": -90,
+                    "maximum": 0
+                  }
+                }
+              }
+            }
+          },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "model_id",
+              "enabled",
+              "parameters"
+            ],
+            "properties": {
+              "model_id": {
+                "type": "string",
+                "enum": [
+                  "compressor.studio"
+                ]
+              },
+              "enabled": {
+                "type": "boolean"
+              },
+              "parameters": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "threshold_db",
+                  "ratio",
+                  "attack_ms",
+                  "release_ms",
+                  "knee_db",
+                  "makeup_db",
+                  "mix"
+                ],
+                "properties": {
+                  "threshold_db": {
+                    "type": "number",
+                    "minimum": -60,
+                    "maximum": 0
+                  },
+                  "ratio": {
+                    "type": "number",
+                    "minimum": 1,
+                    "maximum": 20
+                  },
+                  "attack_ms": {
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 100
+                  },
+                  "release_ms": {
+                    "type": "number",
+                    "minimum": 10,
+                    "maximum": 1000
+                  },
+                  "knee_db": {
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 40
+                  },
+                  "makeup_db": {
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 12
+                  },
+                  "mix": {
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 1
+                  }
+                }
+              }
+            }
+          },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "model_id",
+              "enabled",
+              "parameters"
+            ],
+            "properties": {
+              "model_id": {
+                "type": "string",
+                "enum": [
+                  "compressor.sustain"
+                ]
+              },
+              "enabled": {
+                "type": "boolean"
+              },
+              "parameters": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "sustain",
+                  "makeup_db",
+                  "mix"
+                ],
+                "properties": {
+                  "sustain": {
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 1
+                  },
+                  "makeup_db": {
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 12
+                  },
+                  "mix": {
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 1
+                  }
+                }
+              }
+            }
+          },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "model_id",
+              "enabled",
+              "parameters"
+            ],
+            "properties": {
+              "model_id": {
+                "type": "string",
+                "enum": [
+                  "compressor.punch"
+                ]
+              },
+              "enabled": {
+                "type": "boolean"
+              },
+              "parameters": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "threshold_db",
+                  "attack_ms",
+                  "release_ms",
+                  "ratio",
+                  "makeup_db"
+                ],
+                "properties": {
+                  "threshold_db": {
+                    "type": "number",
+                    "minimum": -60,
+                    "maximum": 0
+                  },
+                  "attack_ms": {
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 100
+                  },
+                  "release_ms": {
+                    "type": "number",
+                    "minimum": 10,
+                    "maximum": 1000
+                  },
+                  "ratio": {
+                    "type": "number",
+                    "minimum": 1,
+                    "maximum": 20
+                  },
+                  "makeup_db": {
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 12
+                  }
+                }
+              }
+            }
+          },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "model_id",
+              "enabled",
+              "parameters"
+            ],
+            "properties": {
+              "model_id": {
+                "type": "string",
+                "enum": [
+                  "boost.clean"
+                ]
+              },
+              "enabled": {
+                "type": "boolean"
+              },
+              "parameters": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "gain_db"
+                ],
+                "properties": {
+                  "gain_db": {
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 18
+                  }
+                }
+              }
+            }
+          },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "model_id",
+              "enabled",
+              "parameters"
+            ],
+            "properties": {
+              "model_id": {
+                "type": "string",
+                "enum": [
+                  "boost.treble"
+                ]
+              },
+              "enabled": {
+                "type": "boolean"
+              },
+              "parameters": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "gain_db",
+                  "tone"
+                ],
+                "properties": {
+                  "gain_db": {
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 18
+                  },
+                  "tone": {
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 1
+                  }
+                }
+              }
+            }
+          },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "model_id",
+              "enabled",
+              "parameters"
+            ],
+            "properties": {
+              "model_id": {
+                "type": "string",
+                "enum": [
+                  "boost.mid"
+                ]
+              },
+              "enabled": {
+                "type": "boolean"
+              },
+              "parameters": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "gain_db",
+                  "focus"
+                ],
+                "properties": {
+                  "gain_db": {
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 18
+                  },
+                  "focus": {
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 1
+                  }
+                }
+              }
+            }
+          },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "model_id",
+              "enabled",
+              "parameters"
+            ],
+            "properties": {
+              "model_id": {
+                "type": "string",
+                "enum": [
+                  "wah.classic"
+                ]
+              },
+              "enabled": {
+                "type": "boolean"
+              },
+              "parameters": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "position",
+                  "q",
+                  "level_db"
+                ],
+                "properties": {
+                  "position": {
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 1
+                  },
+                  "q": {
+                    "type": "number",
+                    "minimum": 0.5,
+                    "maximum": 12
+                  },
+                  "level_db": {
+                    "type": "number",
+                    "minimum": -24,
+                    "maximum": 12
+                  }
+                }
+              }
+            }
+          },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "model_id",
+              "enabled",
+              "parameters"
+            ],
+            "properties": {
+              "model_id": {
+                "type": "string",
+                "enum": [
+                  "wah.wide"
+                ]
+              },
+              "enabled": {
+                "type": "boolean"
+              },
+              "parameters": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "position",
+                  "q",
+                  "mix",
+                  "level_db"
+                ],
+                "properties": {
+                  "position": {
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 1
+                  },
+                  "q": {
+                    "type": "number",
+                    "minimum": 0.5,
+                    "maximum": 12
+                  },
+                  "mix": {
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 1
+                  },
+                  "level_db": {
+                    "type": "number",
+                    "minimum": -24,
+                    "maximum": 12
+                  }
+                }
+              }
+            }
+          },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "model_id",
+              "enabled",
+              "parameters"
+            ],
+            "properties": {
+              "model_id": {
+                "type": "string",
+                "enum": [
+                  "wah.vocal"
+                ]
+              },
+              "enabled": {
+                "type": "boolean"
+              },
+              "parameters": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "position",
+                  "q",
+                  "level_db"
+                ],
+                "properties": {
+                  "position": {
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 1
+                  },
+                  "q": {
+                    "type": "number",
+                    "minimum": 0.5,
+                    "maximum": 12
+                  },
+                  "level_db": {
+                    "type": "number",
+                    "minimum": -24,
+                    "maximum": 12
+                  }
+                }
+              }
+            }
+          },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "model_id",
+              "enabled",
+              "parameters"
+            ],
+            "properties": {
+              "model_id": {
+                "type": "string",
+                "enum": [
+                  "overdrive.green"
+                ]
+              },
+              "enabled": {
+                "type": "boolean"
+              },
+              "parameters": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "drive",
+                  "tone",
+                  "level_db"
+                ],
+                "properties": {
+                  "drive": {
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 1
+                  },
+                  "tone": {
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 1
+                  },
+                  "level_db": {
+                    "type": "number",
+                    "minimum": -24,
+                    "maximum": 12
+                  }
+                }
+              }
+            }
+          },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "model_id",
+              "enabled",
+              "parameters"
+            ],
+            "properties": {
+              "model_id": {
+                "type": "string",
+                "enum": [
+                  "overdrive.gold"
+                ]
+              },
+              "enabled": {
+                "type": "boolean"
+              },
+              "parameters": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "drive",
+                  "tone",
+                  "level_db"
+                ],
+                "properties": {
+                  "drive": {
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 1
+                  },
+                  "tone": {
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 1
+                  },
+                  "level_db": {
+                    "type": "number",
+                    "minimum": -24,
+                    "maximum": 12
+                  }
+                }
+              }
+            }
+          },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "model_id",
+              "enabled",
+              "parameters"
+            ],
+            "properties": {
+              "model_id": {
+                "type": "string",
+                "enum": [
+                  "overdrive.blue"
+                ]
+              },
+              "enabled": {
+                "type": "boolean"
+              },
+              "parameters": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "gain",
+                  "tone",
+                  "level_db"
+                ],
+                "properties": {
+                  "gain": {
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 1
+                  },
+                  "tone": {
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 1
+                  },
+                  "level_db": {
+                    "type": "number",
+                    "minimum": -24,
+                    "maximum": 12
+                  }
+                }
+              }
+            }
+          },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "model_id",
+              "enabled",
+              "parameters"
+            ],
+            "properties": {
+              "model_id": {
+                "type": "string",
+                "enum": [
+                  "distortion.orange"
+                ]
+              },
+              "enabled": {
+                "type": "boolean"
+              },
+              "parameters": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "distortion",
+                  "tone",
+                  "level_db"
+                ],
+                "properties": {
+                  "distortion": {
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 1
+                  },
+                  "tone": {
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 1
+                  },
+                  "level_db": {
+                    "type": "number",
+                    "minimum": -24,
+                    "maximum": 12
+                  }
+                }
+              }
+            }
+          },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "model_id",
+              "enabled",
+              "parameters"
+            ],
+            "properties": {
+              "model_id": {
+                "type": "string",
+                "enum": [
+                  "distortion.rodent"
+                ]
+              },
+              "enabled": {
+                "type": "boolean"
+              },
+              "parameters": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "distortion",
+                  "filter",
+                  "level_db"
+                ],
+                "properties": {
+                  "distortion": {
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 1
+                  },
+                  "filter": {
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 1
+                  },
+                  "level_db": {
+                    "type": "number",
+                    "minimum": -24,
+                    "maximum": 12
+                  }
+                }
+              }
+            }
+          },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "model_id",
+              "enabled",
+              "parameters"
+            ],
+            "properties": {
+              "model_id": {
+                "type": "string",
+                "enum": [
+                  "distortion.gold"
+                ]
+              },
+              "enabled": {
+                "type": "boolean"
+              },
+              "parameters": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "distortion",
+                  "level_db"
+                ],
+                "properties": {
+                  "distortion": {
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 1
+                  },
+                  "level_db": {
+                    "type": "number",
+                    "minimum": -24,
+                    "maximum": 12
+                  }
+                }
+              }
+            }
+          },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "model_id",
+              "enabled",
+              "parameters"
+            ],
+            "properties": {
+              "model_id": {
+                "type": "string",
+                "enum": [
+                  "fuzz.round"
+                ]
+              },
+              "enabled": {
+                "type": "boolean"
+              },
+              "parameters": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "drive",
+                  "level_db"
+                ],
+                "properties": {
+                  "drive": {
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 1
+                  },
+                  "level_db": {
+                    "type": "number",
+                    "minimum": -24,
+                    "maximum": 12
+                  }
+                }
+              }
+            }
+          },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "model_id",
+              "enabled",
+              "parameters"
+            ],
+            "properties": {
+              "model_id": {
+                "type": "string",
+                "enum": [
+                  "fuzz.sustain"
+                ]
+              },
+              "enabled": {
+                "type": "boolean"
+              },
+              "parameters": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "drive",
+                  "tone",
+                  "level_db"
+                ],
+                "properties": {
+                  "drive": {
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 1
+                  },
+                  "tone": {
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 1
+                  },
+                  "level_db": {
+                    "type": "number",
+                    "minimum": -24,
+                    "maximum": 12
+                  }
+                }
+              }
+            }
+          },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "model_id",
+              "enabled",
+              "parameters"
+            ],
+            "properties": {
+              "model_id": {
+                "type": "string",
+                "enum": [
+                  "fuzz.velcro"
+                ]
+              },
+              "enabled": {
+                "type": "boolean"
+              },
+              "parameters": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "drive",
+                  "bias",
+                  "tone",
+                  "level_db"
+                ],
+                "properties": {
+                  "drive": {
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 1
+                  },
+                  "bias": {
+                    "type": "number",
+                    "minimum": -0.4,
+                    "maximum": 0.4
+                  },
+                  "tone": {
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 1
+                  },
+                  "level_db": {
+                    "type": "number",
+                    "minimum": -24,
+                    "maximum": 12
+                  }
+                }
+              }
+            }
+          },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "model_id",
+              "enabled",
+              "parameters"
+            ],
+            "properties": {
+              "model_id": {
+                "type": "string",
+                "enum": [
+                  "amp.american_clean"
+                ]
+              },
+              "enabled": {
+                "type": "boolean"
+              },
+              "parameters": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "input_drive",
+                  "bass_db",
+                  "treble_db",
+                  "master_db",
+                  "bright"
+                ],
+                "properties": {
+                  "input_drive": {
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 1
+                  },
+                  "bass_db": {
+                    "type": "number",
+                    "minimum": -12,
+                    "maximum": 12
+                  },
+                  "treble_db": {
+                    "type": "number",
+                    "minimum": -12,
+                    "maximum": 12
+                  },
+                  "master_db": {
+                    "type": "number",
+                    "minimum": -24,
+                    "maximum": 0
+                  },
+                  "bright": {
+                    "type": "boolean"
+                  }
+                }
+              }
+            }
+          },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "model_id",
+              "enabled",
+              "parameters"
+            ],
+            "properties": {
+              "model_id": {
+                "type": "string",
+                "enum": [
+                  "amp.british_crunch"
+                ]
+              },
+              "enabled": {
+                "type": "boolean"
+              },
+              "parameters": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "gain",
+                  "bass_db",
+                  "mid_db",
+                  "treble_db",
+                  "presence_db",
+                  "master_db"
+                ],
+                "properties": {
+                  "gain": {
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 1
+                  },
+                  "bass_db": {
+                    "type": "number",
+                    "minimum": -12,
+                    "maximum": 12
+                  },
+                  "mid_db": {
+                    "type": "number",
+                    "minimum": -12,
+                    "maximum": 12
+                  },
+                  "treble_db": {
+                    "type": "number",
+                    "minimum": -12,
+                    "maximum": 12
+                  },
+                  "presence_db": {
+                    "type": "number",
+                    "minimum": -6,
+                    "maximum": 6
+                  },
+                  "master_db": {
+                    "type": "number",
+                    "minimum": -24,
+                    "maximum": 0
+                  }
+                }
+              }
+            }
+          },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "model_id",
+              "enabled",
+              "parameters"
+            ],
+            "properties": {
+              "model_id": {
+                "type": "string",
+                "enum": [
+                  "amp.modern_high_gain"
+                ]
+              },
+              "enabled": {
+                "type": "boolean"
+              },
+              "parameters": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "gain",
+                  "bass_db",
+                  "mid_db",
+                  "treble_db",
+                  "presence_db",
+                  "resonance_db",
+                  "master_db",
+                  "bright"
+                ],
+                "properties": {
+                  "gain": {
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 1
+                  },
+                  "bass_db": {
+                    "type": "number",
+                    "minimum": -12,
+                    "maximum": 12
+                  },
+                  "mid_db": {
+                    "type": "number",
+                    "minimum": -12,
+                    "maximum": 12
+                  },
+                  "treble_db": {
+                    "type": "number",
+                    "minimum": -12,
+                    "maximum": 12
+                  },
+                  "presence_db": {
+                    "type": "number",
+                    "minimum": -6,
+                    "maximum": 6
+                  },
+                  "resonance_db": {
+                    "type": "number",
+                    "minimum": -6,
+                    "maximum": 6
+                  },
+                  "master_db": {
+                    "type": "number",
+                    "minimum": -24,
+                    "maximum": 0
+                  },
+                  "bright": {
+                    "type": "boolean"
+                  }
+                }
+              }
+            }
+          },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "model_id",
+              "enabled",
+              "parameters"
+            ],
+            "properties": {
+              "model_id": {
+                "type": "string",
+                "enum": [
+                  "amp.studio_clean"
+                ]
+              },
+              "enabled": {
+                "type": "boolean"
+              },
+              "parameters": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "volume_db",
+                  "bass_db",
+                  "treble_db",
+                  "bright"
+                ],
+                "properties": {
+                  "volume_db": {
+                    "type": "number",
+                    "minimum": -24,
+                    "maximum": 0
+                  },
+                  "bass_db": {
+                    "type": "number",
+                    "minimum": -12,
+                    "maximum": 12
+                  },
+                  "treble_db": {
+                    "type": "number",
+                    "minimum": -12,
+                    "maximum": 12
+                  },
+                  "bright": {
+                    "type": "boolean"
+                  }
+                }
+              }
+            }
+          },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "model_id",
+              "enabled",
+              "parameters"
+            ],
+            "properties": {
+              "model_id": {
+                "type": "string",
+                "enum": [
+                  "cabinet.open_112"
+                ]
+              },
+              "enabled": {
+                "type": "boolean"
+              },
+              "parameters": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "mic",
+                  "position",
+                  "distance",
+                  "low_cut_hz",
+                  "high_cut_hz",
+                  "level_db"
+                ],
+                "properties": {
+                  "mic": {
+                    "type": "string",
+                    "enum": [
+                      "dynamic",
+                      "ribbon",
+                      "condenser"
+                    ]
+                  },
+                  "position": {
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 1
+                  },
+                  "distance": {
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 1
+                  },
+                  "low_cut_hz": {
+                    "type": "number",
+                    "minimum": 20,
+                    "maximum": 500
+                  },
+                  "high_cut_hz": {
+                    "type": "number",
+                    "minimum": 1000,
+                    "maximum": 16000
+                  },
+                  "level_db": {
+                    "type": "number",
+                    "minimum": -24,
+                    "maximum": 12
+                  }
+                }
+              }
+            }
+          },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "model_id",
+              "enabled",
+              "parameters"
+            ],
+            "properties": {
+              "model_id": {
+                "type": "string",
+                "enum": [
+                  "cabinet.british_212"
+                ]
+              },
+              "enabled": {
+                "type": "boolean"
+              },
+              "parameters": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "mic",
+                  "position",
+                  "mic2",
+                  "mic_blend",
+                  "low_cut_hz",
+                  "high_cut_hz",
+                  "level_db"
+                ],
+                "properties": {
+                  "mic": {
+                    "type": "string",
+                    "enum": [
+                      "dynamic",
+                      "ribbon",
+                      "condenser"
+                    ]
+                  },
+                  "position": {
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 1
+                  },
+                  "mic2": {
+                    "type": "string",
+                    "enum": [
+                      "dynamic",
+                      "ribbon",
+                      "condenser"
+                    ]
+                  },
+                  "mic_blend": {
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 1
+                  },
+                  "low_cut_hz": {
+                    "type": "number",
+                    "minimum": 20,
+                    "maximum": 500
+                  },
+                  "high_cut_hz": {
+                    "type": "number",
+                    "minimum": 1000,
+                    "maximum": 16000
+                  },
+                  "level_db": {
+                    "type": "number",
+                    "minimum": -24,
+                    "maximum": 12
+                  }
+                }
+              }
+            }
+          },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "model_id",
+              "enabled",
+              "parameters"
+            ],
+            "properties": {
+              "model_id": {
+                "type": "string",
+                "enum": [
+                  "cabinet.closed_412"
+                ]
+              },
+              "enabled": {
+                "type": "boolean"
+              },
+              "parameters": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "mic",
+                  "position",
+                  "distance",
+                  "mic2",
+                  "mic2_position",
+                  "mic2_distance",
+                  "mic_blend",
+                  "mic2_delay_ms",
+                  "mic2_invert",
+                  "low_cut_hz",
+                  "high_cut_hz",
+                  "level_db"
+                ],
+                "properties": {
+                  "mic": {
+                    "type": "string",
+                    "enum": [
+                      "dynamic",
+                      "ribbon",
+                      "condenser"
+                    ]
+                  },
+                  "position": {
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 1
+                  },
+                  "distance": {
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 1
+                  },
+                  "mic2": {
+                    "type": "string",
+                    "enum": [
+                      "dynamic",
+                      "ribbon",
+                      "condenser"
+                    ]
+                  },
+                  "mic2_position": {
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 1
+                  },
+                  "mic2_distance": {
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 1
+                  },
+                  "mic_blend": {
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 1
+                  },
+                  "mic2_delay_ms": {
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 10
+                  },
+                  "mic2_invert": {
+                    "type": "boolean"
+                  },
+                  "low_cut_hz": {
+                    "type": "number",
+                    "minimum": 20,
+                    "maximum": 500
+                  },
+                  "high_cut_hz": {
+                    "type": "number",
+                    "minimum": 1000,
+                    "maximum": 16000
+                  },
+                  "level_db": {
+                    "type": "number",
+                    "minimum": -24,
+                    "maximum": 12
+                  }
+                }
+              }
+            }
+          },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "model_id",
+              "enabled",
+              "parameters"
+            ],
+            "properties": {
+              "model_id": {
+                "type": "string",
+                "enum": [
+                  "eq.neutral"
+                ]
+              },
+              "enabled": {
+                "type": "boolean"
+              },
+              "parameters": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "low_cut_hz",
+                  "bass_db",
+                  "mid_hz",
+                  "mid_q",
+                  "mid_db",
+                  "treble_db",
+                  "high_cut_hz"
+                ],
+                "properties": {
+                  "low_cut_hz": {
+                    "type": "number",
+                    "minimum": 20,
+                    "maximum": 500
+                  },
+                  "bass_db": {
+                    "type": "number",
+                    "minimum": -12,
+                    "maximum": 12
+                  },
+                  "mid_hz": {
+                    "type": "number",
+                    "minimum": 100,
+                    "maximum": 6000
+                  },
+                  "mid_q": {
+                    "type": "number",
+                    "minimum": 0.2,
+                    "maximum": 10
+                  },
+                  "mid_db": {
+                    "type": "number",
+                    "minimum": -18,
+                    "maximum": 18
+                  },
+                  "treble_db": {
+                    "type": "number",
+                    "minimum": -12,
+                    "maximum": 12
+                  },
+                  "high_cut_hz": {
+                    "type": "number",
+                    "minimum": 1000,
+                    "maximum": 20000
+                  }
+                }
+              }
+            }
+          },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "model_id",
+              "enabled",
+              "parameters"
+            ],
+            "properties": {
+              "model_id": {
+                "type": "string",
+                "enum": [
+                  "eq.warm"
+                ]
+              },
+              "enabled": {
+                "type": "boolean"
+              },
+              "parameters": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "bass_db",
+                  "mid_hz",
+                  "mid_q",
+                  "mid_db",
+                  "treble_db"
+                ],
+                "properties": {
+                  "bass_db": {
+                    "type": "number",
+                    "minimum": -12,
+                    "maximum": 12
+                  },
+                  "mid_hz": {
+                    "type": "number",
+                    "minimum": 100,
+                    "maximum": 6000
+                  },
+                  "mid_q": {
+                    "type": "number",
+                    "minimum": 0.2,
+                    "maximum": 10
+                  },
+                  "mid_db": {
+                    "type": "number",
+                    "minimum": -18,
+                    "maximum": 18
+                  },
+                  "treble_db": {
+                    "type": "number",
+                    "minimum": -12,
+                    "maximum": 12
+                  }
+                }
+              }
+            }
+          },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "model_id",
+              "enabled",
+              "parameters"
+            ],
+            "properties": {
+              "model_id": {
+                "type": "string",
+                "enum": [
+                  "eq.bright"
+                ]
+              },
+              "enabled": {
+                "type": "boolean"
+              },
+              "parameters": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "bass_db",
+                  "mid_hz",
+                  "mid_q",
+                  "mid_db",
+                  "treble_db",
+                  "high_cut_hz"
+                ],
+                "properties": {
+                  "bass_db": {
+                    "type": "number",
+                    "minimum": -12,
+                    "maximum": 12
+                  },
+                  "mid_hz": {
+                    "type": "number",
+                    "minimum": 100,
+                    "maximum": 6000
+                  },
+                  "mid_q": {
+                    "type": "number",
+                    "minimum": 0.2,
+                    "maximum": 10
+                  },
+                  "mid_db": {
+                    "type": "number",
+                    "minimum": -18,
+                    "maximum": 18
+                  },
+                  "treble_db": {
+                    "type": "number",
+                    "minimum": -12,
+                    "maximum": 12
+                  },
+                  "high_cut_hz": {
+                    "type": "number",
+                    "minimum": 1000,
+                    "maximum": 20000
+                  }
+                }
+              }
+            }
+          },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "model_id",
+              "enabled",
+              "parameters"
+            ],
+            "properties": {
+              "model_id": {
+                "type": "string",
+                "enum": [
+                  "eq.tilt"
+                ]
+              },
+              "enabled": {
+                "type": "boolean"
+              },
+              "parameters": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "tilt_db",
+                  "pivot_hz"
+                ],
+                "properties": {
+                  "tilt_db": {
+                    "type": "number",
+                    "minimum": -12,
+                    "maximum": 12
+                  },
+                  "pivot_hz": {
+                    "type": "number",
+                    "minimum": 100,
+                    "maximum": 6000
+                  }
+                }
+              }
+            }
+          },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "model_id",
+              "enabled",
+              "parameters"
+            ],
+            "properties": {
+              "model_id": {
+                "type": "string",
+                "enum": [
+                  "chorus.classic"
+                ]
+              },
+              "enabled": {
+                "type": "boolean"
+              },
+              "parameters": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "rate_hz",
+                  "depth_ms",
+                  "mix"
+                ],
+                "properties": {
+                  "rate_hz": {
+                    "type": "number",
+                    "minimum": 0.05,
+                    "maximum": 12
+                  },
+                  "depth_ms": {
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 8
+                  },
+                  "mix": {
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 1
+                  }
+                }
+              }
+            }
+          },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "model_id",
+              "enabled",
+              "parameters"
+            ],
+            "properties": {
+              "model_id": {
+                "type": "string",
+                "enum": [
+                  "chorus.wide"
+                ]
+              },
+              "enabled": {
+                "type": "boolean"
+              },
+              "parameters": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "rate_hz",
+                  "depth_ms",
+                  "delay_ms",
+                  "mix"
+                ],
+                "properties": {
+                  "rate_hz": {
+                    "type": "number",
+                    "minimum": 0.05,
+                    "maximum": 12
+                  },
+                  "depth_ms": {
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 8
+                  },
+                  "delay_ms": {
+                    "type": "number",
+                    "minimum": 10,
+                    "maximum": 35
+                  },
+                  "mix": {
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 1
+                  }
+                }
+              }
+            }
+          },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "model_id",
+              "enabled",
+              "parameters"
+            ],
+            "properties": {
+              "model_id": {
+                "type": "string",
+                "enum": [
+                  "chorus.dark"
+                ]
+              },
+              "enabled": {
+                "type": "boolean"
+              },
+              "parameters": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "rate_hz",
+                  "depth_ms",
+                  "mix"
+                ],
+                "properties": {
+                  "rate_hz": {
+                    "type": "number",
+                    "minimum": 0.05,
+                    "maximum": 12
+                  },
+                  "depth_ms": {
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 8
+                  },
+                  "mix": {
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 1
+                  }
+                }
+              }
+            }
+          },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "model_id",
+              "enabled",
+              "parameters"
+            ],
+            "properties": {
+              "model_id": {
+                "type": "string",
+                "enum": [
+                  "flanger.positive"
+                ]
+              },
+              "enabled": {
+                "type": "boolean"
+              },
+              "parameters": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "rate_hz",
+                  "depth_ms",
+                  "feedback",
+                  "mix"
+                ],
+                "properties": {
+                  "rate_hz": {
+                    "type": "number",
+                    "minimum": 0.05,
+                    "maximum": 12
+                  },
+                  "depth_ms": {
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 3
+                  },
+                  "feedback": {
+                    "type": "number",
+                    "minimum": -0.75,
+                    "maximum": 0.75
+                  },
+                  "mix": {
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 1
+                  }
+                }
+              }
+            }
+          },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "model_id",
+              "enabled",
+              "parameters"
+            ],
+            "properties": {
+              "model_id": {
+                "type": "string",
+                "enum": [
+                  "flanger.negative"
+                ]
+              },
+              "enabled": {
+                "type": "boolean"
+              },
+              "parameters": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "rate_hz",
+                  "depth_ms",
+                  "delay_ms",
+                  "feedback",
+                  "mix"
+                ],
+                "properties": {
+                  "rate_hz": {
+                    "type": "number",
+                    "minimum": 0.05,
+                    "maximum": 12
+                  },
+                  "depth_ms": {
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 3
+                  },
+                  "delay_ms": {
+                    "type": "number",
+                    "minimum": 3,
+                    "maximum": 12
+                  },
+                  "feedback": {
+                    "type": "number",
+                    "minimum": -0.75,
+                    "maximum": 0.75
+                  },
+                  "mix": {
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 1
+                  }
+                }
+              }
+            }
+          },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "model_id",
+              "enabled",
+              "parameters"
+            ],
+            "properties": {
+              "model_id": {
+                "type": "string",
+                "enum": [
+                  "flanger.wide"
+                ]
+              },
+              "enabled": {
+                "type": "boolean"
+              },
+              "parameters": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "rate_hz",
+                  "depth_ms",
+                  "feedback",
+                  "mix"
+                ],
+                "properties": {
+                  "rate_hz": {
+                    "type": "number",
+                    "minimum": 0.05,
+                    "maximum": 12
+                  },
+                  "depth_ms": {
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 3
+                  },
+                  "feedback": {
+                    "type": "number",
+                    "minimum": -0.75,
+                    "maximum": 0.75
+                  },
+                  "mix": {
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 1
+                  }
+                }
+              }
+            }
+          },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "model_id",
+              "enabled",
+              "parameters"
+            ],
+            "properties": {
+              "model_id": {
+                "type": "string",
+                "enum": [
+                  "phaser.four"
+                ]
+              },
+              "enabled": {
+                "type": "boolean"
+              },
+              "parameters": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "rate_hz",
+                  "depth",
+                  "mix"
+                ],
+                "properties": {
+                  "rate_hz": {
+                    "type": "number",
+                    "minimum": 0.05,
+                    "maximum": 12
+                  },
+                  "depth": {
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 1
+                  },
+                  "mix": {
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 1
+                  }
+                }
+              }
+            }
+          },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "model_id",
+              "enabled",
+              "parameters"
+            ],
+            "properties": {
+              "model_id": {
+                "type": "string",
+                "enum": [
+                  "phaser.six"
+                ]
+              },
+              "enabled": {
+                "type": "boolean"
+              },
+              "parameters": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "rate_hz",
+                  "depth",
+                  "center_hz",
+                  "mix"
+                ],
+                "properties": {
+                  "rate_hz": {
+                    "type": "number",
+                    "minimum": 0.05,
+                    "maximum": 12
+                  },
+                  "depth": {
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 1
+                  },
+                  "center_hz": {
+                    "type": "number",
+                    "minimum": 200,
+                    "maximum": 2500
+                  },
+                  "mix": {
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 1
+                  }
+                }
+              }
+            }
+          },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "model_id",
+              "enabled",
+              "parameters"
+            ],
+            "properties": {
+              "model_id": {
+                "type": "string",
+                "enum": [
+                  "phaser.eight"
+                ]
+              },
+              "enabled": {
+                "type": "boolean"
+              },
+              "parameters": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "rate_hz",
+                  "depth",
+                  "center_hz",
+                  "mix"
+                ],
+                "properties": {
+                  "rate_hz": {
+                    "type": "number",
+                    "minimum": 0.05,
+                    "maximum": 12
+                  },
+                  "depth": {
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 1
+                  },
+                  "center_hz": {
+                    "type": "number",
+                    "minimum": 200,
+                    "maximum": 2500
+                  },
+                  "mix": {
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 1
+                  }
+                }
+              }
+            }
+          },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "model_id",
+              "enabled",
+              "parameters"
+            ],
+            "properties": {
+              "model_id": {
+                "type": "string",
+                "enum": [
+                  "tremolo.sine"
+                ]
+              },
+              "enabled": {
+                "type": "boolean"
+              },
+              "parameters": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "rate_hz",
+                  "depth"
+                ],
+                "properties": {
+                  "rate_hz": {
+                    "type": "number",
+                    "minimum": 0.1,
+                    "maximum": 20
+                  },
+                  "depth": {
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 1
+                  }
+                }
+              }
+            }
+          },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "model_id",
+              "enabled",
+              "parameters"
+            ],
+            "properties": {
+              "model_id": {
+                "type": "string",
+                "enum": [
+                  "tremolo.triangle"
+                ]
+              },
+              "enabled": {
+                "type": "boolean"
+              },
+              "parameters": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "rate_hz",
+                  "depth",
+                  "mix"
+                ],
+                "properties": {
+                  "rate_hz": {
+                    "type": "number",
+                    "minimum": 0.1,
+                    "maximum": 20
+                  },
+                  "depth": {
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 1
+                  },
+                  "mix": {
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 1
+                  }
+                }
+              }
+            }
+          },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "model_id",
+              "enabled",
+              "parameters"
+            ],
+            "properties": {
+              "model_id": {
+                "type": "string",
+                "enum": [
+                  "tremolo.square"
+                ]
+              },
+              "enabled": {
+                "type": "boolean"
+              },
+              "parameters": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "rate_hz",
+                  "depth"
+                ],
+                "properties": {
+                  "rate_hz": {
+                    "type": "number",
+                    "minimum": 0.1,
+                    "maximum": 20
+                  },
+                  "depth": {
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 1
+                  }
+                }
+              }
+            }
+          },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "model_id",
+              "enabled",
+              "parameters"
+            ],
+            "properties": {
+              "model_id": {
+                "type": "string",
+                "enum": [
+                  "pitch.fast"
+                ]
+              },
+              "enabled": {
+                "type": "boolean"
+              },
+              "parameters": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "semitones",
+                  "mix"
+                ],
+                "properties": {
+                  "semitones": {
+                    "type": "number",
+                    "minimum": -12,
+                    "maximum": 12
+                  },
+                  "mix": {
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 1
+                  }
+                }
+              }
+            }
+          },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "model_id",
+              "enabled",
+              "parameters"
+            ],
+            "properties": {
+              "model_id": {
+                "type": "string",
+                "enum": [
+                  "pitch.smooth"
+                ]
+              },
+              "enabled": {
+                "type": "boolean"
+              },
+              "parameters": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "semitones",
+                  "cents",
+                  "mix"
+                ],
+                "properties": {
+                  "semitones": {
+                    "type": "number",
+                    "minimum": -12,
+                    "maximum": 12
+                  },
+                  "cents": {
+                    "type": "number",
+                    "minimum": -50,
+                    "maximum": 50
+                  },
+                  "mix": {
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 1
+                  }
+                }
+              }
+            }
+          },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "model_id",
+              "enabled",
+              "parameters"
+            ],
+            "properties": {
+              "model_id": {
+                "type": "string",
+                "enum": [
+                  "pitch.detune"
+                ]
+              },
+              "enabled": {
+                "type": "boolean"
+              },
+              "parameters": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "cents",
+                  "mix"
+                ],
+                "properties": {
+                  "cents": {
+                    "type": "number",
+                    "minimum": -50,
+                    "maximum": 50
+                  },
+                  "mix": {
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 1
+                  }
+                }
+              }
+            }
+          },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "model_id",
+              "enabled",
+              "parameters"
+            ],
+            "properties": {
+              "model_id": {
+                "type": "string",
+                "enum": [
+                  "delay.digital"
+                ]
+              },
+              "enabled": {
+                "type": "boolean"
+              },
+              "parameters": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "time_ms",
+                  "feedback",
+                  "mix",
+                  "sync",
+                  "division"
+                ],
+                "properties": {
+                  "time_ms": {
+                    "type": "number",
+                    "minimum": 10,
+                    "maximum": 2000
+                  },
+                  "feedback": {
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 0.8
+                  },
+                  "mix": {
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 1
+                  },
+                  "sync": {
+                    "type": "boolean"
+                  },
+                  "division": {
+                    "type": "string",
+                    "enum": [
+                      "quarter",
+                      "eighth",
+                      "dotted_eighth",
+                      "triplet"
+                    ]
+                  }
+                }
+              }
+            }
+          },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "model_id",
+              "enabled",
+              "parameters"
+            ],
+            "properties": {
+              "model_id": {
+                "type": "string",
+                "enum": [
+                  "delay.analog"
+                ]
+              },
+              "enabled": {
+                "type": "boolean"
+              },
+              "parameters": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "time_ms",
+                  "feedback",
+                  "tone_hz",
+                  "mix",
+                  "sync",
+                  "division"
+                ],
+                "properties": {
+                  "time_ms": {
+                    "type": "number",
+                    "minimum": 10,
+                    "maximum": 2000
+                  },
+                  "feedback": {
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 0.8
+                  },
+                  "tone_hz": {
+                    "type": "number",
+                    "minimum": 600,
+                    "maximum": 12000
+                  },
+                  "mix": {
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 1
+                  },
+                  "sync": {
+                    "type": "boolean"
+                  },
+                  "division": {
+                    "type": "string",
+                    "enum": [
+                      "quarter",
+                      "eighth",
+                      "dotted_eighth",
+                      "triplet"
+                    ]
+                  }
+                }
+              }
+            }
+          },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "model_id",
+              "enabled",
+              "parameters"
+            ],
+            "properties": {
+              "model_id": {
+                "type": "string",
+                "enum": [
+                  "delay.ping_pong"
+                ]
+              },
+              "enabled": {
+                "type": "boolean"
+              },
+              "parameters": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "time_ms",
+                  "feedback",
+                  "mix",
+                  "sync",
+                  "division"
+                ],
+                "properties": {
+                  "time_ms": {
+                    "type": "number",
+                    "minimum": 10,
+                    "maximum": 2000
+                  },
+                  "feedback": {
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 0.8
+                  },
+                  "mix": {
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 1
+                  },
+                  "sync": {
+                    "type": "boolean"
+                  },
+                  "division": {
+                    "type": "string",
+                    "enum": [
+                      "quarter",
+                      "eighth",
+                      "dotted_eighth",
+                      "triplet"
+                    ]
+                  }
+                }
+              }
+            }
+          },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "model_id",
+              "enabled",
+              "parameters"
+            ],
+            "properties": {
+              "model_id": {
+                "type": "string",
+                "enum": [
+                  "delay.single_tap"
+                ]
+              },
+              "enabled": {
+                "type": "boolean"
+              },
+              "parameters": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "time_ms",
+                  "mix"
+                ],
+                "properties": {
+                  "time_ms": {
+                    "type": "number",
+                    "minimum": 10,
+                    "maximum": 2000
+                  },
+                  "mix": {
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 1
+                  }
+                }
+              }
+            }
+          },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "model_id",
+              "enabled",
+              "parameters"
+            ],
+            "properties": {
+              "model_id": {
+                "type": "string",
+                "enum": [
+                  "reverb.room"
+                ]
+              },
+              "enabled": {
+                "type": "boolean"
+              },
+              "parameters": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "decay_s",
+                  "damping_hz",
+                  "mix"
+                ],
+                "properties": {
+                  "decay_s": {
+                    "type": "number",
+                    "minimum": 0.2,
+                    "maximum": 6
+                  },
+                  "damping_hz": {
+                    "type": "number",
+                    "minimum": 500,
+                    "maximum": 12000
+                  },
+                  "mix": {
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 1
+                  }
+                }
+              }
+            }
+          },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "model_id",
+              "enabled",
+              "parameters"
+            ],
+            "properties": {
+              "model_id": {
+                "type": "string",
+                "enum": [
+                  "reverb.plate"
+                ]
+              },
+              "enabled": {
+                "type": "boolean"
+              },
+              "parameters": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "decay_s",
+                  "predelay_ms",
+                  "damping_hz",
+                  "mix"
+                ],
+                "properties": {
+                  "decay_s": {
+                    "type": "number",
+                    "minimum": 0.2,
+                    "maximum": 6
+                  },
+                  "predelay_ms": {
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 250
+                  },
+                  "damping_hz": {
+                    "type": "number",
+                    "minimum": 500,
+                    "maximum": 12000
+                  },
+                  "mix": {
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 1
+                  }
+                }
+              }
+            }
+          },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "model_id",
+              "enabled",
+              "parameters"
+            ],
+            "properties": {
+              "model_id": {
+                "type": "string",
+                "enum": [
+                  "reverb.spring"
+                ]
+              },
+              "enabled": {
+                "type": "boolean"
+              },
+              "parameters": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "decay_s",
+                  "predelay_ms",
+                  "mix"
+                ],
+                "properties": {
+                  "decay_s": {
+                    "type": "number",
+                    "minimum": 0.2,
+                    "maximum": 6
+                  },
+                  "predelay_ms": {
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 250
+                  },
+                  "mix": {
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 1
+                  }
+                }
+              }
+            }
+          }
+        ]
+      }
+    }
+  }
+}
