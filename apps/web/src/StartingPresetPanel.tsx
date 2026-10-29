@@ -9,7 +9,7 @@ import {ToneQualityCheck} from "./ToneQualityCheck";
 import {measureListeningLevels,type ListeningLevels} from "./listeningLevels";
 import { apiJson, parsePresetGeneration, parseSeparationJob, type PresetGeneration } from "./separation";
 
-export interface PresetAudition { stop(): void }
+export interface PresetAudition { stop(): void; invalidateCalibration?(): void }
 interface Props {
   jobId: string;
   revision: number;
@@ -184,7 +184,7 @@ export function StartingPresetPanel({ jobId, revision, recording, onPlay, onRefe
 
   async function play(useFile: boolean) {
     if (!applied || !engine.current || startingAudio) return;
-    if (useFile && !recording) { setError("Choose and calibrate your guitar recording above first."); return; }
+    if (useFile && !recording) { setError("Calibrate your live guitar above first."); return; }
     onPlay();
     const request = ++audioRequest.current;
     setStartingAudio(true); setPlaying("Starting…"); setError("");
@@ -195,7 +195,7 @@ export function StartingPresetPanel({ jobId, revision, recording, onPlay, onRefe
       engine.current.setListeningGains(levels?.originalDb??0,levels?.processedDb??0);playedFile.current=useFile;
       const started = await (useFile && recording ? engine.current.playFile(recording.file) : engine.current.playTestSignal());
       if (alive.current && request === audioRequest.current) {
-        setPlaying(started ? (useFile ? "Playing your calibrated recording" : "Playing synthetic test signal") : "Stopped");
+        setPlaying(started ? (useFile ? "Replaying your live calibration" : "Playing synthetic test signal") : "Stopped");
         playbackDuration.current = useFile && recording ? recording.measurements.duration_seconds : 2;
         setElapsed(0); setPlaybackStart(started ? performance.now() : null);
       }
@@ -204,7 +204,7 @@ export function StartingPresetPanel({ jobId, revision, recording, onPlay, onRefe
   }
 
   return <section className="result-panel starting-preset" aria-labelledby="starting-preset-title"><span className="step">05 / STARTING PRESET</span><h2 id="starting-preset-title">Generate a starting preset</h2>
-    <p className="warning-message">{recording ? <><strong>Your input level is calibrated; source spectral bands are measured.</strong> Generation uses source/target spectral balance over input gain {recording.inputGainDb.toFixed(1)} dB. Render and listen before accepting its tone.</> : <><strong>Choose your recording above first.</strong> New presets need its input-level calibration. Older saved presets may use target energy only.</>}</p>
+    <p className="warning-message">{recording ? <><strong>Your input level is calibrated; source spectral bands are measured.</strong> Generation uses source/target spectral balance over input gain {recording.inputGainDb.toFixed(1)} dB. Render and listen before accepting its tone.</> : <><strong>Calibrate your live guitar above first.</strong> New presets need measurements from your live instrument. Older saved presets may use target energy only.</>}</p>
     {available === false && <p className="notice" role="status">Generation is disabled: a separate backend request/budget allowance is required. No new paid requests are enabled by this integration.</p>}
     {available && uncapped && <p className="hint" role="status">Manual generation is enabled without a dollar cap. New generations and deliberate retries can incur provider charges.</p>}
     <div className="preset-actions"><button disabled={!available || !recording || submitting || generation?.status === "generating" || (generation?.status === "ready" && calibrationKey(generation.source_calibration) === sourceKey)} onClick={() => void generate()}>{submitting || generation?.status === "generating" ? "Generating starting preset…" : generation?.status === "failed" ? "Retry generation" : "Generate starting preset"}</button><button className="secondary" disabled={submitting} onClick={() => { setError(""); setRefresh((value) => value + 1); }}>Reconnect preset status</button></div>
@@ -217,18 +217,18 @@ export function StartingPresetPanel({ jobId, revision, recording, onPlay, onRefe
       {!onApplyPreset && <>
       <div className="guitar-comparison" aria-labelledby="guitar-comparison-title">
         <span className="step">06 / YOUR GUITAR</span><h2 id="guitar-comparison-title">Compare original and rig</h2>
-        <p>Play the same recording used for calibration, and switch modes while it continues from the same position.</p>
-        <p className="hint">{recording ? `Selected: ${recording.originalName} · leading quiet audio skipped ${recording.skippedSeconds.toFixed(1)} s` : "Choose and calibrate your guitar recording at the top of this page."}</p>
+        <p>Replay the live notes and chords captured during calibration; switch modes while the same exercise continues.</p>
+        <p className="hint">{recording ? `Selected: ${recording.originalName} · leading quiet audio skipped ${recording.skippedSeconds.toFixed(1)} s` : "Calibrate your connected guitar at the top of this page."}</p>
         <div className="preset-actions" role="group" aria-label="Guitar comparison mode">
           <button className={bypass ? "selected" : "secondary"} aria-pressed={bypass} disabled={!applied||startingAudio} onClick={() => void compare(true)}>Original guitar</button>
           <button className={!bypass ? "selected" : "secondary"} aria-pressed={!bypass} disabled={!applied||startingAudio} onClick={() => void compare(false)}>Rig applied</button>
         </div>
         <label className="toggle"><input type="checkbox" checked={levelMatch} onChange={event=>{stop();setLevelMatch(event.target.checked);setListening(undefined);engine.current?.setListeningGains(0,0);}} />Match listening levels</label>
         <p className="hint">{levelMatch?listening?.key===auditionKey?`Recording comparison matched to approximately ${listening.levels.rmsDbfs.toFixed(1)} dBFS RMS, with peak headroom.`:"Play to measure and match recording levels locally.":"Raw preset output levels; loudness can differ."} Only listening gain changes; preset parameters stay unchanged.</p>
-        <div className="preset-actions"><button disabled={!applied || !recording || startingAudio} onClick={() => void play(true)}>Play guitar recording</button><button className="stop" disabled={!applied} onClick={stop}>Stop preset audio</button><button className="secondary" disabled={!applied || startingAudio} onClick={() => void play(false)}>Play test signal</button></div>
+        <div className="preset-actions"><button disabled={!applied || !recording || startingAudio} onClick={() => void play(true)}>Replay calibration exercise</button><button className="stop" disabled={!applied} onClick={stop}>Stop preset audio</button><button className="secondary" disabled={!applied || startingAudio} onClick={() => void play(false)}>Play test signal</button></div>
         <progress aria-label="Guitar playback progress" value={elapsed} max={playbackDuration.current || recording?.measurements.duration_seconds || 1} /><span> {elapsed.toFixed(1)} / {(playbackDuration.current || recording?.measurements.duration_seconds || 0).toFixed(1)} s</span>
         <p role="status">{playing} · {bypass ? "Original guitar — input boost, drive and EQ off" : "Rig applied — current preset effects"}</p>
-        <p className="hint">Both modes keep output protection. Level matching applies to the recording, not the synthetic test signal. WAV/MP3 recommended, up to 20 MiB. Playback restarts only when you press Play.</p>
+        <p className="hint">Both modes keep output protection. Level matching applies to the recording, not the synthetic test signal. The captured live exercise replays only when you press Play.</p>
         <p className="hint">Audio stays in this browser; generation uses its numeric level/spectral measurements. The extracted song guitar above is the target; it is never fed through this rig. The test signal is synthetic.</p>
       </div></>}
     </>}

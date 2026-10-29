@@ -1,12 +1,11 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { AudioEngine, type CalibrationFlag, type CalibrationTake, type InputLevel, type LiveInputInfo } from "@modulo/audio";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { AudioEngine, type InputLevel, type LiveInputInfo } from "@modulo/audio";
 import { parsePreset, type Preset } from "@modulo/contracts";
 import example from "../../../fixtures/preset.example.json";
 import { AppShell, type AppView } from "./AppShell";
 import { AudioFileDropzone } from "./AudioFileDropzone";
 import { ChoiceMenu } from "./ChoiceMenu";
 import { audioInputOptions, DEFAULT_AUDIO_INPUT, LiveRequestGate, liveInputErrorMessage, type AudioInputOption } from "./liveInput";
-import { encodeMonoWav } from "./localAudio";
 import { projectTitle, upsertProject } from "./projectSessions";
 import { SeparationPage } from "./SeparationPage";
 import type { PresetAudition } from "./StartingPresetPanel";
@@ -27,8 +26,6 @@ const controls = [
 type JobStage = "idle" | "queued" | "running" | "ready" | "failed";
 
 type LiveState = "stopped" | "starting" | "live" | "error";
-type CalibrationState = "idle" | "recording" | "complete" | "error";
-type CalibrationPlaybackState = "stopped" | "starting" | "playing" | "error";
 type PerformanceRecordingState = "idle" | "recording" | "finalizing" | "error";
 type EngineSource = "none" | "sample" | "live";
 
@@ -41,18 +38,9 @@ interface StoredProject {
   jobId: string;
   preset: Preset;
   bypass: boolean;
-  calibrationTake?: CalibrationTake;
 }
 
 const levelDb = (value: number) => 20 * Math.log10(Math.max(value, 1e-8));
-const meterPercent = (value: number) => Math.max(0, Math.min(100, ((levelDb(value) + 60) / 60) * 100));
-const qualityFlagLabels: Record<CalibrationFlag, string> = {
-  too_short: "The take is under 2 seconds.",
-  silence: "The input is too quiet.",
-  clipping: "The input clipped. Lower the interface gain.",
-  invalid_samples: "The browser returned invalid audio samples.",
-};
-
 export function App() {
   const [view, setView] = useState<AppView>("workspace");
   const [preset, setPreset] = useState<Preset>(initialPreset);
@@ -73,10 +61,6 @@ export function App() {
   const [liveMessage, setLiveMessage] = useState("Stopped");
   const [liveInfo, setLiveInfo] = useState<LiveInputInfo>();
   const [inputLevel, setInputLevel] = useState<InputLevel | null>(null);
-  const [calibrationState, setCalibrationState] = useState<CalibrationState>("idle");
-  const [calibrationTake, setCalibrationTake] = useState<CalibrationTake>();
-  const [calibrationMessage, setCalibrationMessage] = useState("Start live input, then record a clean dry chord for up to 10 seconds.");
-  const [calibrationPlaybackState, setCalibrationPlaybackState] = useState<CalibrationPlaybackState>("stopped");
   const [activeProjectId, setActiveProjectId] = useState<string>(() => crypto.randomUUID());
   const [savedProjects, setSavedProjects] = useState<StoredProject[]>([]);
   const [recordings, setRecordings] = useState<PerformanceRecording[]>([]);
@@ -87,12 +71,9 @@ export function App() {
   const workflow = useRef<PresetAudition | null>(null);
   const audioRun = useRef(0);
   const liveRequests = useRef(new LiveRequestGate());
-  const calibrationRun = useRef(0);
   const performanceRun = useRef(0);
   const performanceStateRef = useRef<PerformanceRecordingState>("idle");
   const engineSource = useRef<EngineSource>("none");
-  const calibrationPlayer = useRef<HTMLAudioElement>(null);
-  const calibrationPlaybackUrl = useMemo(() => calibrationTake ? URL.createObjectURL(encodeMonoWav(calibrationTake.samples, calibrationTake.sampleRate)) : "", [calibrationTake]);
   const processing = jobStage === "queued" || jobStage === "running";
   const hasResult = preset.provenance.kind === "generated";
   const inactiveProjects = savedProjects.filter((project) => project.id !== activeProjectId);
@@ -130,11 +111,7 @@ export function App() {
       }
       if (engineSource.current === "live") {
         liveRequests.current.cancel();
-        calibrationRun.current++;
         setInputLevel(null);
-        setCalibrationState("idle");
-        setCalibrationTake(undefined);
-        setCalibrationMessage("Input disconnected. Reconnect, start live input and record a new take.");
         setLiveState("stopped");
         setLiveMessage("Input disconnected. Refresh the list and start again after reconnecting.");
         void refreshInputDevices();
@@ -173,7 +150,6 @@ export function App() {
     return () => mediaDevices.removeEventListener("devicechange", handleDeviceChange);
   }, [refreshInputDevices]);
 
-  useEffect(() => () => { if (calibrationPlaybackUrl) URL.revokeObjectURL(calibrationPlaybackUrl); }, [calibrationPlaybackUrl]);
 
   useEffect(() => {
     if (view !== "tone-match" || liveState !== "live") {
@@ -193,15 +169,6 @@ export function App() {
     return () => window.cancelAnimationFrame(frame);
   }, [liveState, view]);
 
-  function stopCalibrationPlayback() {
-    const player = calibrationPlayer.current;
-    if (player) {
-      player.pause();
-      player.currentTime = 0;
-    }
-    setCalibrationPlaybackState("stopped");
-  }
-
   function snapshotActiveProject(): StoredProject {
     return {
       id: activeProjectId,
@@ -212,7 +179,6 @@ export function App() {
       jobId,
       preset,
       bypass,
-      calibrationTake,
     };
   }
 
@@ -222,7 +188,6 @@ export function App() {
       || project.jobId
       || project.dryFile
       || project.jobStage !== "idle"
-      || project.calibrationTake
       || project.bypass
       || project.preset.name !== initialPreset.name
       || controls.some(([key]) => project.preset.parameters[key] !== initialPreset.parameters[key]),
@@ -294,13 +259,6 @@ export function App() {
     engine.current?.applyPreset(project.preset);
     setBypass(project.bypass);
     engine.current?.setBypass(project.bypass);
-    setCalibrationTake(project.calibrationTake);
-    setCalibrationState(project.calibrationTake ? "complete" : "idle");
-    setCalibrationMessage(project.calibrationTake
-      ? project.calibrationTake.usable ? "Saved calibration sample ready to review." : "Saved sample needs another try."
-      : "Start live input, then record a clean dry chord for up to 10 seconds.");
-    setLiveInfo(undefined);
-    setInputLevel(null);
     setError("");
     setSessionKey((currentKey) => currentKey + 1);
     setView("tone-match");
@@ -316,17 +274,10 @@ export function App() {
     audioRun.current++; setBusy(false);
     if (stopWorkflow) workflow.current?.stop();
     liveRequests.current.cancel();
-    calibrationRun.current++;
-    const wasRecording = calibrationState === "recording";
     markPerformanceFinalizing();
     engineSource.current = "none";
     engine.current?.stop();
-    stopCalibrationPlayback();
     setInputLevel(null);
-    if (wasRecording) {
-      setCalibrationState("idle");
-      setCalibrationMessage("Capture stopped before finishing. Start live input to try again.");
-    }
     setAudioState("Stopped");
     setLiveState("stopped");
     setLiveMessage(message);
@@ -352,7 +303,6 @@ export function App() {
     stopEngineAudio();
     const run = ++audioRun.current;
     liveRequests.current.cancel();
-    stopCalibrationPlayback();
     markPerformanceFinalizing("The previous audio source stopped. Finalizing your take…");
     engineSource.current = "sample";
     setLiveState("stopped");
@@ -382,14 +332,9 @@ export function App() {
     audioRun.current++; setBusy(false);
     markPerformanceFinalizing("The previous audio source stopped. Finalizing your take…");
     engineSource.current = "live";
-    stopCalibrationPlayback();
     workflow.current?.stop();
     setAudioState("Stopped");
     setError("");
-    calibrationRun.current++;
-    setCalibrationState("idle");
-    setCalibrationTake(undefined);
-    setCalibrationMessage("Once the level looks healthy, record one clean dry chord.");
     setLiveInfo(undefined);
     setLiveState("starting");
     setLiveMessage("Starting… Allow microphone access if your browser asks.");
@@ -416,78 +361,13 @@ export function App() {
     }
   }
 
-  async function recordCalibration() {
-    if (liveState !== "live" || !engine.current || calibrationState === "recording" || performanceStateRef.current === "recording" || performanceStateRef.current === "finalizing") return;
-    stopCalibrationPlayback();
-    const run = ++calibrationRun.current;
-    setCalibrationTake(undefined);
-    setCalibrationState("recording");
-    setCalibrationMessage("Recording dry input… Play one clean chord, then finish, or wait for 10 seconds.");
-    try {
-      const take = await engine.current.startCalibration(10);
-      if (run !== calibrationRun.current) return;
-      setCalibrationTake(take);
-      setCalibrationState("complete");
-      setCalibrationMessage(take.usable
-        ? "Take captured. The local level check passed."
-        : "This take needs another try. Review the notes below.");
-    } catch (failure) {
-      if (run !== calibrationRun.current) return;
-      if (failure instanceof DOMException && failure.name === "AbortError") {
-        setCalibrationState("idle");
-        setCalibrationMessage("Take discarded. Record again when you’re ready.");
-        return;
-      }
-      setCalibrationState("error");
-      setCalibrationMessage(failure instanceof Error ? failure.message : "Calibration capture failed. Try again.");
-    }
-  }
-
-  function finishCalibration() {
-    if (calibrationState !== "recording") return;
-    setCalibrationMessage("Finishing the take…");
-    engine.current?.finishCalibration();
-  }
-
-  function discardCalibration(message = "Take discarded. Record again when you’re ready.") {
-    calibrationRun.current++;
-    engine.current?.cancelCalibration();
-    stopCalibrationPlayback();
-    setCalibrationTake(undefined);
-    setCalibrationState("idle");
-    setCalibrationMessage(message);
-  }
-
-  async function playCalibrationTake() {
-    const player = calibrationPlayer.current;
-    if (!player || !calibrationPlaybackUrl) return;
-    if (calibrationPlaybackState === "playing") {
-      stopCalibrationPlayback();
-      return;
-    }
-
-    stopEngineAudio("Stopped — calibration review took over the audio output.");
-    const run = audioRun.current;
-    player.currentTime = 0;
-    setCalibrationPlaybackState("starting");
-    try {
-      await player.play();
-      if (run !== audioRun.current) { player.pause(); return; }
-      setCalibrationPlaybackState("playing");
-    } catch (failure) {
-      if (run !== audioRun.current) return;
-      setCalibrationPlaybackState("error");
-      setCalibrationMessage(failure instanceof Error ? failure.message : "The calibration sample could not play.");
-    }
-  }
-
   function changeLiveDevice(deviceId: string) {
-    discardCalibration("Input changed. Start live input and record a new take.");
+    workflow.current?.invalidateCalibration?.();
     setSelectedDeviceId(deviceId);
   }
 
   function changeLiveChannel(value: string) {
-    discardCalibration("Channel changed. Start live input and record a new take.");
+    workflow.current?.invalidateCalibration?.();
     setChannel(Number(value) as 0 | 1);
   }
 
@@ -526,7 +406,6 @@ export function App() {
     setError("");
     setLiveInfo(undefined);
     setInputLevel(null);
-    discardCalibration("Start live input, then record a clean dry chord for up to 10 seconds.");
     setActiveProjectId(crypto.randomUUID());
     setSessionKey((current) => current + 1);
     setView("tone-match");
@@ -556,7 +435,7 @@ export function App() {
 
       <section className="projects-section" aria-labelledby="projects-heading">
         <div className="section-heading"><div><span className="step">YOUR PROJECTS</span><h2 id="projects-heading">Recently updated</h2></div></div>
-        {inactiveProjects.length > 0 && <div className="project-list">{inactiveProjects.map((project) => <article className="saved-project" key={project.id}><div className="saved-project-art" aria-hidden="true"><span>MOD</span></div><div><span className="project-kicker">SAVED IN THIS TAB</span><h3>{projectTitle(project.songFile?.name)}</h3><p>{project.songFile?.name ?? "No reference song"} · {project.jobStage === "ready" ? "Tone ready" : project.jobStage === "failed" ? "Needs attention" : project.calibrationTake ? "Calibration captured" : "In progress"}</p></div><button className="secondary" onClick={() => openProject(project.id)}>Open project</button></article>)}</div>}
+        {inactiveProjects.length > 0 && <div className="project-list">{inactiveProjects.map((project) => <article className="saved-project" key={project.id}><div className="saved-project-art" aria-hidden="true"><span>MOD</span></div><div><span className="project-kicker">SAVED IN THIS TAB</span><h3>{projectTitle(project.songFile?.name)}</h3><p>{project.songFile?.name ?? "No reference song"} · {project.jobStage === "ready" ? "Tone ready" : project.jobStage === "failed" ? "Needs attention" : "In progress"}</p></div><button className="secondary" onClick={() => openProject(project.id)}>Open project</button></article>)}</div>}
         <div className="empty-projects"><div className="empty-art" aria-hidden="true"><span className="accent-coral" /><span className="accent-lavender" /><span className="accent-mint" /></div><div><h3>{inactiveProjects.length ? "Start another tone" : "Your next tone starts here"}</h3><p>{inactiveProjects.length ? "Your earlier projects stay available above while this tab remains open." : "Create another project when you’re ready to match a song’s guitar tone."}</p></div><button className="secondary" onClick={startNewToneMatch}>Start a project</button></div>
       </section>
     </div>}
@@ -566,7 +445,7 @@ export function App() {
         <div><span className="eyebrow">TONE MATCH</span><h2 className="display-title">Find the sound.<br /><em>Make it yours.</em></h2><p>Choose a song, confirm the reference and apply a starting preset to your browser amp.</p></div>
         <div className="mode-badge"><strong>Real local separation</strong><span>Tone match remains unverified</span></div>
       </header>
-      <SeparationPage key={activeProjectId} ref={workflow} embedded initialJobId={jobId} initialFile={songFile}
+      <SeparationPage key={activeProjectId} ref={workflow} embedded active={view === "tone-match"} onInputChosen={(device, inputChannel) => { setSelectedDeviceId(device); setChannel(inputChannel); }} initialJobId={jobId} initialFile={songFile}
         onJobChange={(id, file, status) => { setJobId(id); setSongFile(file); setJobStage(status); }}
         onApplyPreset={applyStartingPreset} onStopAudio={() => stopEngineAudio("Stopped — song preview took over the audio output.", false)} onInvalidatePreset={invalidateStartingPreset} />
 
@@ -585,31 +464,13 @@ export function App() {
           <p className="hint">{deviceMessage} Device names may appear after the first permission grant.</p>
           <p className={`live-status ${liveState}`} role="status"><strong>{liveState === "starting" ? "Starting" : liveState === "live" ? "Live" : liveState === "error" ? "Error" : "Stopped"}</strong><span>{liveMessage}</span></p>
 
-          <div className="calibration" aria-labelledby="calibration-title">
-            <div className="calibration-heading"><div><span className="step">INPUT CHECK</span><h3 id="calibration-title">Set a clean dry level</h3></div><span className={`calibration-chip ${calibrationState}`}>{calibrationState === "recording" ? "Recording" : calibrationState === "complete" ? calibrationTake?.usable ? "Ready" : "Retry" : calibrationState === "error" ? "Error" : liveState === "live" ? "Ready" : "Waiting"}</span></div>
-            <p>Watch the meter while you play, then capture one chord. This checks local input quality only; it does not identify the chord or analyse tone.</p>
-            <div className={`input-meter ${inputLevel?.clipping ? "is-clipping" : ""}`}>
-              <div className="meter-label"><span>Dry input</span><output>{inputLevel ? `${levelDb(inputLevel.rms).toFixed(1)} dBFS` : "— dBFS"}</output></div>
-              <div className="meter-track" role="meter" aria-label="Dry guitar input level" aria-valuemin={-60} aria-valuemax={0} aria-valuenow={inputLevel ? Math.round(levelDb(inputLevel.rms)) : undefined} aria-valuetext={inputLevel ? `${levelDb(inputLevel.rms).toFixed(1)} decibels full scale` : "No active input"}><span className="meter-zone" /><span className="meter-fill" style={{ width: `${inputLevel ? meterPercent(inputLevel.rms) : 0}%` }} /><span className="meter-peak" style={{ left: `${inputLevel ? meterPercent(inputLevel.peak) : 0}%` }} /></div>
-              <div className="meter-scale"><span>−60</span><span>Good level</span><span>0</span></div>
-            </div>
-            {calibrationTake && <audio className="calibration-audio" ref={calibrationPlayer} src={calibrationPlaybackUrl} preload="metadata" onEnded={() => setCalibrationPlaybackState("stopped")} />}
-            <div className="calibration-actions">
-              {calibrationState === "idle" && <button disabled={liveState !== "live"} onClick={() => void recordCalibration()}>Record</button>}
-              {calibrationState === "recording" && <><button onClick={finishCalibration}>Finish</button><button className="secondary" onClick={() => discardCalibration()}>Discard</button></>}
-              {calibrationState === "complete" && <><button className="review-action" disabled={calibrationPlaybackState === "starting"} onClick={() => void playCalibrationTake()}>{calibrationPlaybackState === "playing" ? "Stop sample" : calibrationPlaybackState === "starting" ? "Starting…" : "Play sample"}</button><button disabled={liveState !== "live"} onClick={() => void recordCalibration()}>{liveState === "live" ? calibrationTake?.usable ? "Record again" : "Retry" : "Start live to record again"}</button><button className="secondary" onClick={() => discardCalibration()}>Discard</button></>}
-              {calibrationState === "error" && <><button disabled={liveState !== "live"} onClick={() => void recordCalibration()}>Retry</button><button className="secondary" onClick={() => discardCalibration()}>Discard</button></>}
-            </div>
-            <p className={`calibration-status ${calibrationState}`} role="status">{calibrationMessage}</p>
-            {calibrationTake && <div className={`take-summary ${calibrationTake.usable ? "usable" : "needs-retry"}`}><div><strong>{calibrationTake.durationSeconds.toFixed(1)} s take</strong><span>{calibrationTake.sampleRate} Hz · peak {levelDb(calibrationTake.level.peak).toFixed(1)} dBFS · RMS {levelDb(calibrationTake.level.rms).toFixed(1)} dBFS</span></div>{calibrationTake.usable ? <p>Input level looks usable for the next local calibration step.</p> : <ul>{calibrationTake.qualityFlags.map((flag) => <li key={flag}>{qualityFlagLabels[flag]}</li>)}</ul>}</div>}
-            <p className="hint">This temporary sample stays in browser memory only. If you change the interface gain, guitar or pickup, discard it and calibrate again.</p>
-          </div>
-
+          <p className="hint">Calibrate your connected guitar at the top of this page before generating a tone. Live input here monitors your playing through the amp; keep volume low and select the physical instrument input.</p>
+          {inputLevel && <p role="status">Dry input: RMS {levelDb(inputLevel.rms).toFixed(1)} dBFS · peak {levelDb(inputLevel.peak).toFixed(1)} dBFS{inputLevel.clipping ? " · Clipping — lower interface gain" : ""}</p>}
           <div className="performance-capture" aria-labelledby="performance-capture-title">
             <div className="calibration-heading"><div><span className="step">PERFORMANCE</span><h3 id="performance-capture-title">Record your processed guitar</h3></div><span className={`calibration-chip ${performanceState}`}>{performanceState === "recording" ? "Recording" : performanceState === "finalizing" ? "Finalizing" : performanceState === "error" ? "Error" : "Ready"}</span></div>
             <p>Capture the sound after Modulo’s gain, Drive, EQ and bypass controls. Takes stay in this tab for playback, download or deletion.</p>
             <div className="performance-actions">
-              {(performanceState === "idle" || performanceState === "error") && <button disabled={engineSource.current === "none" || calibrationState === "recording"} onClick={() => void recordPerformance()}>{performanceState === "error" ? "Retry recording" : "Record"}</button>}
+              {(performanceState === "idle" || performanceState === "error") && <button disabled={engineSource.current === "none"} onClick={() => void recordPerformance()}>{performanceState === "error" ? "Retry recording" : "Record"}</button>}
               {performanceState === "recording" && <><button onClick={finishPerformanceRecording}>Finish</button><button className="secondary" onClick={() => discardPerformanceRecording()}>Discard</button></>}
               {performanceState === "finalizing" && <><button disabled>Finalizing…</button><button className="secondary" onClick={() => discardPerformanceRecording()}>Discard</button></>}
             </div>

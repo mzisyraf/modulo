@@ -23,12 +23,32 @@ async (page) => {
     if (window.__toneMatchInstrumented) return;
     window.__toneMatchInstrumented = true;
     window.__contexts = []; window.__shapers = []; window.__micRequests = 0;
+    const connect = AudioNode.prototype.connect;
+    AudioNode.prototype.connect = function(destination, ...args) {
+      if (destination instanceof AudioDestinationNode && !(this.context instanceof OfflineAudioContext)) {
+        const mute = this.context.createGain(); mute.gain.value = 0;
+        connect.call(mute, destination); connect.call(this, mute, ...args); return destination;
+      }
+      return connect.call(this, destination, ...args);
+    };
     const Native = window.AudioContext;
     window.AudioContext = class extends Native {
       constructor(...args) { super(...args); window.__contexts.push(this); }
       createWaveShaper() { const node = super.createWaveShaper(); window.__shapers.push(node); return node; }
     };
-    navigator.mediaDevices.getUserMedia = async () => { window.__micRequests++; throw new DOMException("TEST ONLY denied", "NotAllowedError"); };
+    Object.defineProperty(navigator, "mediaDevices", { value: Object.assign(new EventTarget(), {
+      enumerateDevices: async () => [{kind:"audioinput",deviceId:"test-interface",label:"TEST ONLY instrument"}],
+      getUserMedia: async () => {
+        window.__micRequests++;
+        const context = new Native();
+        const source=context.createOscillator(), gain=context.createGain(), output=context.createMediaStreamDestination();
+        source.frequency.value=window.__testFrequency ?? 220; gain.gain.value=.1;
+        source.connect(gain).connect(output); source.start();
+        const track=output.stream.getAudioTracks()[0], stop=track.stop.bind(track);
+        track.stop=()=>{stop();void context.close();};
+        return output.stream;
+      },
+    }) });
   });
   await page.unroute("**/api/**");
   await page.route("**/api/**", async (route) => {
@@ -60,6 +80,7 @@ async (page) => {
     if (action === "preset" && method === "POST") {
       generations++;
       const source = request.postDataJSON().source_calibration;
+      check(source?.method === "browser_level_v1" && source.duration_seconds >= 3 && source.tone_features?.bands.length === 6, "generation receives live level and spectral measurements");
       const calibrated = source ? { ...preset, quality_flags: source.tone_features?["source_level_calibrated","spectral_features_measured","tone_matching_unverified"]:["source_level_calibrated", "spectral_calibration_missing", "target_energy_only", "tone_matching_unverified"], parameters: { ...preset.parameters, input_gain_db: Math.round(Math.max(-24, Math.min(12, -24 - source.rms_dbfs, -6 - source.peak_dbfs)) * 10) / 10 } } : preset;
       job.generation = { request_id: `22222222-2222-4222-8222-${String(generations).padStart(12, "0")}`, reference_revision: job.result.reference_revision,
         ...(source ? { source_calibration: source } : {}),
@@ -69,12 +90,18 @@ async (page) => {
     }
     return json(job);
   });
-  await page.goto("http://127.0.0.1:5174");
+  let calibrations = 0;
+  async function calibrate() {
+    await page.getByRole("button", {name: /Calibrate live guitar|Calibrate again/, exact:true}).click();
+    await page.getByText("Live guitar calibrated", {exact:true}).waitFor({timeout:18000});
+    calibrations++;
+    await page.evaluate(() => { window.__contexts=window.__contexts.filter(c=>c.state!=="closed"); window.__shapers=[]; });
+  }
+  await page.goto("http://127.0.0.1:5173");
   await page.getByRole("button", { name: "Tone Match", exact: true }).click();
   check(await page.getByText("Real local separation", { exact: true }).isVisible(), "main Tone Match uses real API workflow");
   check(await page.getByLabel("Demo result").count() === 0, "fixture stage controls removed");
-  await page.locator("#calibration-file").setInputFiles({ name: "test-guitar.wav", mimeType: "audio/wav", buffer: wav });
-  await page.getByText("Input level calibrated:", { exact: false }).waitFor();
+  await calibrate();
   await page.getByLabel("Mixed-song audio", { exact: true }).setInputFiles({ name: "test-only.wav", mimeType: "audio/wav", buffer: wav });
   await page.getByRole("button", { name: "Separate guitar", exact: true }).dblclick();
   await page.getByRole("heading", { name: "Compare the same passage" }).waitFor();
@@ -116,8 +143,7 @@ async (page) => {
   await page.locator("#reference-end").fill("11");
   check(await page.getByRole("button", { name: "Apply starting preset", exact: true }).count() === 0, "changed bounds remove stale proposal");
   check(await page.locator("#amp-title").innerText() !== preset.name, "changed bounds invalidate applied generated preset");
-  await page.locator("#calibration-file").setInputFiles({ name: "test-guitar.wav", mimeType: "audio/wav", buffer: wav });
-  await page.getByText("Input level calibrated:", { exact: false }).waitFor();
+  await calibrate();
   await page.getByRole("button", { name: "Confirm reference", exact: true }).click();
   await page.getByRole("button", { name: "Generate starting preset", exact: true }).waitFor();
   failGeneration = true;
@@ -131,8 +157,8 @@ async (page) => {
   await page.getByRole("button", { name: "Recordings", exact: true }).click();
   check(await page.getByRole("heading", { name: "No performance recordings yet" }).isVisible(), "recordings library remains available");
   await page.getByRole("button", { name: "Tone Match", exact: true }).click();
-  check(await page.getByRole("button", { name: "Record", exact: true }).count() === 1, "calibration controls preserved");
-  check(await page.evaluate(() => window.__micRequests) === 0, "integration never requests microphone automatically");
+  check(await page.getByRole("button", { name: "Record", exact: true }).count() === 1, "performance recording controls preserved");
+  check(await page.evaluate(() => window.__micRequests) === calibrations, "integration never requests microphone automatically");
   check(await page.evaluate(() => window.__contexts.length) === 1, "one audio context across jobs, projects and navigation");
   await page.setViewportSize({ width: 390, height: 844 });
   check(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), "narrow layout has no horizontal overflow");
@@ -151,10 +177,9 @@ async (page) => {
   await page.getByRole("button", { name: "Confirm reference", exact: true }).click();
   await page.getByText("Generation is disabled:", { exact: false }).waitFor();
   check(await page.getByRole("button", { name: "Generate starting preset", exact: true }).isDisabled(), "zero allowance keeps main generation disabled");
-  await page.goto("http://127.0.0.1:5174/separation.html");
+  await page.goto("http://127.0.0.1:5173/separation.html");
   check(await page.getByRole("main").count() === 1, "standalone preview retains main landmark");
-  await page.locator("#calibration-file").setInputFiles({ name: "test-guitar.wav", mimeType: "audio/wav", buffer: wav });
-  await page.getByText("Input level calibrated:", { exact: false }).waitFor();
+  await calibrate();
   await page.getByLabel("Mixed-song audio", { exact: true }).setInputFiles({ name: "standalone-test.wav", mimeType: "audio/wav", buffer: wav });
   await page.getByRole("button", { name: "Separate guitar", exact: true }).click();
   await page.getByRole("heading", { name: "Compare the same passage" }).waitFor();
@@ -174,22 +199,21 @@ async (page) => {
   await page.getByRole("button", {name:"Use refined controls",exact:true}).click();
   check(await page.getByText("Review or edit the controls, then Apply.",{exact:false}).isVisible(),"refined controls require a separate Apply");
   await page.getByRole("button", { name: "Apply starting preset", exact: true }).click();
-  await page.getByRole("button", { name: "Play guitar recording", exact: true }).click();
+  await page.getByRole("button", { name: "Replay calibration exercise", exact: true }).click();
   await page.waitForFunction(() => window.__contexts.length === 1);
   await page.waitForFunction(() => document.querySelector('progress[aria-label="Guitar playback progress"]').value > .2);
-  check(await page.getByText("Playing your calibrated recording", { exact: false }).isVisible(), "standalone plays selected calibration recording with advancing progress");
+  check(await page.getByText("Replaying your live calibration", { exact: false }).isVisible(), "standalone plays selected calibration recording with advancing progress");
   await page.getByRole("button", { name: "Original guitar", exact: true }).click();
   check(await page.getByRole("button", { name: "Original guitar", exact: true }).getAttribute("aria-pressed") === "true", "original comparison selects without restarting playback");
   await page.getByRole("button", { name: "Rig applied", exact: true }).click();
   check(await page.getByRole("button", { name: "Stop preset audio", exact: true }).isVisible(), "standalone keeps its deliberate audition controls");
   await page.getByRole("button", { name: "Stop preset audio", exact: true }).click();
   const beforeSourceChange = generations;
-  const changedWav = Buffer.from(wav); changedWav.writeInt16LE(500, 46);
-  await page.locator("#calibration-file").setInputFiles({ name: "different-guitar.wav", mimeType: "audio/wav", buffer: changedWav });
-  await page.getByText("Input level calibrated: different-guitar.wav", { exact: true }).waitFor();
-  check(await page.getByRole("button", { name: "Apply starting preset", exact: true }).count() === 0, "changing recording removes stale generated rig");
-  check(!await page.getByRole("button", { name: "Generate starting preset", exact: true }).isDisabled(), "new recording enables a fresh deliberate generation");
-  check(generations === beforeSourceChange, "changing recording never auto-generates");
+  await page.evaluate(() => { window.__testFrequency=440; });
+  await calibrate();
+  check(await page.getByRole("button", { name: "Apply starting preset", exact: true }).count() === 0, "recalibrating live input removes stale generated rig");
+  check(!await page.getByRole("button", { name: "Generate starting preset", exact: true }).isDisabled(), "new live calibration enables a fresh deliberate generation");
+  check(generations === beforeSourceChange, "recalibrating live input never auto-generates");
   check(errors.length === 0, `no page errors: ${errors.join("; ")}`);
   await page.unroute("**/api/**");
   return { synthetic: true, checks, uploads, generations, errors };

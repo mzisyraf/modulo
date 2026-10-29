@@ -170,7 +170,7 @@ export class AudioEngine {
   }
 
   /** Call from a user gesture. False means a newer start/stop canceled this request. */
-  async startLive(deviceId?: string, channel: number = 0): Promise<LiveInputInfo | false> {
+  async startLive(deviceId?: string, channel: number = 0, monitor = true): Promise<LiveInputInfo | false> {
     if (this.disposed) throw new Error("Audio engine is closed.");
     if (channel !== 0 && channel !== 1) throw new Error("Choose input channel 0 or 1.");
     this.stop();
@@ -209,7 +209,7 @@ export class AudioEngine {
       source = context.createMediaStreamSource(new MediaStream([track]));
       splitter = context.createChannelSplitter(2);
       source.connect(splitter);
-      splitter.connect(this.input!, channel, 0);
+      if (monitor) splitter.connect(this.input!, channel, 0);
       const ended = () => {
         if (this.liveStream !== stream) return;
         this.stop();
@@ -332,7 +332,7 @@ export class AudioEngine {
 
   /** Resolve with an encoded processed take on finish/limit/source stop; catch cancellation. */
   async startPerformanceRecording(options?: PerformanceRecordingOptions): Promise<PerformanceTake> {
-    if (!this.context || this.context.state !== "running" || !this.outputGuard || (!this.liveStream && !this.source)) {
+    if (!this.context || !("createMediaStreamDestination" in this.context) || this.context.state !== "running" || !this.outputGuard || (!this.liveStream && !this.source)) {
       throw new Error("Start live input or sample playback before recording a performance.");
     }
     if (this.performanceRecording) throw new Error("A performance recording is already recording or finalizing.");

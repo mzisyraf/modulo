@@ -3,7 +3,7 @@ import { apiJson, isJobId, parseSeparationJob, referenceBounds, type ReferencePa
 import { ReferenceSelector } from "./ReferenceSelector";
 import type { Preset } from "@modulo/contracts";
 import { StartingPresetPanel, type PresetAudition } from "./StartingPresetPanel";
-import { RecordingCalibration } from "./GuitarCalibrationPanel";
+import { GuitarCalibration, type LiveCalibrationControl } from "./GuitarCalibrationPanel";
 import type { CalibratedRecording } from "./recordingCalibration";
 
 const storageKey = "modulo.local-separation-job";
@@ -23,6 +23,8 @@ function releasePlayer(player: HTMLAudioElement | null | undefined) {
 
 interface Props {
   embedded?: boolean;
+  active?: boolean;
+  onInputChosen?: (device: string, channel: 0 | 1) => void;
   initialJobId?: string;
   initialFile?: File;
   onJobChange?: (id: string, file: File | undefined, status: SeparationJob["status"] | "idle") => void;
@@ -32,7 +34,7 @@ interface Props {
   ref?: Ref<PresetAudition>;
 }
 
-export function SeparationPage({ embedded = false, initialJobId = "", initialFile, onJobChange, onApplyPreset, onStopAudio, onInvalidatePreset, ref }: Props) {
+export function SeparationPage({ embedded = false, active = true, onInputChosen, initialJobId = "", initialFile, onJobChange, onApplyPreset, onStopAudio, onInvalidatePreset, ref }: Props) {
   const [file, setFile] = useState<File | undefined>(initialFile);
   const [recording, setRecording] = useState<CalibratedRecording>();
   const [jobId, setJobId] = useState(() => {
@@ -54,6 +56,7 @@ export function SeparationPage({ embedded = false, initialJobId = "", initialFil
   const selectionController = useRef<AbortController | null>(null);
   const players = useRef<Partial<Record<(typeof tracks)[number][0], HTMLAudioElement | null>>>({});
   const preview = useRef<{ player: HTMLAudioElement; end: number } | null>(null);
+  const liveCalibration = useRef<LiveCalibrationControl | null>(null);
   const presetAudition = useRef<PresetAudition | null>(null);
   const result = job?.status === "ready" ? job.result : undefined;
   const processing = uploading || Boolean(jobId && (!job || job.status === "queued" || job.status === "running"));
@@ -64,9 +67,10 @@ export function SeparationPage({ embedded = false, initialJobId = "", initialFil
   invalidatePreset.current = onInvalidatePreset;
   useEffect(() => { jobChanged.current?.(jobId, file, job?.status ?? (jobId ? "queued" : "idle")); }, [jobId, file, job?.status]);
   function saveJob(id: string) { if (!embedded) rememberJob(id); }
-  useImperativeHandle(ref, () => ({ stop: () => pausePlayers() }));
+  useImperativeHandle(ref, () => ({ stop: () => pausePlayers(), invalidateCalibration: () => liveCalibration.current?.invalidate() }));
 
   function pausePlayers(except?: HTMLAudioElement) {
+    liveCalibration.current?.stop();
     presetAudition.current?.stop();
     Object.values(players.current).forEach((player) => { if (player && player !== except) player.pause(); });
   }
@@ -182,10 +186,10 @@ export function SeparationPage({ embedded = false, initialJobId = "", initialFil
 
   const Container = embedded ? "div" : "main";
   return <Container className={embedded ? "separation-page" : "separation-page app-content"}>
-    {!embedded && <><header className="hero"><div><a className="separation-brand" href="/">modulo <span>↗ Browser amp</span></a><span className="eyebrow">LOCAL TONE WORKFLOW</span><h1>From song to your guitar.</h1><p>Run the full local flow, then compare your recorded guitar with the rig on or off. No audio interface required.</p></div><div className="mode-badge"><strong>Real local separation</strong><span>Tone match remains unverified</span></div></header>
-      <ol className="local-flow-guide"><li><strong>Calibrate your recording.</strong> Set your guitar’s starting input level.</li><li><strong>Choose a target song.</strong> Separate it and listen to the extracted guitar.</li><li><strong>Confirm a passage.</strong> Choose a suggestion or highlight a manual region.</li><li><strong>Generate and Apply.</strong> Add the song’s starting rig over your input calibration.</li><li><strong>Compare your guitar.</strong> Play the same recording and switch Original / Rig applied.</li></ol></>}
+    {!embedded && <><header className="hero"><div><a className="separation-brand" href="/">modulo <span>↗ Browser amp</span></a><span className="eyebrow">LOCAL TONE WORKFLOW</span><h1>From song to your guitar.</h1><p>Calibrate your connected guitar, choose a target song, then compare your live exercise with the rig on or off. An instrument input is required for calibration.</p></div><div className="mode-badge"><strong>Real local separation</strong><span>Tone match remains unverified</span></div></header>
+      <ol className="local-flow-guide"><li><strong>Calibrate your live guitar.</strong> Set your guitar’s starting input level.</li><li><strong>Choose a target song.</strong> Separate it and listen to the extracted guitar.</li><li><strong>Confirm a passage.</strong> Choose a suggestion or highlight a manual region.</li><li><strong>Generate and Apply.</strong> Add the song’s starting rig over your input calibration.</li><li><strong>Compare your guitar.</strong> Compare the captured live exercise with Original / Rig applied.</li></ol></>}
     <p className="notice">Your song is sent to this laptop’s local API. Jobs expire after 24 hours; only four are kept. Separation stays local. Preset generation sends measured source/target descriptors, not audio, to Nebius only with a separate configured allowance.</p>
-    <RecordingCalibration onChange={next => { pausePlayers(); invalidatePreset.current?.(); setRecording(next); }} />
+    <GuitarCalibration ref={liveCalibration} active={active} onInputChosen={onInputChosen} onStart={() => { pausePlayers(); onStopAudio?.(); }} onChange={next => { pausePlayers(); invalidatePreset.current?.(); setRecording(next); }} />
     <div className="workflow-grid">
       <section className="upload-panel" aria-labelledby="local-upload-title"><span className="step">01 / SONG</span><h2 id="local-upload-title">Choose a mixed song</h2><p>Use audio you have permission to process. WAV or MP3, mono/stereo, 10 seconds–4:55, up to 50 MiB.</p><label className="file-label" htmlFor="separation-file">Mixed-song audio</label><input id="separation-file" type="file" accept="audio/wav,audio/mpeg,.wav,.mp3" disabled={processing || confirming} onChange={(event) => chooseFile(event.target.files?.[0])} />{file && <p className="file-summary"><strong>{file.name}</strong><span>{(file.size / 1024 / 1024).toFixed(1)} MiB</span></p>}<button disabled={!file || processing || confirming} onClick={() => void separate()}>{uploading ? "Uploading…" : job?.status === "failed" ? "Retry separation" : "Separate guitar"}</button><p className="hint">One local job runs at a time. Separation does not generate a tone preset.</p></section>
       <section className="progress-panel" aria-labelledby="local-progress-title"><span className="step">02 / SEPARATION</span><h2 id="local-progress-title">Job status</h2><p className="job-state" role="status">{uploading ? "Uploading to this laptop…" : connectionLost ? "Connection lost — status unverified" : job?.status === "ready" ? "Separation ready — review the audio below" : job?.status === "failed" ? "Separation failed" : job?.status === "running" ? "Running local guitar separation…" : job?.status === "queued" ? "Queued for local separation…" : jobId ? "Reconnecting to your job…" : "Choose a song to begin."}</p>{job?.status === "failed" && <p className="error" role="alert">{job.error?.message}</p>}{connectionLost && <button className="secondary" onClick={() => setReconnect((value) => value + 1)}>Reconnect to job</button>}{jobId && <p className="hint">Job <code>{jobId}</code> · {embedded ? "saved with this project in this tab; refreshing clears in-tab projects." : "refreshing this tab reconnects to it."}</p>}{result && <p className="hint">{timestamp(result.duration_seconds)} · {result.sample_rate.toLocaleString()} Hz · {result.provenance.model} · {result.provenance.device}</p>}</section>
@@ -194,7 +198,7 @@ export function SeparationPage({ embedded = false, initialJobId = "", initialFil
       <div className="reference-selection"><span className="step">04 / REFERENCE</span><h2>Choose your reference passage</h2>
         <ReferenceSelector key={jobId} jobId={jobId} duration={result.duration_seconds} start={start} end={end} confirmed={Boolean(confirmed)} confirming={confirming}
           onChange={changeInterval} onPreview={(track) => void playPassage(track)} onStop={() => pausePlayers()} onConfirm={() => void confirmPassage()} />
-        {confirmed && <div className="success-state" role="status"><strong>Reference confirmed: {timestamp(confirmed.start_seconds)}–{timestamp(confirmed.end_seconds)}</strong><p>{confirmed.explanation}</p><p>Quality flags: {confirmed.quality_flags.join(", ")}</p><p>Select your recording above to include source measurements in a new preset.</p></div>}
+        {confirmed && <div className="success-state" role="status"><strong>Reference confirmed: {timestamp(confirmed.start_seconds)}–{timestamp(confirmed.end_seconds)}</strong><p>{confirmed.explanation}</p><p>Quality flags: {confirmed.quality_flags.join(", ")}</p><p>Calibrate your connected guitar above to include source measurements in a new preset.</p></div>}
       </div>
     </section>}
     {result && (confirmed ? <StartingPresetPanel key={`${jobId}:${result.reference_revision ?? 0}`} recording={recording} ref={presetAudition} jobId={jobId} revision={result.reference_revision ?? 0} onApplyPreset={onApplyPreset} onPlay={() => { pausePlayers(); onStopAudio?.(); }} onReferenceChanged={() => { pausePlayers(); onInvalidatePreset?.(); setConfirmed(null); setReconnect((value) => value + 1); setError("The confirmed passage changed. Review it and confirm again."); }} /> : <p className="notice">Confirm a passage to unlock starting-preset generation and audition.</p>)}

@@ -265,3 +265,7 @@ guitar timbre, recording quality on every browser or hardware latency. The
 reported live Drive crackling remains unresolved and is not changed by this
 recorder. Real Scarlett/Edge recording and downloaded-file listening still
 require human verification.
+
+## Silent live calibration
+
+`startLive(deviceId, channel, monitor = true)` preserves existing monitored input by default. Passing `false` omits the selected splitter-to-amp connection entirely, while retaining dry metering and the silent capture worklet. Use this for guided live calibration, then stop/dispose to release capture. This does not suppress an interface hardware direct-monitor path or repair external loopback routing. No preset/schema change.

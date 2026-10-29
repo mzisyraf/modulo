@@ -366,3 +366,20 @@ test("empty/ended streams and graph failures release capture; dispose prevents r
   await engine.dispose();
   await assert.rejects(engine.startLive(), /closed/);
 }));
+
+test("silent live calibration captures dry input without routing it into the amp", () => withEngine(async (engine) => {
+  assert.ok(await engine.startLive("interface-id", 1, false));
+  const splitter = Context.current.splitters[0];
+  assert.equal(splitter.connections.length, 0);
+  assert.ok(engine.getInputLevel());
+  const captured = engine.startCalibration(10);
+  await setImmediate();
+  assert.equal(splitter.connections.length, 2); // meter and silent worklet only
+  Worklet.current.send({ samples: new Float32Array(48000 * 3).fill(0.1), done: true });
+  const take = await captured;
+  assert.equal(take.usable, true);
+  assert.equal(take.input.channel, 1);
+  engine.stop();
+  assert.ok(await engine.startLive("interface-id", 1));
+  assert.equal(Context.current.splitters[1].connections.length, 1);
+}));

@@ -2,7 +2,7 @@
 
 Turn a guitar sound in a mixed song into a browser preset you can play through.
 
-**Status:** browser amp/live capture and a fixture preset API work. Tone Match and the standalone [local workflow](docs/LOCAL_SEPARATION.md) connect recorded-guitar level/spectral measurements, real upload, CUDA guitar/backing separation, reference confirmation and budget-gated starting rigs with editable Apply/Play. The standalone page compares the same calibrated recording with the rig on/off. Generation is disabled by default; rendered checks/local refinement are available; broad audible tone-match and physical-rig acceptance remain incomplete.
+**Status:** browser amp/live capture and a fixture preset API work. Tone Match and the standalone [local workflow](docs/LOCAL_SEPARATION.md) connect live-guitar level/spectral measurements, real upload, CUDA guitar/backing separation, reference confirmation and budget-gated starting rigs with editable Apply/Play. The standalone page compares the same captured live exercise with the rig on/off. Generation is disabled by default; rendered checks/local refinement are available; broad audible tone-match and physical-rig acceptance remain incomplete.
 
 - **Team:** Isyraf — AI/backend/integration; Dinnie — browser audio/DSP; Shazlin — frontend/UX.
 - **Deadline:** 31 October 2026, 01:00 MYT (30 October, 17:00 UTC).

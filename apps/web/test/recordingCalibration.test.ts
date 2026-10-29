@@ -25,3 +25,17 @@ test("silent, clipped, nonfinite, very short and overlong recordings cannot cali
     assert.throws(() => recordingLevels(samples, 8000));
   }
 });
+
+test("live PCM supplies source level/spectra and a temporary comparison sample without file input", async () => {
+  const { calibrateLiveInput } = await import("../src/recordingCalibration.ts");
+  const rate = 44100, samples = Float32Array.from({length:rate*4}, (_,i) => .15*Math.sin(2*Math.PI*220*i/rate));
+  const result = await calibrateLiveInput(samples, rate);
+  assert.equal(result.originalName, "Live guitar calibration");
+  assert.equal(result.measurements.method, "browser_level_v1");
+  assert.equal(result.measurements.duration_seconds, 4);
+  assert.match(result.measurements.id, /^[a-f0-9]{64}$/);
+  assert.equal(result.measurements.tone_features?.bands.length, 6);
+  assert.ok(result.measurements.peak_dbfs + result.inputGainDb <= -6);
+  assert.equal(result.file.type, "audio/wav");
+  await assert.rejects(calibrateLiveInput(new Float32Array(rate*4),rate));
+});
