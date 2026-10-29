@@ -3,12 +3,14 @@ import { AudioEngine, type CalibrationFlag, type CalibrationTake, type InputLeve
 import { parsePreset, type Preset } from "@modulo/contracts";
 import example from "../../../fixtures/preset.example.json";
 import { AppShell, type AppView } from "./AppShell";
+import { AudioFileDropzone } from "./AudioFileDropzone";
 import { ChoiceMenu } from "./ChoiceMenu";
 import { audioInputOptions, DEFAULT_AUDIO_INPUT, LiveRequestGate, liveInputErrorMessage, type AudioInputOption } from "./liveInput";
 import { encodeMonoWav } from "./localAudio";
 import { projectTitle, upsertProject } from "./projectSessions";
 import { RecordingLibrary } from "./RecordingLibrary";
-import type { PerformanceRecording } from "./performanceRecordings";
+import { addPerformanceRecording, createPerformanceRecording, type PerformanceRecording } from "./performanceRecordings";
+import { ReferenceWaveformReview } from "./ReferenceWaveformReview";
 
 const initialPreset = parsePreset(example);
 const controls = [
@@ -33,6 +35,7 @@ type FixtureOutcome = "ready" | "low_quality" | "failed";
 type LiveState = "stopped" | "starting" | "live" | "error";
 type CalibrationState = "idle" | "recording" | "complete" | "error";
 type CalibrationPlaybackState = "stopped" | "starting" | "playing" | "error";
+type PerformanceRecordingState = "idle" | "recording" | "finalizing" | "error";
 type EngineSource = "none" | "sample" | "live";
 
 interface StoredProject {
@@ -84,12 +87,16 @@ export function App() {
   const [activeProjectId, setActiveProjectId] = useState<string>(() => crypto.randomUUID());
   const [savedProjects, setSavedProjects] = useState<StoredProject[]>([]);
   const [recordings, setRecordings] = useState<PerformanceRecording[]>([]);
+  const [performanceState, setPerformanceState] = useState<PerformanceRecordingState>("idle");
+  const [performanceMessage, setPerformanceMessage] = useState("Start live input or an audition, then record your processed sound.");
   const [sessionKey, setSessionKey] = useState(0);
   const engine = useRef<AudioEngine | null>(null);
   const jobRun = useRef(0);
   const jobRunning = useRef(false);
   const liveRequests = useRef(new LiveRequestGate());
   const calibrationRun = useRef(0);
+  const performanceRun = useRef(0);
+  const performanceStateRef = useRef<PerformanceRecordingState>("idle");
   const engineSource = useRef<EngineSource>("none");
   const mixPlayer = useRef<HTMLAudioElement>(null);
   const referencePlayer = useRef<HTMLAudioElement>(null);
@@ -100,6 +107,12 @@ export function App() {
   const hasResult = jobStage === "ready";
   const currentStageIndex = stages.findIndex(([stage]) => stage === jobStage);
   const inactiveProjects = savedProjects.filter((project) => project.id !== activeProjectId);
+
+  const updatePerformanceStatus = useCallback((state: PerformanceRecordingState, message: string) => {
+    performanceStateRef.current = state;
+    setPerformanceState(state);
+    setPerformanceMessage(message);
+  }, []);
 
   const refreshInputDevices = useCallback(async () => {
     if (!navigator.mediaDevices?.enumerateDevices) {
@@ -123,6 +136,9 @@ export function App() {
   useEffect(() => {
     const audio = new AudioEngine(initialPreset);
     audio.onEnded = () => {
+      if (performanceStateRef.current === "recording") {
+        updatePerformanceStatus("finalizing", "The audio source stopped. Finalizing your take…");
+      }
       if (engineSource.current === "live") {
         liveRequests.current.cancel();
         calibrationRun.current++;
@@ -152,10 +168,12 @@ export function App() {
       controller.abort();
       jobRun.current++;
       liveRequests.current.cancel();
+      performanceRun.current++;
+      audio.cancelPerformanceRecording();
       engineSource.current = "none";
       void audio.dispose();
     };
-  }, [refreshInputDevices]);
+  }, [refreshInputDevices, updatePerformanceStatus]);
 
   useEffect(() => {
     void refreshInputDevices();
@@ -222,6 +240,54 @@ export function App() {
     );
   }
 
+  function markPerformanceFinalizing(message = "The audio source stopped. Finalizing your take…") {
+    if (performanceStateRef.current === "recording") updatePerformanceStatus("finalizing", message);
+  }
+
+  function discardPerformanceRecording(message = "Take discarded. Record again when you’re ready.") {
+    performanceRun.current++;
+    engine.current?.cancelPerformanceRecording();
+    updatePerformanceStatus("idle", message);
+  }
+
+  async function recordPerformance() {
+    const audio = engine.current;
+    if (!audio || engineSource.current === "none" || performanceStateRef.current === "recording" || performanceStateRef.current === "finalizing") return;
+
+    const run = ++performanceRun.current;
+    const details = {
+      projectId: activeProjectId,
+      projectTitle: projectTitle(songFile?.name),
+      presetName: preset.name,
+    };
+    updatePerformanceStatus("recording", "Recording processed audio… Finish when you’re done, or discard this take.");
+    try {
+      const take = await audio.startPerformanceRecording();
+      if (run !== performanceRun.current) return;
+      const recording = createPerformanceRecording(take, details);
+      setRecordings((current) => addPerformanceRecording(current, recording));
+      const message = take.stopReason === "duration_limit"
+        ? "The 3-minute limit was reached. Your take was saved."
+        : take.stopReason === "source_stopped"
+          ? "The audio source stopped. Your take was saved."
+          : "Take saved to Recordings for playback or download.";
+      updatePerformanceStatus("idle", message);
+    } catch (failure) {
+      if (run !== performanceRun.current) return;
+      if (failure instanceof DOMException && failure.name === "AbortError") {
+        updatePerformanceStatus("idle", "Take discarded. Record again when you’re ready.");
+        return;
+      }
+      updatePerformanceStatus("error", failure instanceof Error ? failure.message : "The performance recording failed. Try again.");
+    }
+  }
+
+  function finishPerformanceRecording() {
+    if (performanceStateRef.current !== "recording") return;
+    updatePerformanceStatus("finalizing", "Finalizing the recording so it can be played back…");
+    engine.current?.finishPerformanceRecording();
+  }
+
   function openProject(projectId: string) {
     const project = savedProjects.find((candidate) => candidate.id === projectId);
     if (!project) return;
@@ -230,6 +296,7 @@ export function App() {
 
     jobRun.current++;
     jobRunning.current = false;
+    discardPerformanceRecording("Ready to record a take for this project.");
     stopEngineAudio();
     mixPlayer.current?.pause();
     referencePlayer.current?.pause();
@@ -264,6 +331,7 @@ export function App() {
     liveRequests.current.cancel();
     calibrationRun.current++;
     const wasRecording = calibrationState === "recording";
+    markPerformanceFinalizing();
     engineSource.current = "none";
     engine.current?.stop();
     stopCalibrationPlayback();
@@ -315,6 +383,7 @@ export function App() {
   async function play(useFile: boolean) {
     liveRequests.current.cancel();
     stopCalibrationPlayback();
+    markPerformanceFinalizing("The previous audio source stopped. Finalizing your take…");
     engineSource.current = "sample";
     setLiveState("stopped");
     setLiveMessage("Stopped — local audition took over the audio engine.");
@@ -339,6 +408,7 @@ export function App() {
     if (!selectedDeviceId || !engine.current) return;
     const request = liveRequests.current.begin();
     if (request === undefined) return;
+    markPerformanceFinalizing("The previous audio source stopped. Finalizing your take…");
     engineSource.current = "live";
     stopCalibrationPlayback();
     mixPlayer.current?.pause();
@@ -376,7 +446,7 @@ export function App() {
   }
 
   async function recordCalibration() {
-    if (liveState !== "live" || !engine.current || calibrationState === "recording") return;
+    if (liveState !== "live" || !engine.current || calibrationState === "recording" || performanceStateRef.current === "recording" || performanceStateRef.current === "finalizing") return;
     stopCalibrationPlayback();
     const run = ++calibrationRun.current;
     setCalibrationTake(undefined);
@@ -482,6 +552,7 @@ export function App() {
 
     jobRun.current++;
     jobRunning.current = false;
+    discardPerformanceRecording("Ready to record a take for your new project.");
     stopEngineAudio();
     mixPlayer.current?.pause();
     referencePlayer.current?.pause();
@@ -541,8 +612,7 @@ export function App() {
       <div className="workflow-grid">
         <section className="upload-panel" aria-labelledby="upload-title">
           <span className="step">01 / SONG</span><h2 id="upload-title">Choose a mixed song</h2><p>Use a rights-cleared WAV or MP3. This fixture flow keeps the file in your browser.</p>
-          <label className="file-label" htmlFor="song-file">Mixed-song audio</label><input key={`song-${sessionKey}`} id="song-file" type="file" accept="audio/wav,audio/mpeg,.wav,.mp3" disabled={processing} onChange={(event) => selectSong(event.target.files?.[0])} />
-          {songFile && <div className="file-summary"><strong>{songFile.name}</strong><span>{(songFile.size / (1024 * 1024)).toFixed(1)} MB · local only</span></div>}
+          <AudioFileDropzone key={`song-${sessionKey}`} id="song-file" accept="audio/wav,audio/mpeg,.wav,.mp3" formats="WAV or MP3" maxBytes={50 * 1024 * 1024} file={songFile} disabled={processing} onFile={selectSong} />
           <label className="select-label" htmlFor="fixture-outcome">Demo result</label><ChoiceMenu id="fixture-outcome" value={fixtureOutcome} disabled={processing} onChange={(value) => setFixtureOutcome(value as FixtureOutcome)} options={[{ label: "Tone ready", value: "ready" }, { label: "Unclear reference", value: "low_quality" }, { label: "Couldn’t finish", value: "failed" }]} placeholder="Choose a demo result" />
           <button className="primary-action" disabled={!songFile || processing} onClick={() => void runFixtureJob()}>{processing ? "Building your demo tone…" : hasResult ? "Run demo again" : "Start tone match"}</button><p className="hint">Choose a result to preview the ready, warning and retry screens.</p>
         </section>
@@ -552,11 +622,11 @@ export function App() {
         </section>
       </div>
 
-      {hasResult && <section className="result-panel" aria-labelledby="result-title"><div className="result-heading"><div><span className="step">03 / REFERENCE</span><h2 id="result-title">Review the selected passage</h2></div><span className={fixtureOutcome === "low_quality" ? "quality-badge warning" : "quality-badge"}>{fixtureOutcome === "low_quality" ? "Needs another listen" : "Demo result"}</span></div>{fixtureOutcome === "low_quality" && <p className="warning-message" role="status"><strong>This section may be hard to match.</strong> In the finished flow, you’ll be able to choose another passage or upload a different song.</p>}<div className="players"><div><h3>Your song</h3><p>The original file from this browser.</p><audio ref={mixPlayer} controls preload="metadata" src={songUrl} onPlay={() => playSource("mix")}>Your browser does not support audio playback.</audio></div><div><h3>Guitar reference</h3><p>Demo passage · 00:42–00:57 · currently plays the original file.</p><audio ref={referencePlayer} controls preload="metadata" src={songUrl} onPlay={() => playSource("reference")}>Your browser does not support audio playback.</audio></div></div><div className="explanation"><span>Why this passage</span><p>This demo highlights a clear, sustained 15-second phrase. No audio measurements are performed yet.</p></div></section>}
+      {hasResult && songFile && <ReferenceWaveformReview file={songFile} sourceUrl={songUrl} outcome={fixtureOutcome} mixPlayer={mixPlayer} referencePlayer={referencePlayer} onPlayerStart={playSource} onContinue={() => document.getElementById("amp-title")?.scrollIntoView({ behavior: "smooth", block: "start" })} />}
 
       <div className="grid">
         <section aria-labelledby="amp-title"><span className="step">04 / PRESET</span><h2 id="amp-title">{preset.name}</h2><p>{preset.description}</p><div className="provenance"><strong>Demo preset</strong><span>Manually made · not generated from your song</span></div><div className="controls">{controls.map(([key, label, min, max, step, unit]) => <label key={key} htmlFor={key}><span>{label}<output>{preset.parameters[key]} {unit}</output></span><input id={key} type="range" min={min} max={max} step={step} value={preset.parameters[key]} onChange={(event) => changeControl(key, Number(event.target.value))} /></label>)}</div><button className="secondary" onClick={() => void loadApiExample()}>Load demo preset</button></section>
-        <section aria-labelledby="audition-title"><span className="step">05 / AUDITION</span><h2 id="audition-title">Hear the browser amp</h2><p>Working gain, drive and EQ. Start at a comfortable listening level.</p><button disabled={busy} onClick={() => void play(false)}>Play test signal</button><p className="hint">A two-second synthesized pluck, not an isolated guitar or AI result.</p><label className="file-label" htmlFor="dry-file">Dry guitar recording · local audition only</label><input key={`dry-${sessionKey}`} id="dry-file" type="file" accept="audio/*" onChange={(event) => setDryFile(event.target.files?.[0])} /><button className="secondary" disabled={!dryFile || busy} onClick={() => void play(true)}>Play dry recording</button><label className="toggle"><input type="checkbox" checked={bypass} onChange={(event) => { setBypass(event.target.checked); engine.current?.setBypass(event.target.checked); }} />Bypass drive and EQ</label><button className="stop" onClick={() => stopEngineAudio()}>Stop audio</button><p role="status">{audioState}</p></section>
+        <section aria-labelledby="audition-title"><span className="step">05 / AUDITION</span><h2 id="audition-title">Hear the browser amp</h2><p>Working gain, drive and EQ. Start at a comfortable listening level.</p><button disabled={busy} onClick={() => void play(false)}>Play test signal</button><p className="hint">A two-second synthesized pluck, not an isolated guitar or AI result.</p><AudioFileDropzone key={`dry-${sessionKey}`} id="dry-file" compact accept="audio/*" formats="Browser-supported audio" maxBytes={20 * 1024 * 1024} file={dryFile} disabled={busy} onFile={setDryFile} /><button className="secondary" disabled={!dryFile || busy} onClick={() => void play(true)}>Play dry recording</button><label className="toggle"><input type="checkbox" checked={bypass} onChange={(event) => { setBypass(event.target.checked); engine.current?.setBypass(event.target.checked); }} />Bypass drive and EQ</label><button className="stop" onClick={() => stopEngineAudio()}>Stop audio</button><p role="status">{audioState}</p></section>
         <section aria-labelledby="live-title" className="live-panel">
           <span className="step">06 / LIVE INPUT</span><h2 id="live-title">Connect your guitar</h2>
           <p>Use a local audio interface to play through the same gain, drive, EQ and bypass controls. Song analysis above remains a guided demo.</p>
@@ -587,6 +657,18 @@ export function App() {
             <p className={`calibration-status ${calibrationState}`} role="status">{calibrationMessage}</p>
             {calibrationTake && <div className={`take-summary ${calibrationTake.usable ? "usable" : "needs-retry"}`}><div><strong>{calibrationTake.durationSeconds.toFixed(1)} s take</strong><span>{calibrationTake.sampleRate} Hz · peak {levelDb(calibrationTake.level.peak).toFixed(1)} dBFS · RMS {levelDb(calibrationTake.level.rms).toFixed(1)} dBFS</span></div>{calibrationTake.usable ? <p>Input level looks usable for the next local calibration step.</p> : <ul>{calibrationTake.qualityFlags.map((flag) => <li key={flag}>{qualityFlagLabels[flag]}</li>)}</ul>}</div>}
             <p className="hint">This temporary sample stays in browser memory only. If you change the interface gain, guitar or pickup, discard it and calibrate again.</p>
+          </div>
+
+          <div className="performance-capture" aria-labelledby="performance-capture-title">
+            <div className="calibration-heading"><div><span className="step">PERFORMANCE</span><h3 id="performance-capture-title">Record your processed guitar</h3></div><span className={`calibration-chip ${performanceState}`}>{performanceState === "recording" ? "Recording" : performanceState === "finalizing" ? "Finalizing" : performanceState === "error" ? "Error" : "Ready"}</span></div>
+            <p>Capture the sound after Modulo’s gain, Drive, EQ and bypass controls. Takes stay in this tab for playback, download or deletion.</p>
+            <div className="performance-actions">
+              {(performanceState === "idle" || performanceState === "error") && <button disabled={engineSource.current === "none" || calibrationState === "recording"} onClick={() => void recordPerformance()}>{performanceState === "error" ? "Retry recording" : "Record"}</button>}
+              {performanceState === "recording" && <><button onClick={finishPerformanceRecording}>Finish</button><button className="secondary" onClick={() => discardPerformanceRecording()}>Discard</button></>}
+              {performanceState === "finalizing" && <><button disabled>Finalizing…</button><button className="secondary" onClick={() => discardPerformanceRecording()}>Discard</button></>}
+            </div>
+            <p className={`performance-status ${performanceState}`} role="status">{performanceMessage}</p>
+            <button className="text-action" onClick={() => navigate("recordings")}>View {recordings.length ? `${recordings.length} saved ${recordings.length === 1 ? "take" : "takes"}` : "recordings"} <span aria-hidden="true">→</span></button>
           </div>
 
           {liveInfo && <dl className="capture-info"><div><dt>Capture sample rate</dt><dd>{liveInfo.settings.sampleRate ?? "unknown"}</dd></div><div><dt>Capture channels</dt><dd>{liveInfo.settings.channelCount ?? "unknown"}</dd></div><div><dt>Audio-context rate</dt><dd>{liveInfo.contextSampleRate}</dd></div><div><dt>Echo cancellation</dt><dd>{liveInfo.settings.echoCancellation === undefined ? "unknown" : liveInfo.settings.echoCancellation ? "on" : "off"}</dd></div><div><dt>Noise suppression</dt><dd>{liveInfo.settings.noiseSuppression === undefined ? "unknown" : liveInfo.settings.noiseSuppression ? "on" : "off"}</dd></div><div><dt>Automatic gain</dt><dd>{liveInfo.settings.autoGainControl === undefined ? "unknown" : liveInfo.settings.autoGainControl ? "on" : "off"}</dd></div>{liveInfo.baseLatencySeconds !== undefined && <div><dt>Browser base estimate</dt><dd>{(liveInfo.baseLatencySeconds * 1000).toFixed(1)} ms</dd></div>}{liveInfo.outputLatencySeconds !== undefined && <div><dt>Browser output estimate</dt><dd>{(liveInfo.outputLatencySeconds * 1000).toFixed(1)} ms</dd></div>}</dl>}
