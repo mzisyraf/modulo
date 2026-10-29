@@ -4,7 +4,7 @@ Status: **proposed; awaiting Isyraf's approval of this plan**. Preparation and t
 
 ## Approved policy and intended result
 
-Operator: Isyraf / mzisyraf. Work on Isyraf; serialize integration through issue #11. Isyraf approved **up to US$5 additional overnight usage**, within the existing US$20 overall cap, and a bounded Nemotron Super fallback only if Nano fails the declared tests. The US$30 Modal balance does not enlarge either cap. Tested work may be pushed to staging. Main, repository publication and licence selection remain separate decisions.
+Operator: Isyraf / mzisyraf. Work on Isyraf; serialize integration through issue #11. Isyraf revised the spending ceilings to **US$10 Modal and US$10 Token Factory**, replacing the earlier US$5 overnight allocation. The combined ceiling remains US$20; prior usage and outstanding reservations count toward the applicable ceilings, and credits count as usage. A bounded Nemotron Super fallback is allowed only if Nano fails the declared tests. The US$30 Modal balance does not enlarge these caps. Tested work may be pushed to staging. Main, repository publication and licence selection remain separate decisions.
 
 Deliver a working path: mixed song → Cloud API guitar/backing separation → listen and confirm a guitar segment → choose live guitar or recorded dry guitar → calibrate → NVIDIA/Nebius proposes an implemented rig → render and compare → deliberately apply → audition/play/record. Dinnie and Shazlin run the frontend and lightweight API locally, without a dedicated GPU.
 
@@ -35,6 +35,8 @@ Before implementation, re-read #1–#7/#11 claims and fetch remote refs. Post a 
 
 Both exact Nemotron IDs appeared in the authenticated account model catalog during planning. Catalog visibility is not a successful inference test. Verify current primary-source pricing, model availability and worst-case reservation before enabling paid calls. The current provider permits Nano only and returns the legacy six-control preset; full-rig integration is new work.
 
+**AI output is a custom configuration of individual implemented parameters, not a factory-preset selection.** Choose appropriate gear models and order, then generate explicit values for every parameter of each selected model, including relevant delay/reverb, amplifier, cabinet, EQ and dynamics settings. Use only the controls and units actually present in that model's registry metadata; do not invent unsupported knobs or include an effect merely to fill a category. Validate explicit categorical/on-off choices as well as numeric values. Factory rigs serve as optional test/neutral baselines, not the AI's answer space. Render-based refinement must be able to change supported individual values beyond factory settings.
+
 No extra GPU services, embedding model, transcription model, model training or always-on VM are required for this scope. Keep optional tabs and physical-product identification outside tonight's critical path.
 
 ## Credentials: share the existing access, without new accounts
@@ -59,7 +61,7 @@ The shared Modal token has broad workspace privileges and initially expires **5 
 ### 1. Define the contract and evaluations first — 60–90 minutes
 
 1. Record the exact rig registry/DSP version and predeclare structure, safety and rendered-audio gates before changing prompts. Keep earlier legacy-preset results separate.
-2. Add a versioned rig proposal contract beside the existing preset contract. AI proposes ordered installed model IDs, enabled state and model-owned physical parameters. Start with a serial chain capped at eight processing modules; preserve existing manual parallel/MIDI features.
+2. Add a versioned rig proposal contract beside the existing preset contract. AI proposes ordered installed model IDs, enabled state and explicit model-owned physical parameter values for each selected module. Missing values must not silently turn the response into a factory preset. Start with a serial chain capped at eight processing modules; preserve existing manual parallel/MIDI features.
 3. Export the backend catalog/schema from the TypeScript registry. Compile proposals through existing createGearModule/setGearParameter and RigPreset validation. Do not maintain a second handwritten Python gear catalog or ask the LLM to invent generic DSP internals.
 4. Reject unknown IDs, values, fields, unsafe gain/routing, unavailable IRs and nonfinite parameters at server and browser boundaries. Only built-in IRs are eligible unless a real provided asset exists. Keep legacy presets/imports working.
 5. Hash all relevant graph, processors, models and IR sources for evaluation/cache provenance. Dinnie's changed drive invalidates old prompt assumptions and tone-quality benchmarks; regenerate current-engine targets.
@@ -81,7 +83,7 @@ Likely touch points: App.tsx, SourceCalibration/LiveCalibrationControl, audition
 ### 3. Generate, render and improve the actual rig — 90–150 minutes
 
 1. Provide Nano the confirmed extracted passage features, source calibration, supported model catalog and strict rig proposal schema. Display actual provider/model/reference provenance; generation never automatically plays or applies a rig.
-2. Compile the response into the same RigPreset used by the real panel and shared engine. Show chosen gear/settings and editable explanations. Preserve a user's working rig if generation fails.
+2. Compile the response into the same RigPreset used by the real panel and shared engine. Show individually generated values in the actual model controls with editable explanations. Verify that changing one returned parameter reaches the corresponding DSP control and changes its rendered response. Preserve a user's working rig if generation fails.
 3. Render the source through that actual rig. Reuse renderRigFile/RigGraph and existing comparison/refinement code; extend measured timbre/dynamics/temporal features only where needed and test those additions.
 4. Bound local refinement to at most 80 short candidate renders over a 5–10 second training excerpt, with progress/cancellation. Refine a small set of effective controls; avoid combinatorial catalog search or repeatedly calling the LLM per knob change.
 5. Compare raw proposal, refined proposal and neutral rig with level-matched previews. Keep the best validated result and an honest weak-match status if the target is not reproducible. Cache only against source/reference/calibration/model/schema/catalog/DSP versions.
@@ -112,10 +114,10 @@ Live guitar/hardware latency, physical feedback and human perceptual acceptance 
 
 | Limit | Policy |
 |---|---|
-| Tonight's total | At most US$5 additional, within the prior overall US$20 ceiling; credits count toward usage |
-| Allocation | Up to US$4 Modal; up to US$1 Token Factory; no extra spend without a later explicit decision |
+| Combined ceiling | US$20 across Modal and Token Factory; credits, prior usage and outstanding reservations count toward these ceilings |
+| Allocation | Up to US$10 Modal and US$10 Token Factory; no transfer between service caps or extra spend without a later explicit decision |
 | Modal | At most four new reserved GPU attempts from the seven currently remaining; preserve the existing ten-attempt ledger and leave at least three for teammate/demo use |
-| Token Factory | At most 30 paid requests including repairs; at most six Super requests; input/output/context reservations must fit the US$1 sub-budget before every call |
+| Token Factory | At most 30 paid requests including repairs; at most six Super requests; input/output/context reservations must fit the remaining US$10 service ceiling before every call |
 | Retries/concurrency | One GPU runner, no blind paid retries; one deliberate schema repair maximum, counted; failed requests can cost money |
 
 Before calls, establish a run-specific bounded allowance and conservative per-request worst-case cost using verified current rates. Preserve historical ledgers. The current private legacy configuration is unlimited/100 requests; do not carry that into the new run. Inspect usage before and after and stop before the next reservation can exceed the remaining allowance. Billing can lag, and a local meter is not a provider-enforced global cap; include running reservations/CPU/storage overhead and stop paid work if a safe bound cannot be established. Do not let teammates concurrently consume an assumed exclusive budget unnoticed.
