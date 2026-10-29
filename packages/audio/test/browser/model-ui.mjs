@@ -1,0 +1,65 @@
+import { writeFile } from "node:fs/promises";
+const pages = await (await fetch("http://127.0.0.1:9223/json/list")).json(), page = pages.find(item => item.type === "page");
+const socket = new WebSocket(page.webSocketDebuggerUrl), pending = new Map(); let sequence = 0;
+await new Promise((resolve, reject) => { socket.onopen = resolve; socket.onerror = reject; });
+socket.onmessage = ({ data }) => { const message = JSON.parse(data); if (message.id) { const item = pending.get(message.id); pending.delete(message.id); if (message.error) item?.reject(message.error); else item?.resolve(message.result); } };
+const send = (method, params = {}) => new Promise((resolve, reject) => { const id = ++sequence; pending.set(id, { resolve, reject }); socket.send(JSON.stringify({ id, method, params })); });
+try {
+  await send("Page.navigate", { url: process.env.MODULO_APP_URL || "http://127.0.0.1:5173/" }); await new Promise(resolve => setTimeout(resolve, 1000));
+  const result = await send("Runtime.evaluate", { expression: `(async()=>{
+    const checks=[], wait=ms=>new Promise(r=>setTimeout(r,ms)), panel=()=>document.querySelector('.model-rig-panel'), check=(value,label)=>{if(!value)throw Error(label);checks.push(label)}, click=text=>{const button=[...panel().querySelectorAll('button')].find(b=>b.textContent.trim()===text);if(!button)throw Error('Missing '+text);button.click()}, select=(label,value)=>{const input=document.querySelector('[aria-label="'+label+'"]');input.value=value;input.dispatchEvent(new Event('change',{bubbles:true}))};
+    const setRange=(id,value)=>{const input=panel().querySelector('[data-model-parameter="'+id+'"]');Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,'value').set.call(input,value);input.dispatchEvent(new Event('input',{bubbles:true}))};
+    document.querySelector('.workspace-intro button').click();await wait(300);
+    check(panel()&&panel().querySelector('[data-model="amp.studio_clean"]'),'main React view contains model panel');
+    check(panel().querySelectorAll('[data-model-parameter]').length===4&&!panel().querySelector('[data-model-parameter="gain"]'),'studio exposes only its four actual controls');
+    click('Use model rig');await wait(500);check(panel().textContent.includes('Model rig active')&&document.getElementById('drive').disabled,'model mode uses existing engine and disables legacy editor');
+    select('Selected gear model','amp.modern_high_gain');await wait(300);check(panel().querySelector('[data-model-parameter="gain"]')&&panel().querySelector('[data-model-parameter="resonance_db"]')&&!panel().querySelector('[data-model-parameter="volume_db"]'),'amp model selection replaces schema');
+    setRange('gain',0.8);await wait(100);check(panel().querySelector('[data-model-parameter="gain"]').closest('label').querySelector('output').textContent==='0.64','React knob scaling updates displayed physical value');
+    panel().querySelector('[data-model-parameter="bright"]').click();await wait(100);check(panel().querySelector('[role="switch"]').checked,'model switch updates state');
+    const originalURL=URL.createObjectURL, originalClick=HTMLAnchorElement.prototype.click;let saved;
+    URL.createObjectURL=function(blob){saved=blob;return originalURL.call(this,blob)};HTMLAnchorElement.prototype.click=function(){if(this.download!=='modulo-model-rig.json')originalClick.call(this)};
+    let json;try{click('Save rig JSON');json=await saved.text()}finally{URL.createObjectURL=originalURL;HTMLAnchorElement.prototype.click=originalClick}
+    const preset=JSON.parse(json), amp=preset.chain.find(m=>m.id==='amp');check(preset.rig_version==='1'&&Math.abs(amp.parameters.gain-0.64)<1e-9&&amp.parameters.bright===true,'saved rig preserves real DSP state and existing format');
+    select('Gear category','distortion');select('Model gear library','distortion.gold');click('＋ Add selected gear / drag');await wait(300);check(panel().querySelector('[data-model="distortion.gold"]')&&panel().querySelectorAll('[data-model-parameter]').length===2,'two-knob pedal has no decorative tone or mix');
+    select('Selected gear model','distortion.rodent');await wait(300);check(panel().querySelector('[data-model-parameter="filter"]')&&!panel().querySelector('[data-model-parameter="tone"]'),'rodent exposes Filter instead of inherited Tone');
+    setRange('filter',0.8);await wait(100);check(panel().querySelector('[data-model-parameter="filter"]').closest('label').querySelector('output').textContent==='0.8','pedal knob updates in real time');
+    const added=panel().querySelector('.model-rig-card.is-selected').dataset.rigInstance;panel().querySelector('[aria-label="Move '+added+' earlier"]').click();await wait(300);check([...panel().querySelectorAll('.model-rig-chain:first-of-type .model-rig-card')].length>0,'chain remains rendered after reorder');
+    const enabled=[...panel().querySelectorAll('label')].find(label=>label.textContent.includes('Enable this gear')).querySelector('input');enabled.click();await wait(200);check(panel().querySelector('.model-rig-card.is-selected').textContent.includes('Bypassed'),'per-effect bypass is reflected');
+    const input=[...panel().querySelectorAll('input[type=file]')][0], transfer=new DataTransfer();transfer.items.add(new File([json],'saved.json',{type:'application/json'}));input.files=transfer.files;input.dispatchEvent(new Event('change',{bubbles:true}));await wait(400);check(panel().querySelector('[data-model="amp.modern_high_gain"]')&&panel().querySelector('[data-model-parameter="gain"]').closest('label').querySelector('output').textContent==='0.64','JSON import restores controls and removes stale added gear');
+    const assetRig=JSON.parse(json), cab=assetRig.chain.find(m=>m.type==='cabinet');cab.model='custom';cab.parameters.ir_id='shared_cab';
+    const uploadRig=async()=>{const data=new DataTransfer();data.items.add(new File([JSON.stringify(assetRig)],'cabinet.json',{type:'application/json'}));const upload=panel().querySelector('input[type=file]');upload.files=data.files;upload.dispatchEvent(new Event('change',{bubbles:true}));await wait(350)};
+    await uploadRig();check(panel().querySelector('[aria-label="Cabinet IR identifier"]').value==='shared_cab'&&panel().textContent.includes('not loaded'),'missing IR retains audible rig and exposes required asset ID');
+    const bytes=new ArrayBuffer(44+960), wav=new DataView(bytes), word=(at,text)=>[...text].forEach((c,i)=>wav.setUint8(at+i,c.charCodeAt(0)));word(0,'RIFF');wav.setUint32(4,996,true);word(8,'WAVE');word(12,'fmt ');wav.setUint32(16,16,true);wav.setUint16(20,1,true);wav.setUint16(22,1,true);wav.setUint32(24,48000,true);wav.setUint32(28,96000,true);wav.setUint16(32,2,true);wav.setUint16(34,16,true);word(36,'data');wav.setUint32(40,960,true);wav.setInt16(44,16384,true);
+    const irData=new DataTransfer();irData.items.add(new File([bytes],'test-cab.wav',{type:'audio/wav'}));const irUpload=panel().querySelectorAll('input[type=file]')[1];irUpload.files=irData.files;irUpload.dispatchEvent(new Event('change',{bubbles:true}));await wait(350);await uploadRig();panel().querySelector('[data-rig-instance="cabinet"]>button').click();await wait(100);check(panel().querySelector('[data-model="cabinet.custom"]')&&panel().querySelector('[data-model-parameter="ir_id"]').value==='shared_cab','IR can be reimported under preset ID and loaded through asset control');
+    document.querySelector('button[aria-label="Workspace"]').click();await wait(100);document.querySelector('.workspace-intro button').click();await wait(200);check(!document.getElementById('drive').disabled&&panel().textContent.includes('Model rig draft'),'new project restores legacy mode safely');
+    document.querySelector('button[aria-label="Workspace"]').click();await wait(200);document.querySelector('.saved-project button').click();await wait(400);check(panel().textContent.includes('Model rig active')&&panel().querySelector('[data-model-parameter="gain"]').closest('label').querySelector('output').textContent==='0.64','project switching restores saved model rig on same engine');
+    click('Use demo preset');await wait(100);check(!document.getElementById('drive').disabled&&!panel().textContent.includes('Model rig active'),'legacy preset path remains available');
+    click('Use model rig');await wait(250);const originalText=File.prototype.text;let release;
+    File.prototype.text=function(){if(this.name==='late.json')return new Promise(resolve=>{release=resolve});return originalText.call(this)};
+    try{const late=new DataTransfer();late.items.add(new File([json],'late.json',{type:'application/json'}));const upload=panel().querySelector('input[type=file]');upload.files=late.files;upload.dispatchEvent(new Event('change',{bubbles:true}));await wait(50);document.querySelector('button[aria-label="Workspace"]').click();await wait(50);document.querySelector('.workspace-intro button').click();await wait(150);release(json);await wait(350);check(!document.getElementById('drive').disabled&&panel().textContent.includes('Model rig draft'),'late file import cannot apply a previous project rig')}finally{File.prototype.text=originalText}
+    select('Selected gear model','amp.modern_high_gain');await wait(200);
+    return{passed:checks.length,checks};
+  })()`, awaitPromise: true, returnByValue: true, timeout: 60000 });
+  if (result.exceptionDetails) throw new Error(JSON.stringify(result.exceptionDetails));
+  const knobStart = await send("Runtime.evaluate", { expression: `(async()=>{document.querySelector('.model-rig-panel button').click();await new Promise(r=>setTimeout(r,250));const input=document.querySelector('.model-rig-panel [data-instance="amp"][data-model-parameter="gain"]');input.closest('.model-knob-wrapper').scrollIntoView({block:'center'});const rect=input.getBoundingClientRect();return{x:rect.x+rect.width/2,y:rect.y+rect.height/2,value:Number(input.value)}})()`, awaitPromise: true, returnByValue: true });
+  if (knobStart.exceptionDetails) throw new Error(JSON.stringify(knobStart.exceptionDetails));
+  const point = knobStart.result.value;
+  await send("Input.dispatchMouseEvent", { type: "mouseMoved", x: point.x, y: point.y });
+  await send("Input.dispatchMouseEvent", { type: "mousePressed", x: point.x, y: point.y, button: "left", buttons: 1, clickCount: 1 });
+  await send("Input.dispatchMouseEvent", { type: "mouseMoved", x: point.x, y: point.y - 18, buttons: 1 });
+  await send("Input.dispatchMouseEvent", { type: "mouseReleased", x: point.x, y: point.y - 18, button: "left", buttons: 0, clickCount: 1 });
+  await new Promise(resolve => setTimeout(resolve, 100));
+  const knobAfter = await send("Runtime.evaluate", { expression: `Number(document.querySelector('.model-rig-panel [data-instance="amp"][data-model-parameter="gain"]').value)`, returnByValue: true });
+  if (!(knobAfter.result.value > point.value + 0.05)) throw new Error("Native mouse drag did not adjust the model knob");
+  await send("Input.dispatchKeyEvent", { type: "keyDown", key: "ArrowLeft", code: "ArrowLeft", windowsVirtualKeyCode: 37 }); await send("Input.dispatchKeyEvent", { type: "keyUp", key: "ArrowLeft", code: "ArrowLeft", windowsVirtualKeyCode: 37 });
+  await new Promise(resolve => setTimeout(resolve, 100));
+  const knobKey = await send("Runtime.evaluate", { expression: `Number(document.querySelector('.model-rig-panel [data-instance="amp"][data-model-parameter="gain"]').value)`, returnByValue: true });
+  if (!(knobKey.result.value < knobAfter.result.value)) throw new Error("Native keyboard did not adjust the model knob");
+  await send("Emulation.setDeviceMetricsOverride", { width: 390, height: 844, deviceScaleFactor: 1, mobile: true }); await new Promise(resolve => setTimeout(resolve, 200));
+  const mobile = await send("Runtime.evaluate", { expression: "({width:innerWidth,scrollWidth:document.documentElement.scrollWidth})", returnByValue: true });
+  if (mobile.result.value.scrollWidth > mobile.result.value.width) throw new Error(`Model UI overflows: ${JSON.stringify(mobile.result.value)}`);
+  await send("Emulation.setDeviceMetricsOverride", { width: 1280, height: 1000, deviceScaleFactor: 1, mobile: false });
+  await send("Runtime.evaluate", { expression: 'document.querySelector(".model-rig-panel").scrollIntoView({block:"start"})' });
+  const screenshot = await send("Page.captureScreenshot", { format: "png", captureBeyondViewport: false }); await writeFile("/private/tmp/modulo-model-react.png", Buffer.from(screenshot.data, "base64"));
+  console.log(JSON.stringify({ ...result.result.value, passed: result.result.value.passed + 2, nativeKnobDrag: true, nativeKnobKeyboard: true, mobile: mobile.result.value }));
+} finally { socket.close(); }

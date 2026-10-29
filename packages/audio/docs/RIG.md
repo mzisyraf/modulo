@@ -1,9 +1,11 @@
 # Rig engine and frontend handoff
 
 This is Dinnie's audio implementation of the four requested tiers. The engine
-has real processing for the catalog entries below. The main `apps/web` rig
-editor still needs Shazlin's integration. Isyraf and Shazlin must review this
-additive engine interface before adopting it in the shared workflow.
+has real processing for the catalog entries below. A model-specific React panel
+is wired into the main Tone Match view and shares controls with the audio
+workbench. Isyraf and Shazlin still need to review this additive interface and
+UI integration before staging adoption. See [MODEL_ARCHITECTURE.md](MODEL_ARCHITECTURE.md)
+for the model registry, DSP examples, reference study and licence findings.
 
 `RigPreset` is an **experimental local engine configuration**, with
 `rig_version: "1"`. It is not a provider response. The shared
@@ -61,11 +63,13 @@ independent and safe to edit before validation.
 
 ## Catalog and brand references
 
-`getRigCatalog()` is the master catalog. Each module has a signal-chain position,
-models, descriptive character and controls with type, default, range, units,
-choices and `realtime`. `createRigModule(type, model?, uniqueId?)` provides all
-required controls. `on` enables a module; input/output cannot be bypassed.
-The catalog has 19 module types, 53 built-in processing characters plus a custom
+`getGearModels()` is the model-specific catalog, organized into 14 gear
+categories. Each model declares its own parameter IDs, labels, types, widgets,
+defaults, bounds, units, scaling, choices and DSP bindings. `getRigCatalog()` is
+retained for the legacy category/DSP wire format; do not use its category knob
+lists to build new model controls. `createGearModule(modelId, uniqueId?)` builds
+model defaults. `on` enables a module; input/output cannot be bypassed.
+The catalog has 19 wire module types, 56 built-in processing characters plus a custom
 cabinet option (including the single input and output models).
 
 | Type | Choices |
@@ -83,6 +87,14 @@ cabinet option (including the single input and output models).
 | Phaser / tremolo | Four/Six/Eight-stage phase; Sine/Triangle/Chop tremolo |
 | Pitch | Fast/Smooth granular shift, Wide opposing stereo detune |
 | Delay / reverb | Digital/Analog-style/Ping-pong; Room/Plate-style/Spring-style synthetic IRs |
+
+Additional original models: Studio Clean Preamp (linear two-band preamp),
+Single Tap / Slapback (feed-forward delay without feedback) and Tilt EQ
+(complementary shelves with movable pivot). These have dedicated processor
+factories and small, verified control sets. Existing approximation models are
+explicit legacy-processor adapters with model-owned controls. Legacy presets
+retain all stored values; a visible notice identifies non-default adjustments
+outside a model's new panel, with an explicit Reset model defaults action.
 
 **All branded names are approximate inspirations, not circuit simulations,
 licensed models, endorsed products or measured tone matches.** The model
@@ -125,6 +137,16 @@ await engine.applyRigPreset(importRigPreset(json));
 // Existing provider preset workflow remains available:
 engine.applyPreset(providerPreset); // exits rig mode and restores legacy processing
 ```
+
+New UI code uses `modelFor(module)` / `modelValues(module)` and
+`engine.setModelParameter(instanceId, parameterId, value)` instead of the legacy
+wire-parameter API. `changeGearModel` resets this gear's model defaults and
+removes its old snapshot values/incompatible CC mappings; changing the model
+does not inherit old knobs. `ModelControls.tsx` is the shared React renderer.
+The main app reuses its existing engine/capture/recorder, disables the legacy
+editor while model mode is active, and preserves model rigs in tab-local project
+sessions. JSON save/load retains the established engine rig format. Model rigs
+remain local manual setups, not full-rig provider inference.
 
 Changing order/model/buffer controls requires `applyRigPreset` with the complete
 validated rig. Compatible changes update in place; structural changes build first

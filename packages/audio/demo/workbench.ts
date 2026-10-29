@@ -1,6 +1,11 @@
 import example from "../../../fixtures/preset.example.json";
 import { AudioEngine, factoryRigPresets, getRigCatalog, allRigModules, exportRigPreset, importRigPreset, type RigPreset, type ModuleType } from "../src/index.ts";
 import { editRig, recommendedModels, type RigEdit } from "./rigEditor.ts";
+import { createElement } from "react";
+import { createRoot, type Root } from "react-dom/client";
+import { flushSync } from "react-dom";
+import { ModelControls } from "../../../apps/web/src/ModelControls.tsx";
+import { changeGearModel, resetGearModel, modelFor, type Value } from "../src/index.ts";
 
 const element = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
 const engine = new AudioEngine(example as any), factories = factoryRigPresets(), catalog = getRigCatalog();
@@ -10,6 +15,7 @@ let selectedId = "amp", recommendationRig: RigPreset | null = factories[0], edit
 type GearDrag = { action: "move"; id: string } | { action: "add"; type: ModuleType; model: string };
 const dragType = "application/x-modulo-rig-gear";
 let dragged: GearDrag | undefined;
+let controlsRoot: Root | undefined;
 const trayModels = new Map<ModuleType, string>();
 const status = (message: string) => { element("status").textContent = message; };
 const run = (action: () => unknown) => async () => { try { await action(); } catch (error) { status(error instanceof Error ? error.message : String(error)); } };
@@ -105,13 +111,15 @@ function draw() {
   element("rig-name").textContent = draft.name;
   const snapshots = element<HTMLSelectElement>("snapshots"), selectedSnapshot = snapshots.value; snapshots.replaceChildren(); draft.snapshots.forEach(item => option(snapshots, item.id, item.name)); if (draft.snapshots.some(item => item.id === selectedSnapshot)) snapshots.value = selectedSnapshot;
   drawChains(); drawTray();
+  controlsRoot?.unmount(); controlsRoot = undefined;
   const chain = element("controls"); chain.replaceChildren();
   for (const module of allRigModules(draft).filter(module => module.id === selectedId)) {
     const definition = catalog[module.type], article = document.createElement("article"), heading = document.createElement("h2"), model = document.createElement("select");
     heading.textContent = definition.name; article.append(heading); model.setAttribute("aria-label", `${module.id} model`); model.disabled = !initialized;
     modelChoices(model, module.type, module.model); model.dataset.focus = `model_${module.id}`;
-    model.onchange = run(() => enqueue(async () => { const next = structuredClone(draft), target = allRigModules(next).find(item => item.id === module.id)!; target.model = model.value; if (target.model === "custom") target.parameters.ir_id = engine.listCabinetIRs()[0]?.id ?? "none"; await apply(next); }));
+    model.onchange = run(() => enqueue(async () => { try { await apply(changeGearModel(draft, module.id, `${module.type}.${model.value}`, engine.listCabinetIRs()[0]?.id)); } catch (error) { draw(); throw error; } }));
     article.append(model);
+    const reset = button("Reset model defaults", () => enqueue(() => apply(resetGearModel(draft, module.id)))); reset.disabled = !initialized; article.append(reset);
     const note = document.createElement("p"); note.textContent = definition.models.find(item => item.id === module.model)!.character;
     if (recommendedModels(recommendationRig, module.type).includes(module.model)) note.textContent = `★ Recommended for ${recommendationRig!.name}. ${note.textContent}`;
     article.append(note);
@@ -121,23 +129,23 @@ function draw() {
       toggle.onchange = run(() => { engine.setRigModuleEnabled(module.id, toggle.checked); draft = engine.getRigPreset()!; draw(); });
       label.append("Enabled", toggle); article.append(label);
     }
-    for (const [key, control] of Object.entries(definition.controls)) {
-      const label = document.createElement("label"), input = control.kind === "choice" ? document.createElement("select") : document.createElement("input"), output = document.createElement("output");
-      label.append(key.replaceAll("_", " ")); input.setAttribute("aria-label", `${module.id} ${key}`);
-      input.disabled = !initialized;
-      input.dataset.focus = `${module.id}_${key}`;
-      if (input instanceof HTMLSelectElement) { const choices = key === "ir_id" ? ["none", ...engine.listCabinetIRs().map(item => item.id)] : control.choices!; choices.forEach(value => option(input, value, value)); input.value = String(module.parameters[key]); }
-      else if (control.kind === "boolean") { input.type = "checkbox"; input.checked = Boolean(module.parameters[key]); }
-      else { input.type = "range"; input.min = String(control.min); input.max = String(control.max); input.step = String((control.max! - control.min!) / 200); input.value = String(module.parameters[key]); output.textContent = `${Number(module.parameters[key]).toFixed(2)} ${control.unit ?? ""}`; }
-      const change = run(async () => {
-        const value = input instanceof HTMLSelectElement ? input.value : input.type === "checkbox" ? input.checked : Number(input.value);
-        if (typeof value === "number") output.textContent = `${value.toFixed(2)} ${control.unit ?? ""}`;
-        if (control.realtime) { engine.setRigParameter(module.id, key, value as number | boolean); draft = engine.getRigPreset()!; element<HTMLTextAreaElement>("json").value = exportRigPreset(draft); }
-        else await enqueue(async () => { const next = structuredClone(draft); allRigModules(next).find(item => item.id === module.id)!.parameters[key] = value; await apply(next); });
-      });
-      if (control.kind === "number" && control.realtime) input.oninput = change; else input.onchange = change;
-      label.append(input, output); article.append(label);
-    }
+    const host = document.createElement("div"); article.append(host); controlsRoot = createRoot(host);
+    const root = controlsRoot;
+    let firstRender = true;
+    const renderParameters = () => {
+      const current = allRigModules(draft).find(item => item.id === module.id); if (!current || controlsRoot !== root) return;
+      const render = () => root.render(createElement(ModelControls, { module: current, disabled: !initialized, assets: engine.listCabinetIRs(), onChange: (key: string, value: Value) => {
+        void run(async () => {
+          try {
+            const parameter = modelFor(current).parameters.find(item => item.id === key)!;
+            if (parameter.realtime) { await engine.setModelParameter(current.id, key, value); draft = engine.getRigPreset()!; element<HTMLTextAreaElement>("json").value = exportRigPreset(draft); renderParameters(); }
+            else await enqueue(async () => { if (await engine.setModelParameter(current.id, key, value)) { draft = engine.getRigPreset()!; draw(); } });
+          } catch (error) { renderParameters(); throw error; }
+        })();
+      } }));
+      if (firstRender) { flushSync(render); firstRender = false; } else render();
+    };
+    renderParameters();
     chain.append(article);
   }
   if (focus) {
@@ -175,11 +183,11 @@ on("record", async () => {
 on("finish", () => { engine.finishRigRecording(); status("Finalizing recording…"); }); on("discard", () => engine.cancelRigRecording());
 on("import-ir", async () => { const file = element<HTMLInputElement>("ir").files?.[0]; if (!file) throw new Error("Choose an IR file first."); await engine.loadCabinetIR(element<HTMLInputElement>("ir-id").value, file); draw(); status("IR imported. Choose User cabinet IR on a cabinet module."); });
 on("export", () => download(new Blob([exportRigPreset(engine.getRigPreset() ?? draft)], { type: "application/json" }), "modulo-rig.json"));
-element<HTMLInputElement>("import").onchange = run(async () => { const file = element<HTMLInputElement>("import").files?.[0]; if (file) { if (file.size > 256 * 1024) throw new Error("Preset is too large."); const next = importRigPreset(await file.text()); await enqueue(async () => { if (await apply(next)) { recommendationRig = null; draw(); status("Preset imported. All model choices remain available."); } }); } });
+element<HTMLInputElement>("import").onchange = run(async () => { const input = element<HTMLInputElement>("import"), file = input.files?.[0]; input.value = ""; if (file) { if (file.size > 256 * 1024) throw new Error("Preset is too large."); const next = importRigPreset(await file.text()); await enqueue(async () => { if (await apply(next)) { recommendationRig = null; draw(); status("Preset imported. All model choices remain available."); } }); } });
 on("apply-json", () => { const next = importRigPreset(element<HTMLTextAreaElement>("json").value); return enqueue(async () => { if (await apply(next)) { recommendationRig = null; draw(); } }); });
 on("render", async () => { const file = element<HTMLInputElement>("render-file").files?.[0]; if (!file) throw new Error("Choose an offline input file first."); if (rendering) throw new Error("A render is already running."); await ready(); rendering = new AbortController(); status("Rendering WAV…"); try { const result = await engine.renderRigFile(file, { signal: rendering.signal }); download(result.blob, "modulo-wet.wav"); status(`Rendered ${result.durationSeconds.toFixed(1)}s in ${result.renderMilliseconds.toFixed(0)}ms.`); } finally { rendering = undefined; } });
 on("cancel-render", () => rendering?.abort());
 engine.onRigError = status;
 const timer = setInterval(() => { const level = engine.getInputLevel(), tuner = engine.getTunerReading(); element("meter").textContent = `Dry meter: ${level ? (20 * Math.log10(Math.max(1e-6, level.rms))).toFixed(1) + " dBFS" : "—"} · Tuner: ${tuner ? `${tuner.note} ${tuner.cents.toFixed(0)} cents` : "—"}`; element("diagnostics").textContent = JSON.stringify(engine.getDiagnostics(), null, 2); }, 200);
-window.addEventListener("pagehide", () => { clearInterval(timer); rendering?.abort(); urls.forEach(URL.revokeObjectURL); void engine.dispose(); });
+window.addEventListener("pagehide", () => { clearInterval(timer); rendering?.abort(); controlsRoot?.unmount(); urls.forEach(URL.revokeObjectURL); void engine.dispose(); });
 draw();

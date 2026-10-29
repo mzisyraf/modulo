@@ -11,8 +11,9 @@ try {
   await send("Page.navigate", { url: "http://127.0.0.1:5173/" });
   await new Promise(resolve => setTimeout(resolve, 1500));
   const root = new URL("../../", import.meta.url).pathname;
-  const result = await send("Runtime.evaluate", { expression: `(async()=>{ const {verifyRig}=await import(${JSON.stringify(`/@fs${root}test/browser/verify.ts`)}); return verifyRig(); })()`, awaitPromise: true, returnByValue: true, timeout: 180000 });
+  const suite = process.env.MODULO_AUDIO_SUITE === "models" ? "models" : "verify";
+  const result = await send("Runtime.evaluate", { expression: `(async()=>{ const {verifyRig}=await import(${JSON.stringify(`/@fs${root}test/browser/${suite}.ts`)}); return verifyRig(); })()`, awaitPromise: true, returnByValue: true, timeout: 180000 });
   if (result.exceptionDetails) throw new Error(JSON.stringify(result.exceptionDetails));
-  const report = result.result.value; await writeFile("/private/tmp/modulo-rig-browser-report.json", JSON.stringify(report, null, 2));
-  console.log(JSON.stringify({ browser: report.browser, fixture: report.fixture, passed: report.passed, failed: report.failed, errors: report.checks.filter(item => !item.passed), report: "/private/tmp/modulo-rig-browser-report.json" }, null, 2)); if (report.failed) process.exitCode = 1;
+  const report = result.result.value, path = `/private/tmp/modulo-${suite === "models" ? "models" : "rig"}-browser-report.json`; await writeFile(path, JSON.stringify(report, null, 2));
+  console.log(JSON.stringify({ browser: report.browser, fixture: report.fixture, passed: report.passed, failed: report.failed, errors: report.checks.filter(item => !item.passed), report: path }, null, 2)); if (report.failed) process.exitCode = 1;
 } finally { socket.close(); }

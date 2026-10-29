@@ -315,6 +315,7 @@ require human verification.
 The additive four-tier rig engine, catalog, recording/rendering APIs and frontend
 handoff are documented in [docs/RIG.md](docs/RIG.md). Try the audio workbench with
 `npm run dev:rig --workspace @modulo/audio` at http://127.0.0.1:5175/.
-The main product rig controls still need frontend integration. Branded choices
+Model-specific controls are now wired into the main React page and the workbench;
+shared UI/API review is still pending. Branded choices
 are approximations; built-in IRs are synthetic. The existing provider Preset v1
 and live-input/calibration/performance-recording APIs above remain supported.
