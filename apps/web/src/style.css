@@ -114,6 +114,33 @@ input[type="range"] { width: 100%; accent-color: var(--accent-strong); cursor: p
 output { color: var(--accent); font-variant-numeric: tabular-nums; white-space: nowrap; }
 .file-label, .select-label { display: block; margin-top: 20px; font-size: 13px; font-weight: 650; color: #e4e0d9; }
 input[type="file"] { display: block; width: 100%; font-size: 12px; color: var(--muted); margin-top: 10px; }
+.audio-upload { display: grid; gap: 10px; margin-top: 20px; }
+.audio-dropzone { position: relative; isolation: isolate; min-height: 224px; display: flex; align-items: center; justify-content: center; flex-direction: column; gap: 8px; overflow: hidden; padding: 26px 20px; border: 1px dashed rgba(221, 177, 119, .5); border-radius: 14px; background: radial-gradient(circle at 50% 38%, rgba(137, 78, 40, .18), transparent 42%), rgba(25, 17, 15, .52); color: var(--text); cursor: pointer; text-align: center; transition: border-color 150ms ease, background 150ms ease, transform 150ms ease; }
+.audio-dropzone::before { position: absolute; z-index: -1; inset: 0; content: ""; opacity: .7; background: linear-gradient(125deg, rgba(255, 210, 31, .025), transparent 45%, rgba(233, 111, 81, .025)); }
+.audio-dropzone:hover, .audio-dropzone:focus-within, .audio-dropzone.is-dragging { border-color: var(--accent); background-color: rgba(52, 32, 24, .72); box-shadow: inset 0 0 0 1px rgba(255, 210, 31, .08), 0 12px 32px rgba(10, 5, 3, .18); }
+.audio-dropzone.is-dragging { transform: translateY(-2px); }
+.audio-dropzone.is-disabled { opacity: .5; cursor: not-allowed; transform: none; }
+.audio-dropzone .audio-file-input { position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; overflow: hidden; clip: rect(0 0 0 0); clip-path: inset(50%); border: 0; white-space: nowrap; }
+.audio-upload-icon, .audio-file-mark { display: grid; place-items: center; color: #f8ead7; background: rgba(255, 222, 166, .07); }
+.audio-upload-icon { width: 58px; height: 58px; margin-bottom: 2px; border: 1px solid rgba(222, 179, 124, .2); border-radius: 18px; }
+.audio-upload-icon svg, .audio-file-mark svg { width: 29px; height: 29px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+.audio-dropzone > strong { font-size: 16px; letter-spacing: -.015em; }
+.audio-dropzone > strong span { color: var(--accent); }
+.audio-dropzone > small { color: #a9978d; font-size: 11px; }
+.audio-upload-button { min-width: 128px; margin-top: 3px; padding: 9px 15px; border: 1px solid rgba(255, 210, 31, .72); border-radius: 8px; color: #ffe05c; background: rgba(38, 23, 17, .55); font-size: 12px; font-weight: 750; box-shadow: inset 0 1px rgba(255, 255, 255, .04); }
+.audio-upload-help { margin-top: 2px; color: #8f7e76; font-size: 9px; letter-spacing: .02em; }
+.audio-upload-error { margin: 0; padding: 9px 11px; border: 1px solid #865862; border-radius: 8px; background: #2b2023; color: #f1cad1; font-size: 11px; }
+.audio-file-card { display: grid; grid-template-columns: 48px minmax(0, 1fr) 36px; align-items: center; gap: 12px; padding: 12px; border: 1px solid rgba(185, 143, 107, .34); border-radius: 11px; background: linear-gradient(110deg, rgba(54, 34, 27, .76), rgba(26, 19, 17, .86)); }
+.audio-file-mark { width: 48px; height: 48px; border-radius: 10px; color: #ffe47a; background: rgba(255, 210, 31, .08); }
+.audio-file-mark svg { width: 24px; height: 24px; }
+.audio-file-copy { min-width: 0; display: grid; gap: 4px; text-align: left; }
+.audio-file-copy strong { overflow: hidden; color: #eee5dc; font-size: 12px; text-overflow: ellipsis; white-space: nowrap; }
+.audio-file-copy small { color: #9e8c83; font-size: 9px; }
+.audio-file-remove { display: grid; place-items: center; width: 34px; height: 34px; padding: 0; border-color: rgba(185, 143, 107, .28); border-radius: 9px; background: rgba(255, 255, 255, .045); color: #cdbbb0; box-shadow: none; font-size: 20px; font-weight: 400; }
+.audio-file-remove:hover:not(:disabled) { border-color: #b97169; background: rgba(185, 87, 79, .12); color: #f0c2bc; filter: none; }
+.audio-upload.is-compact .audio-dropzone { min-height: 190px; padding: 22px 15px; }
+.audio-upload.is-compact .audio-upload-icon { width: 50px; height: 50px; }
+.audio-upload.is-compact .audio-upload-help { max-width: 210px; line-height: 1.45; }
 .choice-menu { position: relative; z-index: 4; width: 100%; min-width: 0; margin-top: 9px; }
 .choice-menu.is-open { z-index: 40; }
 .choice-menu-trigger { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 10px; width: 100%; min-width: 0; padding: 11px 12px; border: 1px solid #6a5143; border-radius: 10px; background: linear-gradient(180deg, rgba(43, 29, 24, .98), rgba(23, 17, 15, .99)); box-shadow: inset 0 1px rgba(255, 255, 255, .045); color: var(--text); text-align: left; }
