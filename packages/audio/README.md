@@ -3,8 +3,9 @@
 The engine has no React or network dependency. Existing `playTestSignal()` and
 `playFile(file)` return `Promise<boolean>`; `false` means a newer start/stop
 canceled playback. The preset v1 schema, EQ controls, bypass, master and output
-guard remain supported; Drive behavior is revised below. Cabinet, delay and
-reverb remain issue #5 work.
+guard remain supported; Drive behavior is revised below. The additive full rig
+API (including cabinet, delay and reverb) is documented in [docs/RIG.md](docs/RIG.md).
+Its main-app frontend integration and hardware listening review remain open.
 
 ## Drive tuning revision (29 October 2026, listening review pending)
 
@@ -308,3 +309,12 @@ guitar timbre, recording quality on every browser or hardware latency. The
 reported live Drive crackling remains unresolved and is not changed by this
 recorder. Real Scarlett/Edge recording and downloaded-file listening still
 require human verification.
+
+## Full rig engine
+
+The additive four-tier rig engine, catalog, recording/rendering APIs and frontend
+handoff are documented in [docs/RIG.md](docs/RIG.md). Try the audio workbench with
+`npm run dev:rig --workspace @modulo/audio` at http://127.0.0.1:5175/.
+The main product rig controls still need frontend integration. Branded choices
+are approximations; built-in IRs are synthetic. The existing provider Preset v1
+and live-input/calibration/performance-recording APIs above remain supported.
