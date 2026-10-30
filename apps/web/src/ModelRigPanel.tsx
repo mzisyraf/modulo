@@ -1,7 +1,9 @@
 import { useEffect, useRef, useState, type RefObject } from "react";
+import { createPortal } from "react-dom";
 import { AudioEngine, GEAR_CATEGORIES, allRigModules, changeGearModel, resetGearModel, createRigPreset, editRig, exportRigPreset, getGearModels, importRigPreset, modelFor, parameterToDSP, parseRigPreset, type GearCategory, type RigEdit, type RigPreset, type Value } from "@modulo/audio";
 import type { Preset } from "@modulo/contracts";
 import { ModelControls } from "./ModelControls";
+import { clearRemovableGear, isRemovableGear, selectionAfterRemoval } from "./modelRigActions";
 
 interface Props { engineRef: RefObject<AudioEngine | null>; value: RigPreset | null; legacyPreset: Preset }
 function initialRig(): RigPreset {
@@ -39,6 +41,8 @@ export function ModelRigPanel({ engineRef, value, legacyPreset }: Props) {
   const [draft, setDraft] = useState(initialRig), [selectedId, setSelectedId] = useState("amp"), [category, setCategory] = useState<GearCategory | "all">("all");
   const [libraryId, setLibraryId] = useState("delay.single_tap"), [busy, setBusy] = useState(false), [message, setMessage] = useState("Edit this local rig, then choose Apply Rig to hear it through the existing player or live input.");
   const [libraryGroup, setLibraryGroup] = useState("all"), [search, setSearch] = useState("");
+  const [dialog, setDialog] = useState<"clear" | "remove" | "replace" | null>(null), [replacementId, setReplacementId] = useState(""), [replacementSearch, setReplacementSearch] = useState("");
+  const [undoRig, setUndoRig] = useState<RigPreset | null>(null), [undoSelectionId, setUndoSelectionId] = useState("");
   const [assets, setAssets] = useState<{ id: string; name: string }[]>(() => engineRef.current?.listCabinetIRs() ?? []), [destination, setDestination] = useState("main");
   const [irAssetId, setIRAssetId] = useState("my_cab"), [rigFileName, setRigFileName] = useState("No rig selected"), [irFileName, setIRFileName] = useState("No IR selected");
   const mounted = useRef(true), urls = useRef(new Set<string>()), actionToken = useRef(0), libraryRef = useRef<HTMLDivElement>(null), selectedCardRef = useRef<HTMLDivElement>(null), previousSelectedId = useRef(selectedId);
@@ -54,6 +58,8 @@ export function ModelRigPanel({ engineRef, value, legacyPreset }: Props) {
   const activeGroup = LIBRARY_GROUPS.find(item => item.id === libraryGroup) ?? LIBRARY_GROUPS[0], query = search.trim().toLocaleLowerCase();
   const visibleLibraryModels = allLibraryModels.filter(model => (!activeGroup.types.length || (activeGroup.types as readonly string[]).includes(model.type)) && (!query || `${model.name} ${model.description} ${gearFamily(model.type)}`.toLocaleLowerCase().includes(query))).sort((left, right) => Number(STARTER_RECOMMENDATIONS.has(right.id)) - Number(STARTER_RECOMMENDATIONS.has(left.id)) || left.name.localeCompare(right.name));
   const libraryModel = libraryModels.find(item => item.id === libraryId) ?? libraryModels[0], selectedModel = modelFor(selected);
+  const compatibleModels = getGearModels().filter(model => model.type === selected.type), removable = isRemovableGear(selected.type), removableCount = modules.filter(module => isRemovableGear(module.type)).length;
+  const replacementQuery = replacementSearch.trim().toLocaleLowerCase(), visibleReplacements = compatibleModels.filter(model => !replacementQuery || `${model.name} ${model.description} ${gearFamily(model.type)}`.toLocaleLowerCase().includes(replacementQuery));
   const chains = [{ id: "main", name: "Main chain", chain: rig.chain }, ...(rig.parallel?.paths.map(path => ({ id: `path:${path.id}`, name: path.id.replaceAll("_", " "), chain: path.chain })) ?? [])];
   const target = chains.some(chain => chain.id === destination) ? destination : "main";
   const run = async (action: () => Promise<void> | void) => {
@@ -104,25 +110,56 @@ export function ModelRigPanel({ engineRef, value, legacyPreset }: Props) {
   }
   const applyRig = () => void run(async () => { const audio = engineRef.current; if (!audio) throw new Error("Audio is not ready yet."); if (await audio.applyRigPreset(rig)) { setDraft(rig); setMessage("Rig applied. Model rig active for audition and live input."); } });
   const restoreDemo = () => { setDraft(rig); engineRef.current?.applyPreset(legacyPreset); setMessage("Demo rig loaded. The model rig is no longer active."); };
+  function openReplace() {
+    setReplacementId(selectedModel.id); setReplacementSearch(""); setDialog("replace");
+  }
+  function replaceModel() {
+    if (!replacementId || replacementId === selectedModel.id) return;
+    void run(async () => {
+      const next = changeGearModel(engineRef.current?.getRigPreset() ?? draft, selected.id, replacementId, assets[0]?.id);
+      if (await commit(next)) { setDialog(null); setMessage(`${modelFor(allRigModules(next).find(module => module.id === selected.id)!).name} replaced ${selectedModel.name} without moving the gear.`); }
+    });
+  }
+  function removeSelected() {
+    if (!removable) return;
+    void run(async () => {
+      const before = engineRef.current?.getRigPreset() ?? draft, next = editRig(before, { action: "remove", id: selected.id });
+      const nextSelection = selectionAfterRemoval(before, next, selected.id);
+      if (await commit(next)) { setUndoRig(before); setUndoSelectionId(selected.id); setSelectedId(nextSelection); setDialog(null); setMessage(`${selectedModel.name} removed. You can undo this change until the next destructive action.`); }
+    });
+  }
+  function clearRig() {
+    void run(async () => {
+      const before = engineRef.current?.getRigPreset() ?? draft, next = clearRemovableGear(before);
+      if (await commit(next)) { setUndoRig(before); setUndoSelectionId(selected.id); setSelectedId(next.chain[0].id); setDialog(null); setMessage("Rig cleared to the required Input and Output routing. Add any supported gear from the library."); }
+    });
+  }
+  function undoDestructiveChange() {
+    if (!undoRig) return;
+    void run(async () => {
+      if (await commit(undoRig)) { setSelectedId(allRigModules(undoRig).some(module => module.id === undoSelectionId) ? undoSelectionId : undoRig.chain[0].id); setUndoRig(null); setUndoSelectionId(""); setMessage("Previous rig restored."); }
+    });
+  }
 
   return <section className="model-rig-panel" aria-labelledby="model-rig-title">
     <header className="model-rig-heading">
       <div className="model-rig-title"><span className="model-rig-kicker">MODEL RIG</span><h2 id="model-rig-title">Build your signal chain.</h2><p>Arrange your gear, choose a model and shape only the controls that the engine supports.</p></div>
       <div className="model-rig-action-compat" aria-hidden="true"><button onClick={applyRig}>Use model rig</button><button onClick={restoreDemo}>Use demo preset</button><button onClick={save}>Save rig JSON</button></div>
       <div className="model-rig-action-area"><div className="model-rig-primary-actions"><button disabled={busy} title="Activate this edited chain for audition and live input" onClick={applyRig}>Apply Rig</button>
-        <button className="secondary" disabled={!value || busy} title={!value ? "Apply a model rig before switching back to the demo rig." : "Return to the simple starter preset"} onClick={restoreDemo}>Load Demo Rig</button><button className="secondary" title="Download this rig as a JSON file" onClick={save}>Export Rig</button></div><small>Apply activates this chain · Demo restores the starter sound · Export saves a file</small></div>
+        <button className="secondary" disabled={busy} title="Download this rig as a JSON file" onClick={save}>Export Rig</button><button className="model-rig-danger" disabled={busy || removableCount === 0} title={removableCount ? "Remove all optional gear" : "This rig already contains only required routing"} onClick={() => setDialog("clear")}>Clear Rig</button></div><small>Apply activates this chain · Export saves a file · <button className="model-rig-demo-action" disabled={!value || busy} title={!value ? "Apply a model rig before switching back to the demo rig." : "Return to the simple starter preset"} onClick={restoreDemo}>Load demo rig</button></small></div>
       <span className="model-rig-mode"><i />{value ? "Rig applied" : "Local rig"}</span>
     </header>
 
     <section className="model-rig-workbench-section" aria-labelledby="model-rig-chain-title">
       <div className="model-rig-section-heading"><div><span className="model-rig-kicker">SIGNAL CHAIN</span><h3 id="model-rig-chain-title">Current chain</h3></div><p>Drag to reorder. Scroll sideways for more. Select a module to edit it.</p><button className="model-rig-add-gear" onClick={() => libraryRef.current?.scrollIntoView({ behavior: "smooth", block: "start" })}>＋ Add gear</button></div>
+      {removableCount === 0 && <div className="model-rig-empty-chain"><span aria-hidden="true">＋</span><div><h4>Build your rig from scratch</h4><p>Your signal chain is ready. Add an amplifier, pedal, cabinet, or effect from the Gear Library. Required Input and Output routing stays in place.</p></div><button onClick={() => libraryRef.current?.scrollIntoView({ behavior: "smooth", block: "start" })}>Add Gear</button></div>}
       {chains.map(path => <div className="model-rig-path" key={path.id}><span className="model-rig-path-label"><span>{path.name}</span><small>{path.chain.length} modules</small></span><div className="model-rig-chain" tabIndex={0} onDragOver={dragOver} onDrop={event => onDrop(event, path.id)} aria-label={`${path.name} signal chain. Scroll horizontally for more modules.`}>
         {path.chain.map((module, index) => { const model = modelFor(module); return <div ref={module.id === selected.id ? selectedCardRef : undefined} className={`model-rig-card gear-stage-${module.type}${module.id === selected.id ? " is-selected" : ""}${module.on ? "" : " is-bypassed"}`} key={module.id} data-rig-instance={module.id} onDragOver={dragOver} onDrop={event => onDrop(event, path.id, module.id)}>
           <button className="model-rig-card-select" onClick={() => setSelectedId(module.id)} aria-pressed={module.id === selected.id}><span className="gear-jack gear-jack-in" /><GearVisual type={module.type} label={model.name} parameterCount={model.parameters.length} /><span className="gear-jack gear-jack-out" /><span className="model-rig-card-copy"><strong>{model.name}</strong><small>{gearFamily(module.type)}</small><span className="model-rig-card-state"><i />{module.on ? "Enabled" : "Bypassed"}</span></span></button>
-          {!['input', 'output'].includes(module.type) && <div className="model-rig-card-actions"><button disabled={busy} draggable onDragStart={event => { event.dataTransfer.setData("application/x-modulo-model-gear", JSON.stringify({ instanceId: module.id })); event.currentTarget.closest(".model-rig-card")?.classList.add("is-dragging"); }} onDragEnd={event => event.currentTarget.closest(".model-rig-card")?.classList.remove("is-dragging")} onClick={() => setSelectedId(module.id)} aria-label={`Drag ${module.id}`} title="Drag to reorder">⠿</button>
+          {isRemovableGear(module.type) && <div className="model-rig-card-actions"><button disabled={busy} draggable onDragStart={event => { event.dataTransfer.setData("application/x-modulo-model-gear", JSON.stringify({ instanceId: module.id })); event.currentTarget.closest(".model-rig-card")?.classList.add("is-dragging"); }} onDragEnd={event => event.currentTarget.closest(".model-rig-card")?.classList.remove("is-dragging")} onClick={() => setSelectedId(module.id)} aria-label={`Drag ${module.id}`} title="Drag to reorder">⠿</button>
             <button disabled={busy || index <= (path.id === "main" ? 1 : 0)} onClick={() => edit({ action: "move", id: module.id, target: path.id, before: path.chain[index - 1]?.id })} aria-label={`Move ${module.id} earlier`} title="Move earlier">←</button>
             <button disabled={busy || index >= path.chain.length - (path.id === "main" ? 2 : 1)} onClick={() => edit({ action: "move", id: module.id, target: path.id, before: path.chain[index + 2]?.id })} aria-label={`Move ${module.id} later`} title="Move later">→</button>
-            <button disabled={busy} onClick={() => edit({ action: "remove", id: module.id })} aria-label={`Remove ${module.id}`} title="Remove from rig">×</button></div>}
+            <button disabled={busy} onClick={() => { setSelectedId(module.id); setDialog("remove"); }} aria-label={`Remove ${module.id}`} title="Remove from rig">×</button></div>}
         </div>; })}
         <button className="model-rig-add-slot" onClick={() => libraryRef.current?.scrollIntoView({ behavior: "smooth", block: "start" })}><span>＋</span>Add effect</button>
       </div></div>)}
@@ -131,10 +168,12 @@ export function ModelRigPanel({ engineRef, value, legacyPreset }: Props) {
     <div className="model-rig-main-grid">
       <section className="model-rig-selected-panel" aria-labelledby="model-rig-selected-title">
         <div className="model-rig-selected-heading"><GearVisual type={selected.type} label={selectedModel.name} parameterCount={selectedModel.parameters.length} compact /><div><span className="model-rig-kicker">SELECTED GEAR</span><h3 id="model-rig-selected-title">{selectedModel.name}</h3><p>{selectedModel.description}</p></div><span className="model-rig-family">{gearFamily(selected.type)}</span></div>
-        <div className="model-rig-selected-actions"><label><span>Selected model</span><select aria-label="Selected gear model" disabled={busy} value={`${selected.type}.${selected.model}`} onChange={event => { const id = event.target.value; void run(async () => { await commit(changeGearModel(engineRef.current?.getRigPreset() ?? draft, selected.id, id, assets[0]?.id)); }); }}>
-          {getGearModels().filter(model => model.type === selected.type).map(model => <option value={model.id} key={model.id}>{model.name}</option>)}</select></label>
-          {!['input', 'output'].includes(selected.type) && <label className="model-rig-enable switch-control"><span className="switch-control-copy"><strong>Gear enabled</strong><small id={`gear-enable-status-${selected.id}`} aria-live="polite">{selected.on ? "Active in signal chain" : "Bypassed"}</small></span><input className="modulo-switch" type="checkbox" role="switch" aria-describedby={`gear-enable-status-${selected.id}`} disabled={busy} checked={selected.on} onChange={event => { const enabled = event.target.checked; void run(async () => { const next = structuredClone(engineRef.current?.getRigPreset() ?? draft); allRigModules(next).find(item => item.id === selected.id)!.on = enabled; await commit(parseRigPreset(next)); }); }} /></label>}
-          <button className="secondary" disabled={busy} onClick={() => void run(async () => { if (await commit(resetGearModel(engineRef.current?.getRigPreset() ?? draft, selected.id)) && mounted.current) setMessage("Model defaults restored; this gear’s saved snapshot values and incompatible mappings were cleared."); })}>Reset model defaults</button></div>
+        <div className="model-rig-selected-actions">
+          {removable ? <label className="model-rig-enable switch-control"><span className="switch-control-copy"><strong>Gear enabled</strong><small id={`gear-enable-status-${selected.id}`} aria-live="polite">{selected.on ? "Active in signal chain" : "Bypassed"}</small></span><input className="modulo-switch" type="checkbox" role="switch" aria-describedby={`gear-enable-status-${selected.id}`} disabled={busy} checked={selected.on} onChange={event => { const enabled = event.target.checked; void run(async () => { const next = structuredClone(engineRef.current?.getRigPreset() ?? draft); allRigModules(next).find(item => item.id === selected.id)!.on = enabled; await commit(parseRigPreset(next)); }); }} /></label> : <div className="model-rig-routing-lock"><strong>Required routing</strong><small>Input and Output cannot be bypassed or removed.</small></div>}
+          <button disabled={busy || compatibleModels.length < 2} title={compatibleModels.length < 2 ? "No other compatible models are available" : `Replace ${selectedModel.name}`} onClick={openReplace}>↻ Replace Model</button>
+          <button className="secondary" disabled={busy} onClick={() => void run(async () => { if (await commit(resetGearModel(engineRef.current?.getRigPreset() ?? draft, selected.id)) && mounted.current) setMessage("Model defaults restored; this gear’s saved snapshot values and incompatible mappings were cleared."); })}>Reset Defaults</button>
+          <button className="model-rig-danger" disabled={busy || !removable} title={removable ? `Remove ${selectedModel.name}` : "Required Input and Output routing cannot be removed"} onClick={() => setDialog("remove")}>Remove Gear</button>
+        </div>
         <ModelControls module={selected} disabled={busy} assets={assets} onChange={changeParameter} />
         <p className="model-rig-reference"><strong>Model note</strong>{selectedModel.dsp.approximation}</p>
       </section>
@@ -157,6 +196,13 @@ export function ModelRigPanel({ engineRef, value, legacyPreset }: Props) {
     <footer className="model-rig-footer"><details className="model-rig-files"><summary>Rig files and custom cabinet IRs</summary><div className="model-rig-import-grid">
       <label className="model-rig-upload-card"><input className="model-rig-file-input" type="file" accept="application/json,.json" disabled={busy} onChange={event => { const file = event.target.files?.[0]; event.currentTarget.value = ""; if (file) { setRigFileName(file.name); void run(async () => { if (file.size > 256 * 1024) throw new Error("Rig JSON must be at most 256 KiB."); const next = importRigPreset(await file.text()); if (!mounted.current) return; const custom = allRigModules(next).find(module => module.type === "cabinet" && module.model === "custom"); if (custom) setIRAssetId(String(custom.parameters.ir_id)); if (await commit(next) && mounted.current) setMessage(`${file.name} imported. Missing custom IRs must be loaded separately.`); }); } }} /><span className="model-rig-upload-icon">⇩</span><span><strong>Import Rig</strong><small>Load a Modulo rig JSON file · maximum 256 KiB</small><em>{rigFileName}</em></span><b>Choose file</b></label>
       <div className="model-rig-upload-card model-rig-ir-card"><span className="model-rig-upload-icon">◫</span><span><strong>Import Cabinet IR</strong><small>Load an audio impulse response under a reusable local ID</small><label className="model-rig-ir-id">IR identifier<input type="text" aria-label="Cabinet IR identifier" maxLength={64} value={irAssetId} disabled={busy} onChange={event => setIRAssetId(event.target.value)} /></label><em>{irFileName}</em></span><label className="model-rig-file-button">Choose file<input className="model-rig-file-input" type="file" accept="audio/*" disabled={busy} onChange={event => { const file = event.target.files?.[0]; event.currentTarget.value = ""; if (file) { setIRFileName(file.name); void run(async () => { const audio = engineRef.current; if (!audio) throw new Error("Audio is not ready."); await audio.loadCabinetIR(irAssetId, file); if (mounted.current) { setAssets(audio.listCabinetIRs()); setMessage(`${file.name} imported as ${irAssetId}. Select User cabinet IR to use it.`); } }); } }} /></label></div>
-    </div></details><p className="model-rig-status" role="status">{message}</p></footer>
+    </div></details><p className="model-rig-status" role="status">{message}{undoRig && <button className="model-rig-undo" disabled={busy} onClick={undoDestructiveChange}>Undo</button>}</p></footer>
+    {dialog && createPortal(<div className="model-rig-dialog-backdrop" onMouseDown={event => { if (event.target === event.currentTarget && !busy) setDialog(null); }} onKeyDown={event => { if (event.key === "Escape" && !busy) setDialog(null); }}>
+      <section className={`model-rig-dialog${dialog === "replace" ? " is-replace" : ""}`} role="dialog" aria-modal="true" aria-labelledby="model-rig-dialog-title">
+        {dialog === "clear" && <><span className="model-rig-dialog-icon is-danger" aria-hidden="true">!</span><h3 id="model-rig-dialog-title">Clear your rig?</h3><p>This will remove all equipment from the current signal chain. You can add new gear from the Gear Library.</p><p className="model-rig-dialog-note">Modulo keeps the mandatory Input and Output routing required by the audio engine.</p><div className="model-rig-dialog-actions"><button className="secondary" disabled={busy} autoFocus onClick={() => setDialog(null)}>Cancel</button><button className="model-rig-danger is-filled" disabled={busy} onClick={clearRig}>Clear Rig</button></div></>}
+        {dialog === "remove" && <><span className="model-rig-dialog-icon is-danger" aria-hidden="true">×</span><h3 id="model-rig-dialog-title">Remove {selectedModel.name}?</h3><p>This removes only the selected {gearFamily(selected.type).toLocaleLowerCase()} and keeps the rest of your signal chain unchanged.</p><div className="model-rig-dialog-actions"><button className="secondary" disabled={busy} autoFocus onClick={() => setDialog(null)}>Cancel</button><button className="model-rig-danger is-filled" disabled={busy || !removable} onClick={removeSelected}>Remove Gear</button></div></>}
+        {dialog === "replace" && <><div className="model-rig-dialog-heading"><div><span className="model-rig-kicker">REPLACE MODEL</span><h3 id="model-rig-dialog-title">Choose a compatible {gearFamily(selected.type).toLocaleLowerCase()}</h3><p>The gear stays in the same signal-chain position. New model defaults replace incompatible settings.</p></div><button className="model-rig-dialog-close" aria-label="Close replacement dialog" disabled={busy} onClick={() => setDialog(null)}>×</button></div><label className="model-rig-replace-search"><span aria-hidden="true">⌕</span><input autoFocus type="search" value={replacementSearch} onChange={event => setReplacementSearch(event.target.value)} placeholder="Search compatible models…" aria-label="Search compatible replacement models" /></label><div className="model-rig-replacement-grid" role="radiogroup" aria-label="Compatible replacement models">{visibleReplacements.map(model => <button className={`model-rig-replacement${replacementId === model.id ? " is-selected" : ""}`} role="radio" aria-checked={replacementId === model.id} key={model.id} onClick={() => setReplacementId(model.id)}><GearVisual type={model.type} label={model.name} parameterCount={model.parameters.length} compact /><span><small>{gearFamily(model.type)}</small><strong>{model.name}</strong><span>{model.description}</span>{model.id === selectedModel.id && <em>Current model</em>}</span></button>)}</div>{visibleReplacements.length === 0 && <p className="model-rig-replacement-empty">No compatible models match that search.</p>}<div className="model-rig-dialog-actions"><button className="secondary" disabled={busy} onClick={() => setDialog(null)}>Cancel</button><button disabled={busy || !replacementId || replacementId === selectedModel.id} onClick={replaceModel}>Replace Model</button></div></>}
+      </section>
+    </div>, document.body)}
   </section>;
 }
