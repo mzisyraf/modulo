@@ -1,5 +1,7 @@
 # Dinnie continuation prompt — Isyraf handoff, 30 October 2026
 
+> **Handoff cancelled by Isyraf on 30 October 2026.** Execution has returned to the Isyraf session/branch, as recorded in issue11 and issue6. This historical prompt remains a testing/delivery blueprint; it no longer assigns Dinnie an editing claim. Its implementation-state statements below describe the original handoff, not the current branch. Check the latest issue handoff and setup docs for current behavior.
+
 I am Dinnie (`dinni3`), working on the `Dinnie` branch. Isyraf has explicitly handed me the remaining scoped implementation/integration work below because his laptop is running out of battery. Continue useful work autonomously, with honest evidence and the stop criteria below. Do not impersonate Isyraf or assume that every broad project issue is complete.
 
 ## 1. Establish the correct code without losing my work
