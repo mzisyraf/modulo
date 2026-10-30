@@ -1,0 +1,752 @@
+[
+  {
+    "case": "clean",
+    "repeat": 0,
+    "model": "nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B",
+    "catalog_sha256": "cf86b27aa51220d6e44fd6041aa4e7aaa4fb195d0bfa882996ffafc03fd5f84d",
+    "prompt_version": "rig-features-v2",
+    "status": "ready",
+    "evidence_kind": "cached_real_provider_response_not_fresh_inference",
+    "result": {
+      "proposal": {
+        "proposal_version": "1",
+        "name": "RigProposal",
+        "description": "Tailored clean tone matching target spectral centroid and RMS",
+        "tempo_bpm": 120,
+        "modules": [
+          {
+            "model_id": "boost.clean",
+            "enabled": true,
+            "parameters": {
+              "gain_db": 1
+            }
+          },
+          {
+            "model_id": "eq.neutral",
+            "enabled": true,
+            "parameters": {
+              "low_cut_hz": 25,
+              "bass_db": 0,
+              "mid_hz": 1000,
+              "mid_q": 0.8,
+              "mid_db": -1,
+              "treble_db": -2,
+              "high_cut_hz": 16000
+            }
+          },
+          {
+            "model_id": "amp.studio_clean",
+            "enabled": true,
+            "parameters": {
+              "volume_db": -3,
+              "bass_db": 0,
+              "treble_db": 0,
+              "bright": false
+            }
+          }
+        ]
+      },
+      "provenance": {
+        "kind": "generated",
+        "provider": "nebius",
+        "model": "nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B"
+      },
+      "catalog_sha256": "cf86b27aa51220d6e44fd6041aa4e7aaa4fb195d0bfa882996ffafc03fd5f84d",
+      "dsp_sha256": "00af6ec5edc1f52d728bef8934f46a6ed34f42be07f2e7057988b68243644e50",
+      "prompt_version": "rig-features-v2",
+      "quality_flags": [
+        "measured_spectral_proxy",
+        "tone_matching_unverified"
+      ]
+    }
+  },
+  {
+    "case": "crunch",
+    "repeat": 0,
+    "model": "nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B",
+    "catalog_sha256": "cf86b27aa51220d6e44fd6041aa4e7aaa4fb195d0bfa882996ffafc03fd5f84d",
+    "prompt_version": "rig-features-v2",
+    "status": "ready",
+    "evidence_kind": "cached_real_provider_response_not_fresh_inference",
+    "result": {
+      "proposal": {
+        "proposal_version": "1",
+        "name": "Mid-Boosted Clean Tone",
+        "description": "Brighten centroid and shape dynamics with gentle compression, bright EQ, and mid boost.",
+        "tempo_bpm": 120,
+        "modules": [
+          {
+            "model_id": "compressor.studio",
+            "enabled": true,
+            "parameters": {
+              "threshold_db": -24,
+              "ratio": 4,
+              "attack_ms": 10,
+              "release_ms": 150,
+              "knee_db": 12,
+              "makeup_db": 0,
+              "mix": 1
+            }
+          },
+          {
+            "model_id": "eq.bright",
+            "enabled": true,
+            "parameters": {
+              "bass_db": 0,
+              "mid_hz": 1500,
+              "mid_q": 0.8,
+              "mid_db": 2,
+              "treble_db": 1,
+              "high_cut_hz": 16000
+            }
+          },
+          {
+            "model_id": "boost.mid",
+            "enabled": true,
+            "parameters": {
+              "gain_db": 3,
+              "focus": 0.5
+            }
+          }
+        ]
+      },
+      "provenance": {
+        "kind": "generated",
+        "provider": "nebius",
+        "model": "nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B"
+      },
+      "catalog_sha256": "cf86b27aa51220d6e44fd6041aa4e7aaa4fb195d0bfa882996ffafc03fd5f84d",
+      "dsp_sha256": "00af6ec5edc1f52d728bef8934f46a6ed34f42be07f2e7057988b68243644e50",
+      "prompt_version": "rig-features-v2",
+      "quality_flags": [
+        "measured_spectral_proxy",
+        "tone_matching_unverified"
+      ]
+    }
+  },
+  {
+    "case": "space",
+    "repeat": 0,
+    "model": "nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B",
+    "catalog_sha256": "cf86b27aa51220d6e44fd6041aa4e7aaa4fb195d0bfa882996ffafc03fd5f84d",
+    "prompt_version": "rig-features-v2",
+    "status": "ready",
+    "evidence_kind": "cached_real_provider_response_not_fresh_inference",
+    "result": {
+      "proposal": {
+        "proposal_version": "1",
+        "name": "EQ neutral subtle boost",
+        "description": "Raise upper mids and brighten while gently rolling off low end to match target spectral shape",
+        "tempo_bpm": 120,
+        "modules": [
+          {
+            "model_id": "eq.neutral",
+            "enabled": true,
+            "parameters": {
+              "low_cut_hz": 70,
+              "bass_db": -1,
+              "mid_hz": 1500,
+              "mid_q": 0.8,
+              "mid_db": 3,
+              "treble_db": 2,
+              "high_cut_hz": 16000
+            }
+          }
+        ]
+      },
+      "provenance": {
+        "kind": "generated",
+        "provider": "nebius",
+        "model": "nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B"
+      },
+      "catalog_sha256": "cf86b27aa51220d6e44fd6041aa4e7aaa4fb195d0bfa882996ffafc03fd5f84d",
+      "dsp_sha256": "00af6ec5edc1f52d728bef8934f46a6ed34f42be07f2e7057988b68243644e50",
+      "prompt_version": "rig-features-v2",
+      "quality_flags": [
+        "measured_spectral_proxy",
+        "tone_matching_unverified"
+      ]
+    }
+  },
+  {
+    "case": "clean",
+    "repeat": 1,
+    "model": "nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B",
+    "catalog_sha256": "cf86b27aa51220d6e44fd6041aa4e7aaa4fb195d0bfa882996ffafc03fd5f84d",
+    "prompt_version": "rig-features-v2",
+    "status": "ready",
+    "evidence_kind": "cached_real_provider_response_not_fresh_inference",
+    "result": {
+      "proposal": {
+        "proposal_version": "1",
+        "name": "Gentle EQ + Studio Compression + Attenuation",
+        "description": "Minimal chain: neutral EQ to shift centroid, gentle compression to shape dynamics, studio clean amp to set output level.",
+        "tempo_bpm": 120,
+        "modules": [
+          {
+            "model_id": "eq.neutral",
+            "enabled": true,
+            "parameters": {
+              "low_cut_hz": 25,
+              "bass_db": 2,
+              "mid_hz": 1000,
+              "mid_q": 0.8,
+              "mid_db": 0,
+              "treble_db": -1,
+              "high_cut_hz": 14000
+            }
+          },
+          {
+            "model_id": "compressor.studio",
+            "enabled": true,
+            "parameters": {
+              "threshold_db": -24,
+              "ratio": 4,
+              "attack_ms": 10,
+              "release_ms": 150,
+              "knee_db": 12,
+              "makeup_db": 0,
+              "mix": 1
+            }
+          },
+          {
+            "model_id": "amp.studio_clean",
+            "enabled": true,
+            "parameters": {
+              "volume_db": -6,
+              "bass_db": 0,
+              "treble_db": 0,
+              "bright": false
+            }
+          }
+        ]
+      },
+      "provenance": {
+        "kind": "generated",
+        "provider": "nebius",
+        "model": "nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B"
+      },
+      "catalog_sha256": "cf86b27aa51220d6e44fd6041aa4e7aaa4fb195d0bfa882996ffafc03fd5f84d",
+      "dsp_sha256": "00af6ec5edc1f52d728bef8934f46a6ed34f42be07f2e7057988b68243644e50",
+      "prompt_version": "rig-features-v2",
+      "quality_flags": [
+        "measured_spectral_proxy",
+        "tone_matching_unverified"
+      ]
+    }
+  },
+  {
+    "case": "clean",
+    "repeat": 2,
+    "model": "nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B",
+    "catalog_sha256": "cf86b27aa51220d6e44fd6041aa4e7aaa4fb195d0bfa882996ffafc03fd5f84d",
+    "prompt_version": "rig-features-v2",
+    "status": "ready",
+    "evidence_kind": "cached_real_provider_response_not_fresh_inference",
+    "result": {
+      "proposal": {
+        "proposal_version": "1",
+        "name": "Gentle_dynamics_chain_v1",
+        "description": "Conservative gain staging; RMS matched; spectral centroid tuned; minimal delay/reverb.",
+        "tempo_bpm": 120,
+        "modules": [
+          {
+            "model_id": "gate.gentle",
+            "enabled": true,
+            "parameters": {
+              "threshold_db": -45,
+              "release_ms": 200,
+              "depth_db": -40
+            }
+          },
+          {
+            "model_id": "compressor.studio",
+            "enabled": true,
+            "parameters": {
+              "threshold_db": -24,
+              "ratio": 4,
+              "attack_ms": 10,
+              "release_ms": 150,
+              "knee_db": 12,
+              "makeup_db": 0,
+              "mix": 1
+            }
+          },
+          {
+            "model_id": "boost.clean",
+            "enabled": true,
+            "parameters": {
+              "gain_db": 3
+            }
+          },
+          {
+            "model_id": "amp.american_clean",
+            "enabled": true,
+            "parameters": {
+              "input_drive": 0.35,
+              "bass_db": 0,
+              "treble_db": 0,
+              "master_db": -6,
+              "bright": false
+            }
+          },
+          {
+            "model_id": "cabinet.open_112",
+            "enabled": true,
+            "parameters": {
+              "mic": "dynamic",
+              "position": 0.4,
+              "distance": 0.1,
+              "low_cut_hz": 70,
+              "high_cut_hz": 6500,
+              "level_db": 0
+            }
+          },
+          {
+            "model_id": "eq.neutral",
+            "enabled": true,
+            "parameters": {
+              "low_cut_hz": 25,
+              "bass_db": 0,
+              "mid_hz": 1000,
+              "mid_q": 0.8,
+              "mid_db": 0,
+              "treble_db": 0,
+              "high_cut_hz": 16000
+            }
+          }
+        ]
+      },
+      "provenance": {
+        "kind": "generated",
+        "provider": "nebius",
+        "model": "nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B"
+      },
+      "catalog_sha256": "cf86b27aa51220d6e44fd6041aa4e7aaa4fb195d0bfa882996ffafc03fd5f84d",
+      "dsp_sha256": "00af6ec5edc1f52d728bef8934f46a6ed34f42be07f2e7057988b68243644e50",
+      "prompt_version": "rig-features-v2",
+      "quality_flags": [
+        "measured_spectral_proxy",
+        "tone_matching_unverified"
+      ]
+    }
+  },
+  {
+    "case": "crunch",
+    "repeat": 1,
+    "model": "nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B",
+    "catalog_sha256": "cf86b27aa51220d6e44fd6041aa4e7aaa4fb195d0bfa882996ffafc03fd5f84d",
+    "prompt_version": "rig-features-v2",
+    "status": "ready",
+    "evidence_kind": "cached_real_provider_response_not_fresh_inference",
+    "result": {
+      "proposal": {
+        "proposal_version": "1",
+        "name": "Clean bright clean",
+        "description": "Small chain EQ->Compressor->Studio Clean amp to match target brightness and reduced dynamics",
+        "tempo_bpm": 120,
+        "modules": [
+          {
+            "model_id": "eq.neutral",
+            "enabled": true,
+            "parameters": {
+              "low_cut_hz": 25,
+              "bass_db": 6,
+              "mid_hz": 1000,
+              "mid_q": 0.8,
+              "mid_db": 2,
+              "treble_db": -6,
+              "high_cut_hz": 16000
+            }
+          },
+          {
+            "model_id": "compressor.studio",
+            "enabled": true,
+            "parameters": {
+              "threshold_db": -18,
+              "ratio": 4,
+              "attack_ms": 10,
+              "release_ms": 150,
+              "knee_db": 12,
+              "makeup_db": 0,
+              "mix": 1
+            }
+          },
+          {
+            "model_id": "amp.studio_clean",
+            "enabled": true,
+            "parameters": {
+              "volume_db": -10,
+              "bass_db": 0,
+              "treble_db": 0,
+              "bright": false
+            }
+          }
+        ]
+      },
+      "provenance": {
+        "kind": "generated",
+        "provider": "nebius",
+        "model": "nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B"
+      },
+      "catalog_sha256": "cf86b27aa51220d6e44fd6041aa4e7aaa4fb195d0bfa882996ffafc03fd5f84d",
+      "dsp_sha256": "00af6ec5edc1f52d728bef8934f46a6ed34f42be07f2e7057988b68243644e50",
+      "prompt_version": "rig-features-v2",
+      "quality_flags": [
+        "measured_spectral_proxy",
+        "tone_matching_unverified"
+      ]
+    }
+  },
+  {
+    "case": "crunch",
+    "repeat": 2,
+    "model": "nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B",
+    "catalog_sha256": "cf86b27aa51220d6e44fd6041aa4e7aaa4fb195d0bfa882996ffafc03fd5f84d",
+    "prompt_version": "rig-features-v2",
+    "status": "ready",
+    "evidence_kind": "cached_real_provider_response_not_fresh_inference",
+    "result": {
+      "proposal": {
+        "proposal_version": "1",
+        "name": "Bright Clean Rig",
+        "description": "Gentle brightness boost and light compression to match target spectral centroid and reduce crest while preserving dynamics",
+        "tempo_bpm": 120,
+        "modules": [
+          {
+            "model_id": "eq.bright",
+            "enabled": true,
+            "parameters": {
+              "bass_db": 0,
+              "mid_hz": 1000,
+              "mid_q": 0.8,
+              "mid_db": 0,
+              "treble_db": 2,
+              "high_cut_hz": 16000
+            }
+          },
+          {
+            "model_id": "compressor.studio",
+            "enabled": true,
+            "parameters": {
+              "threshold_db": -28,
+              "ratio": 4,
+              "attack_ms": 10,
+              "release_ms": 150,
+              "knee_db": 12,
+              "makeup_db": 0,
+              "mix": 1
+            }
+          }
+        ]
+      },
+      "provenance": {
+        "kind": "generated",
+        "provider": "nebius",
+        "model": "nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B"
+      },
+      "catalog_sha256": "cf86b27aa51220d6e44fd6041aa4e7aaa4fb195d0bfa882996ffafc03fd5f84d",
+      "dsp_sha256": "00af6ec5edc1f52d728bef8934f46a6ed34f42be07f2e7057988b68243644e50",
+      "prompt_version": "rig-features-v2",
+      "quality_flags": [
+        "measured_spectral_proxy",
+        "tone_matching_unverified"
+      ]
+    }
+  },
+  {
+    "case": "space",
+    "repeat": 1,
+    "model": "nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B",
+    "catalog_sha256": "cf86b27aa51220d6e44fd6041aa4e7aaa4fb195d0bfa882996ffafc03fd5f84d",
+    "prompt_version": "rig-features-v2",
+    "status": "ready",
+    "evidence_kind": "cached_real_provider_response_not_fresh_inference",
+    "result": {
+      "proposal": {
+        "proposal_version": "1",
+        "name": "Dry Guitar to Target Tone",
+        "description": "Minimal chain: tight gate, sustain compressor, neutral EQ with modest mid/treble lift, clean boost",
+        "tempo_bpm": 120,
+        "modules": [
+          {
+            "model_id": "gate.tight",
+            "enabled": true,
+            "parameters": {
+              "threshold_db": -55,
+              "attack_ms": 3,
+              "hold_ms": 50,
+              "release_ms": 150,
+              "hysteresis_db": 6
+            }
+          },
+          {
+            "model_id": "compressor.sustain",
+            "enabled": true,
+            "parameters": {
+              "sustain": 0.4,
+              "makeup_db": 0,
+              "mix": 1
+            }
+          },
+          {
+            "model_id": "eq.neutral",
+            "enabled": true,
+            "parameters": {
+              "low_cut_hz": 25,
+              "bass_db": 0,
+              "mid_hz": 1000,
+              "mid_q": 0.8,
+              "mid_db": 3,
+              "treble_db": 2,
+              "high_cut_hz": 16000
+            }
+          },
+          {
+            "model_id": "boost.clean",
+            "enabled": true,
+            "parameters": {
+              "gain_db": 3
+            }
+          }
+        ]
+      },
+      "provenance": {
+        "kind": "generated",
+        "provider": "nebius",
+        "model": "nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B"
+      },
+      "catalog_sha256": "cf86b27aa51220d6e44fd6041aa4e7aaa4fb195d0bfa882996ffafc03fd5f84d",
+      "dsp_sha256": "00af6ec5edc1f52d728bef8934f46a6ed34f42be07f2e7057988b68243644e50",
+      "prompt_version": "rig-features-v2",
+      "quality_flags": [
+        "measured_spectral_proxy",
+        "tone_matching_unverified"
+      ]
+    }
+  },
+  {
+    "case": "space",
+    "repeat": 2,
+    "model": "nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B",
+    "catalog_sha256": "cf86b27aa51220d6e44fd6041aa4e7aaa4fb195d0bfa882996ffafc03fd5f84d",
+    "prompt_version": "rig-features-v2",
+    "status": "ready",
+    "evidence_kind": "cached_real_provider_response_not_fresh_inference",
+    "result": {
+      "proposal": {
+        "proposal_version": "1",
+        "name": "Dry to Target Rig",
+        "description": "Minimal chain: gentle gate shaping envelope, neutral EQ with slight mid boost, clean boost for level, open cabinet tailoring highs",
+        "tempo_bpm": 120,
+        "modules": [
+          {
+            "model_id": "gate.gentle",
+            "enabled": true,
+            "parameters": {
+              "threshold_db": -55,
+              "release_ms": 200,
+              "depth_db": -60
+            }
+          },
+          {
+            "model_id": "eq.neutral",
+            "enabled": true,
+            "parameters": {
+              "low_cut_hz": 25,
+              "bass_db": 0,
+              "mid_hz": 1200,
+              "mid_q": 0.8,
+              "mid_db": 1,
+              "treble_db": 0,
+              "high_cut_hz": 16000
+            }
+          },
+          {
+            "model_id": "boost.clean",
+            "enabled": true,
+            "parameters": {
+              "gain_db": 0
+            }
+          },
+          {
+            "model_id": "cabinet.open_112",
+            "enabled": true,
+            "parameters": {
+              "mic": "dynamic",
+              "position": 0.4,
+              "distance": 0.1,
+              "low_cut_hz": 70,
+              "high_cut_hz": 6500,
+              "level_db": 0
+            }
+          }
+        ]
+      },
+      "provenance": {
+        "kind": "generated",
+        "provider": "nebius",
+        "model": "nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B"
+      },
+      "catalog_sha256": "cf86b27aa51220d6e44fd6041aa4e7aaa4fb195d0bfa882996ffafc03fd5f84d",
+      "dsp_sha256": "00af6ec5edc1f52d728bef8934f46a6ed34f42be07f2e7057988b68243644e50",
+      "prompt_version": "rig-features-v2",
+      "quality_flags": [
+        "measured_spectral_proxy",
+        "tone_matching_unverified"
+      ]
+    }
+  },
+  {
+    "case": "crunch",
+    "repeat": 0,
+    "model": "nvidia/nemotron-3-super-120b-a12b",
+    "catalog_sha256": "cf86b27aa51220d6e44fd6041aa4e7aaa4fb195d0bfa882996ffafc03fd5f84d",
+    "prompt_version": "rig-features-v2",
+    "status": "ready",
+    "evidence_kind": "cached_real_provider_response_not_fresh_inference",
+    "result": {
+      "proposal": {
+        "proposal_version": "1",
+        "name": "Low-Mid Boost with Gentle Compression",
+        "description": "Boost low and low-mid frequencies, cut highs, add light sustain compression to match target spectral shape and envelope.",
+        "tempo_bpm": 120,
+        "modules": [
+          {
+            "model_id": "eq.neutral",
+            "enabled": true,
+            "parameters": {
+              "low_cut_hz": 30,
+              "bass_db": 6,
+              "mid_hz": 800,
+              "mid_q": 1.0,
+              "mid_db": 2,
+              "treble_db": -6,
+              "high_cut_hz": 8000
+            }
+          }
+        ]
+      },
+      "provenance": {
+        "kind": "generated",
+        "provider": "nebius",
+        "model": "nvidia/nemotron-3-super-120b-a12b"
+      },
+      "catalog_sha256": "cf86b27aa51220d6e44fd6041aa4e7aaa4fb195d0bfa882996ffafc03fd5f84d",
+      "dsp_sha256": "00af6ec5edc1f52d728bef8934f46a6ed34f42be07f2e7057988b68243644e50",
+      "prompt_version": "rig-features-v2",
+      "quality_flags": [
+        "measured_spectral_proxy",
+        "tone_matching_unverified"
+      ]
+    }
+  },
+  {
+    "case": "space",
+    "repeat": 0,
+    "model": "nvidia/nemotron-3-super-120b-a12b",
+    "catalog_sha256": "cf86b27aa51220d6e44fd6041aa4e7aaa4fb195d0bfa882996ffafc03fd5f84d",
+    "prompt_version": "rig-features-v2",
+    "status": "ready",
+    "evidence_kind": "cached_real_provider_response_not_fresh_inference",
+    "result": {
+      "proposal": {
+        "proposal_version": "1",
+        "name": "EQ Shape Proposal",
+        "description": "Applies a slight low‑frequency cut, modest mid‑range boost, and strong high‑frequency boost to move the source spectrum toward the target using a single neutral EQ module.",
+        "tempo_bpm": 120,
+        "modules": [
+          {
+            "model_id": "eq.neutral",
+            "enabled": true,
+            "parameters": {
+              "low_cut_hz": 25,
+              "bass_db": -0.6,
+              "mid_hz": 2000,
+              "mid_q": 1.0,
+              "mid_db": 0.2,
+              "treble_db": 2.3,
+              "high_cut_hz": 16000
+            }
+          }
+        ]
+      },
+      "provenance": {
+        "kind": "generated",
+        "provider": "nebius",
+        "model": "nvidia/nemotron-3-super-120b-a12b"
+      },
+      "catalog_sha256": "cf86b27aa51220d6e44fd6041aa4e7aaa4fb195d0bfa882996ffafc03fd5f84d",
+      "dsp_sha256": "00af6ec5edc1f52d728bef8934f46a6ed34f42be07f2e7057988b68243644e50",
+      "prompt_version": "rig-features-v2",
+      "quality_flags": [
+        "measured_spectral_proxy",
+        "tone_matching_unverified"
+      ]
+    }
+  },
+  {
+    "case": "crunch",
+    "repeat": 0,
+    "model": "nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B",
+    "catalog_sha256": "cf86b27aa51220d6e44fd6041aa4e7aaa4fb195d0bfa882996ffafc03fd5f84d",
+    "prompt_version": "rig-features-v3",
+    "status": "ready",
+    "evidence_kind": "cached_real_provider_response_not_fresh_inference",
+    "result": {
+      "proposal": {
+        "proposal_version": "1",
+        "name": "Conservative EQ Boost + Compression",
+        "description": "Minimal ordered chain to raise brightness, gently control peaks, and match target spectral/temporal profile without unnecessary gain stacking.",
+        "tempo_bpm": 120,
+        "modules": [
+          {
+            "model_id": "boost.treble",
+            "enabled": true,
+            "parameters": {
+              "gain_db": 2,
+              "tone": 0.6
+            }
+          },
+          {
+            "model_id": "eq.bright",
+            "enabled": true,
+            "parameters": {
+              "bass_db": 0,
+              "mid_hz": 1000,
+              "mid_q": 0.8,
+              "mid_db": 3,
+              "treble_db": 3,
+              "high_cut_hz": 12000
+            }
+          },
+          {
+            "model_id": "compressor.studio",
+            "enabled": true,
+            "parameters": {
+              "threshold_db": -24,
+              "ratio": 2,
+              "attack_ms": 10,
+              "release_ms": 150,
+              "knee_db": 12,
+              "makeup_db": 0,
+              "mix": 1
+            }
+          }
+        ]
+      },
+      "provenance": {
+        "kind": "generated",
+        "provider": "nebius",
+        "model": "nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B"
+      },
+      "catalog_sha256": "cf86b27aa51220d6e44fd6041aa4e7aaa4fb195d0bfa882996ffafc03fd5f84d",
+      "dsp_sha256": "00af6ec5edc1f52d728bef8934f46a6ed34f42be07f2e7057988b68243644e50",
+      "prompt_version": "rig-features-v3",
+      "quality_flags": [
+        "measured_spectral_proxy",
+        "tone_matching_unverified"
+      ]
+    }
+  }
+]
