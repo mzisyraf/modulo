@@ -14,7 +14,7 @@ The separate private Modal app is `modulo-tabs`, volume `modulo-tabs-jobs`. It u
 
 Dinnie/Shazlin use the same ignored backend files already documented in [TEAM_CLOUD_SETUP](TEAM_CLOUD_SETUP.md): `data/modal/config.toml` for Modal and `services/api/.env` for Token Factory rig generation. Tabs needs only the existing Modal client environment/token, not new keys or local model installations. The initial Modal token expires5November2026; judging access renewal remains a delivery task. Never publish these private files.
 
-## Deployment and allowance
+## Deployment and usage
 
 Run from repository root using the existing `tools/modal/.venv` SDK environment:
 
@@ -25,7 +25,7 @@ tools/modal/.venv/Scripts/python.exe -m modal deploy tools/modal_tabs/app.py
 
 The CUDA11.8/cuDNN8/Python3.10 image is isolated from Demucs and the API. Its full Python dependency lock is `tools/modal_tabs/requirements-lock.txt`. The older Modal builder compatibility setting matches the existing Python3.10 separator setup. The image verifies the packaged model hash before inference. No weights are committed or downloaded from an arbitrary request URL.
 
-Isyraf expanded the initial four-attempt/US$1 feature allowance to **eight total attempts /US$2**, within the existing **US$10 Modal cap**. All earlier attempts still count. Remote `attempts.json` is reserved and committed before inference; failure/cancel/redeploy does not reset it. At the final verified checkpoint,5/8 tabs attempts are consumed, leaving3 shared team attempts. The contemporaneous Demucs ledger reads9/10, leaving1 shared separation attempt; this feature did not change its counter or limits. Review live usage before another cloud separation. Limits are shared, not per laptop. These are conservative attempt guards, not a provider invoice or guaranteed workspace dollar cap; builds/startup/storage/cleanup and other sessions can incur charges. Do not delete/edit ledgers to retry.
+On **31 October 2026**, Isyraf removed application attempt and spending caps for tabs, separation and Nebius generation. The former eight-attempt tabs stop, ten-attempt separation stop and earlier spending allowances are historical. Remote `attempts.json` is still reserved and committed before inference; failure/cancel/redeploy never resets it. The tabs client delegates usage validation to the worker, so a growing ledger cannot trigger the old 4 KiB preflight stop. Corrupt/duplicate reservations still fail closed. Provider credits/quotas and charges still apply; builds/startup/storage/cleanup and other sessions can incur charges. Do not delete/edit ledgers to retry.
 
 ## API and failures
 
@@ -41,7 +41,7 @@ Final295s known-note control: melody onset/pitch F1 **.8696** (gate.85), chord F
 
 Real cleared Exhilarate by Kevin MacLeod, CC BY4.0: full **145.4759s** song separated with local CUDA then transcribed on Modal; **589 notes**, **2912 CUDA heavy kernels**, **15.241s worker processing**, last detected onset144.3348s. Real JSON/text/MIDI, tuning/capo cache, backing playback, whole-song seek and390px layout pass. The final browser rerun reused this result after correcting a test-driver slider value; it made no additional GPU request. Worker timings exclude upload, queue/startup and download, and are not guaranteed user latency. Audio attribution remains in ignored `data/bench/kevin-macleod-exhilarate/ATTRIBUTION.txt`.
 
-Reproduce controlled audio with `tools/verification/prepare-tab-control.py data/tabs/my-control --seconds 295`, run the private `tools/modal_tabs/client.py` explicitly within an approved allowance, then grade with `tools/verification/grade-tab-control.py`. Browser scripts are `song-tabs.browser.js` (injected transport, native playback/UI) and `song-tabs-real.browser.js` (metered unless a retained verification job is available), run through Playwright's filename interface. If Playwright is unavailable, use the manual product steps above and record PASS/FAIL for exports, seek, highlighting, loops, Stop, tuning cache, cancellation and navigation; Node alone does not execute these browser assertions.
+Reproduce controlled audio with `tools/verification/prepare-tab-control.py data/tabs/my-control --seconds 295`, run the private `tools/modal_tabs/client.py` explicitly when a metered run is intended, then grade with `tools/verification/grade-tab-control.py`. Browser scripts are `song-tabs.browser.js` (injected transport, native playback/UI) and `song-tabs-real.browser.js` (metered unless a retained verification job is available), run through Playwright's filename interface. If Playwright is unavailable, use the manual product steps above and record PASS/FAIL for exports, seek, highlighting, loops, Stop, tuning cache, cancellation and navigation; Node alone does not execute these browser assertions.
 
 Limitations: the model can confuse harmonics, distortion, bleed, bends and overlapping guitar parts. The guitar stem is a combined transcription, not separate lead/rhythm tracks. Suggested fingering is a bounded playability heuristic, not recovered original hand positions or a guarantee every chord is comfortable. Unassigned notes remain visible/exported. No real-guitar or human transcription/listening accuracy approval is claimed; this remains draft tablature.
 

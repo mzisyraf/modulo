@@ -66,7 +66,7 @@ Open `services/api/.env` in your editor and fill in `NEBIUS_API_KEY` with your T
 
 Commit only the example with its empty key. The real `.env` is already Git-ignored; keep credentials out of chat, issue comments and frontend files, including `VITE_` variables. Frontend/audio contributors do not need a Nebius key for the scaffold.
 
-The API now reads these provider settings at startup from the existing private `.env`, with process environment variables taking precedence. `NEBIUS_BUDGET_USD=0` and `NEBIUS_MAX_REQUESTS=0` keep generation disabled; adding only a key does not enable inference. A separate runtime request/budget allowance must be explicitly approved before activation; the earlier three-request smoke allowance is consumed. Integration tests inject provider transport and send no paid requests. See [PRESET_GENERATION.md](PRESET_GENERATION.md) for persistent reservations, no automatic retries and missing-calibration disclosures. Do not modify/reset the real `.env` or budget ledger as part of tests.
+The API reads provider settings at startup from the existing private `.env`, with process environment variables taking precedence. A backend key enables manual inference without application request or spending caps, as authorized by Isyraf on 31 October 2026. The retired `NEBIUS_BUDGET_USD` and `NEBIUS_MAX_REQUESTS` settings are ignored. Preserve all usage ledgers. Integration tests inject provider transport and send no paid requests. See [PRESET_GENERATION.md](PRESET_GENERATION.md) for persistent usage records, no automatic retries and missing-calibration disclosures. Do not modify the real `.env` or ledger as part of tests.
 
 ## Checks
 

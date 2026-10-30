@@ -6,7 +6,7 @@ from pathlib import Path
 import sys
 import time
 from uuid import uuid4
-from tabs_common import APP_NAME,VOLUME_NAME,LIMIT,job_path,validate_source
+from tabs_common import APP_NAME,VOLUME_NAME,job_path,validate_source
 
 ROOT=Path(__file__).resolve().parents[2]
 sys.path.insert(0,str(ROOT/'services/api'))
@@ -21,14 +21,6 @@ def run(source,output):
     validate_source(source);output.mkdir(parents=True,exist_ok=True)
     if any((output/name).exists() for name in ('notes.json','notes.mid','modal-tabs-call.json')):raise ValueError('Use a fresh tabs output directory')
     volume=modal.Volume.from_name(VOLUME_NAME)
-    try:
-        raw=b''
-        for block in volume.read_file('/attempts.json'):
-            if len(raw)+len(block)>4096:raise RuntimeError('Oversized attempt ledger')
-            raw+=block
-        entries=json.loads(raw)
-    except FileNotFoundError:entries=[]
-    if not isinstance(entries,list) or len(entries)>=LIMIT or any(not isinstance(x,str) for x in entries):raise RuntimeError('Tabs GPU allowance exhausted or corrupt; review billing')
     job_id=str(uuid4());job_path('/',job_id)
     call=None;complete=False
     write(output/'tabs-progress.json',{'stage':'uploading'})

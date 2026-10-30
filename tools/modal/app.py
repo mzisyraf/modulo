@@ -43,7 +43,7 @@ def separate(job_id: str):
     volume.reload()
     directory = job_path("/jobs", job_id)
     validate_source(directory / "source.bin")
-    # Reservations survive failed jobs/redeployment; this first checkpoint permits ten attempts.
+    # Usage survives failed jobs and redeployment without an attempt cap.
     ledger = Path("/jobs/attempts.json")
     reserve_attempt(ledger)
     volume.commit()

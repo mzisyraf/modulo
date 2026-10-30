@@ -19,8 +19,7 @@ def propose(directory, model, count, case_id=None):
     if config["engine_sha256"] != engine_hash() or targets["engine_sha256"] != engine_hash(): raise ValueError("DSP changed; regenerate targets first")
     provider = RigGenerator.from_env(); provider.model = model; provider.reservation_model = model
     provider.allow_super_fallback = False  # Grade exact models independently; the main app's repair policy is separate.
-    provider.max_model_requests = 6 if model == SUPER_MODEL else 100
-    if not provider.available: raise ValueError("Bounded generation must be enabled first")
+    if not provider.available: raise ValueError("Configure the backend Nebius API key first")
     path = directory / "proposals.json"
     results = json.loads(path.read_text()) if path.exists() else []
     for row in targets["cases"]:

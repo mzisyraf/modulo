@@ -34,13 +34,11 @@ class TransportTests(unittest.TestCase):
             with self.assertRaises(ValueError):
                 job_path(self.root, value)
 
-    def test_attempts_are_durable_bounded_and_fail_closed(self):
+    def test_attempts_continue_past_old_cap_and_fail_closed_on_corruption(self):
         ledger = self.root / "attempts.json"
-        for attempt in range(10):
+        for attempt in range(12):
             reserve_attempt(ledger)
             self.assertEqual(json.loads(ledger.read_text()), attempt + 1)
-        with self.assertRaises(RuntimeError):
-            reserve_attempt(ledger)
         for invalid in ("true", "-1", "1.5", "{}", "corrupt"):
             ledger.write_text(invalid)
             with self.assertRaises((ValueError, RuntimeError)):

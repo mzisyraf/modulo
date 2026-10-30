@@ -65,23 +65,15 @@ def post_completion(key, payload, *, timeout=30):
 
 
 class PresetGenerator:
-    def __init__(self, directory, *, key="", budget_usd="0", max_requests=0, transport=post_completion):
+    def __init__(self, directory, *, key="", transport=post_completion):
         self.directory = Path(directory)
         self.key = key
         self.transport = transport
-        try:
-            self.budget = None if str(budget_usd).strip().lower() == "unlimited" else Decimal(str(budget_usd))
-            if (self.budget is not None and (not self.budget.is_finite() or not 0 <= self.budget <= Decimal("10"))
-                    or type(max_requests) is not int or not 0 <= max_requests <= 100):
-                raise ValueError()
-        except (ValueError, InvalidOperation):
-            raise PresetError("provider_configuration", "Use a local budget of US$0–10 or explicit 'unlimited', and 0–100 requests.") from None
-        self.max_requests = max_requests
 
     @classmethod
     def from_env(cls, directory=ROOT / "data" / "preset-inference"):
         settings = {}
-        names = {"NEBIUS_API_KEY", "NEBIUS_MODEL", "NEBIUS_BASE_URL", "NEBIUS_BUDGET_USD", "NEBIUS_MAX_REQUESTS"}
+        names = {"NEBIUS_API_KEY", "NEBIUS_MODEL", "NEBIUS_BASE_URL"}
         path = ROOT / "services" / "api" / ".env"
         if path.is_file():
             for line in path.read_text(encoding="utf-8-sig").splitlines():
@@ -91,20 +83,15 @@ class PresetGenerator:
         settings.update({name: os.environ[name] for name in names if name in os.environ})
         if settings.get("NEBIUS_BASE_URL", BASE_URL).rstrip("/") != BASE_URL or settings.get("NEBIUS_MODEL", MODEL) != MODEL:
             raise PresetError("provider_configuration", "This local starter supports only the official Nebius Nano endpoint.")
-        try:
-            count = int(settings.get("NEBIUS_MAX_REQUESTS", "0"))
-        except ValueError:
-            raise PresetError("provider_configuration", "NEBIUS_MAX_REQUESTS must be a whole number.") from None
-        return cls(directory, key=settings.get("NEBIUS_API_KEY", ""),
-                   budget_usd=settings.get("NEBIUS_BUDGET_USD", "0"), max_requests=count)
+        return cls(directory, key=settings.get("NEBIUS_API_KEY", ""))
 
     @property
     def available(self):
-        return bool(self.key and self.max_requests and (self.budget is None or self.budget >= RESERVATION_USD))
+        return bool(self.key)
 
     def reserve(self):
         if not self.available:
-            raise PresetError("generation_disabled", "Set a backend Nebius key and an approved request/budget allowance before generating.")
+            raise PresetError("generation_disabled", "Configure the backend Nebius API key before generating.")
         self.directory.mkdir(parents=True, exist_ok=True)
         try:
             with exclusive_lock(self.directory / ".budget.lock"):
@@ -118,10 +105,6 @@ class PresetGenerator:
                 counts = ledger.get("model_attempts", {})
                 if not isinstance(counts, dict) or any(type(count) is not int or count < 0 for count in counts.values()):
                     raise ValueError()
-                if model and counts.get(model, 0) >= self.max_model_requests:
-                    raise PresetError("budget_exhausted", "The approved request allowance for this model is used.", 429)
-                if attempts >= self.max_requests or (self.budget is not None and spent + reservation > self.budget):
-                    raise PresetError("budget_exhausted", "The local preset-generation allowance is used. Ask the operator to review the budget.", 429)
                 temporary = self.directory / "budget.tmp"
                 updated = {**ledger, "attempts": attempts + 1, "reserved_usd": str(spent + reservation)}
                 if model:

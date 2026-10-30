@@ -100,7 +100,7 @@ def test_changed_source_cannot_start_another_inflight_request(preset_api):
 @pytest.fixture
 def preset_api(tmp_path, monkeypatch):
     calls = []
-    generator = PresetGenerator(tmp_path / "budget", key="test-only", budget_usd="0.10", max_requests=3,
+    generator = PresetGenerator(tmp_path / "budget", key="test-only",
         transport=lambda _key, payload: calls.append(deepcopy(payload)) or response())
     store = JobStore(tmp_path / "jobs")
     monkeypatch.setattr(store, "run_worker", success)
@@ -164,7 +164,7 @@ def test_missing_reference_expiry_and_client_features_never_call_provider(preset
 def test_default_disabled_generation_keeps_successful_separation(preset_api):
     client, store, generator, calls = preset_api
     job_id, revision = confirmed_job(client)
-    generator.max_requests = 0
+    generator.key = ""
     assert client.get("/api/health").json()["preset_generation_available"] is False
     request = client.post(f"/api/jobs/{job_id}/preset", json={"reference_revision": revision})
     assert request.status_code == 503 and request.json()["error"]["code"] == "generation_disabled"
@@ -258,7 +258,7 @@ def test_generation_pins_retained_files_until_completion(preset_api):
 
 
 def test_restart_fails_generation_without_resetting_ledger(tmp_path, monkeypatch):
-    generator = PresetGenerator(tmp_path / "budget", key="test", budget_usd="0.10", max_requests=1, transport=lambda *_: response())
+    generator = PresetGenerator(tmp_path / "budget", key="test", transport=lambda *_: response())
     generator.generate(REFERENCE)
     first = JobStore(tmp_path / "jobs")
     monkeypatch.setattr(first, "run_worker", success)

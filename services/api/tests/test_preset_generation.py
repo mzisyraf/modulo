@@ -19,7 +19,7 @@ def response(value=VALUE, finish="stop"):
 
 
 def generator(path, transport, **kwargs):
-    return provider.PresetGenerator(path, key="unit-test-not-a-real-key", budget_usd="0.10", max_requests=3, transport=transport, **kwargs)
+    return provider.PresetGenerator(path, key="unit-test-not-a-real-key", transport=transport, **kwargs)
 
 
 def test_uses_measured_reference_and_trusted_disclosure(tmp_path):
@@ -74,28 +74,28 @@ def test_rejects_bad_structure(tmp_path, kind):
     assert error.value.code == "invalid_provider_preset"
 
 
-def test_timeout_keeps_reservation_and_restart_does_not_reset_limit(tmp_path):
+def test_timeout_keeps_reservation_and_restart_continues_tracking(tmp_path):
     calls = []
     def failure(*_):
         calls.append(1)
         raise provider.PresetError("provider_unavailable", "Timeout")
-    first = provider.PresetGenerator(tmp_path, key="test", budget_usd="0.10", max_requests=1, transport=failure)
+    first = provider.PresetGenerator(tmp_path, key="test", transport=failure)
     with pytest.raises(provider.PresetError, match="Timeout"):
         first.generate(REFERENCE)
-    second = provider.PresetGenerator(tmp_path, key="test", budget_usd="0.10", max_requests=1, transport=failure)
-    with pytest.raises(provider.PresetError) as error:
+    second = provider.PresetGenerator(tmp_path, key="test", transport=failure)
+    with pytest.raises(provider.PresetError, match="Timeout"):
         second.generate(REFERENCE)
-    assert error.value.code == "budget_exhausted" and len(calls) == 1
+    assert len(calls) == 2
+    assert json.loads((tmp_path / "budget.json").read_text())["attempts"] == 2
 
 
-def test_disabled_and_insufficient_budget_never_call_provider(tmp_path):
+def test_missing_key_never_calls_provider(tmp_path):
     def unexpected(*_):
         pytest.fail("No provider request should run")
-    for budget, count in [("0", 0), ("0.01", 3)]:
-        engine = provider.PresetGenerator(tmp_path, key="test", budget_usd=budget, max_requests=count, transport=unexpected)
-        with pytest.raises(provider.PresetError) as error:
-            engine.generate(REFERENCE)
-        assert error.value.code == "generation_disabled"
+    engine = provider.PresetGenerator(tmp_path, transport=unexpected)
+    with pytest.raises(provider.PresetError) as error:
+        engine.generate(REFERENCE)
+    assert error.value.code == "generation_disabled"
     assert not (tmp_path / "budget.json").exists()
 
 
@@ -106,62 +106,44 @@ def test_corrupt_budget_fails_closed(tmp_path):
     assert error.value.code == "budget_unavailable"
 
 
-def test_budget_cap_blocks_before_request_even_when_count_is_available(tmp_path):
-    engine = provider.PresetGenerator(tmp_path, key="test", budget_usd="0.02", max_requests=3,
-                                      transport=lambda *_: response())
-    engine.generate(REFERENCE)
-    with pytest.raises(provider.PresetError) as error:
-        engine.generate(REFERENCE)
-    assert error.value.code == "budget_exhausted"
-    assert json.loads((tmp_path / "budget.json").read_text())["attempts"] == 1
-
-
-def test_explicit_uncapped_budget_preserves_ledger_and_request_stop(tmp_path):
-    ledger = {"attempts": 2, "reserved_usd": "5"}
+def test_uncapped_usage_preserves_exhausted_ledger_and_extra_fields(tmp_path):
+    ledger = {"attempts": 100, "reserved_usd": "50", "audit": "keep"}
     (tmp_path / "budget.json").write_text(json.dumps(ledger))
     calls = []
-    engine = provider.PresetGenerator(tmp_path, key="unit-test", budget_usd="unlimited", max_requests=3,
-                                      transport=lambda *_: calls.append(1) or response())
-    assert engine.available and engine.budget is None
+    engine = provider.PresetGenerator(tmp_path, key="unit-test", transport=lambda *_: calls.append(1) or response())
+    assert engine.available
+    engine.generate(REFERENCE)
     engine.generate(REFERENCE)
     after = json.loads((tmp_path / "budget.json").read_text())
-    assert after["attempts"] == 3
-    assert provider.Decimal(after["reserved_usd"]) == provider.Decimal("5") + provider.RESERVATION_USD
-    with pytest.raises(provider.PresetError) as failure:
-        engine.generate(REFERENCE)
-    assert failure.value.code == "budget_exhausted" and calls == [1]
+    assert after["attempts"] == 102 and after["audit"] == "keep"
+    assert provider.Decimal(after["reserved_usd"]) == provider.Decimal("50") + 2 * provider.RESERVATION_USD
+    assert calls == [1, 1]
 
 
-def test_uncapped_still_requires_explicit_count_and_readable_ledger(tmp_path):
-    engine = provider.PresetGenerator(tmp_path, key="unit-test", budget_usd="unlimited", max_requests=0)
-    assert not engine.available
+def test_uncapped_still_requires_readable_ledger(tmp_path):
     (tmp_path / "budget.json").write_text('{"attempts":0,"reserved_usd":"NaN"}')
-    engine = provider.PresetGenerator(tmp_path, key="unit-test", budget_usd="unlimited", max_requests=3,
+    engine = provider.PresetGenerator(tmp_path, key="unit-test",
                                       transport=lambda *_: pytest.fail("Corrupt ledger must not send a request"))
     with pytest.raises(provider.PresetError) as failure:
         engine.generate(REFERENCE)
     assert failure.value.code == "budget_unavailable"
 
 
-def test_uncapped_environment_and_health_are_explicit(tmp_path, monkeypatch):
+@pytest.mark.parametrize("legacy_limit", ["0", "6", "100", "unlimited", "invalid"])
+def test_retired_environment_limits_do_not_disable_provider_or_rig(tmp_path, monkeypatch, legacy_limit):
     from fastapi.testclient import TestClient
     from app.main import create_app
     from app.jobs import JobStore
     monkeypatch.setenv("NEBIUS_API_KEY", "unit-test")
-    monkeypatch.setenv("NEBIUS_BUDGET_USD", "unlimited")
-    monkeypatch.setenv("NEBIUS_MAX_REQUESTS", "100")
+    from app.rig_generation import RigGenerator
+    monkeypatch.setenv("NEBIUS_BUDGET_USD", legacy_limit)
+    monkeypatch.setenv("NEBIUS_MAX_REQUESTS", legacy_limit)
     engine = provider.PresetGenerator.from_env(tmp_path / "budget")
-    assert engine.budget is None and engine.available
-    with TestClient(create_app(JobStore(tmp_path / "jobs"), engine), base_url="http://127.0.0.1") as client:
+    rig = RigGenerator.from_env(tmp_path / "budget")
+    assert engine.available and rig.available
+    with TestClient(create_app(JobStore(tmp_path / "jobs"), engine, rig), base_url="http://127.0.0.1") as client:
         health = client.get("/api/health").json()
-    assert health["preset_budget_unlimited"] and health["preset_generation_available"]
-
-
-@pytest.mark.parametrize("budget", ["NaN", "Infinity", "-1", "100", "not-money"])
-def test_rejects_invalid_budgets(tmp_path, budget):
-    with pytest.raises(provider.PresetError) as error:
-        provider.PresetGenerator(tmp_path, budget_usd=budget)
-    assert error.value.code == "provider_configuration"
+    assert health["preset_budget_unlimited"] and health["preset_generation_available"] and health["rig_generation_available"]
 
 
 def test_env_defaults_disabled_and_rejects_external_key_destination(tmp_path, monkeypatch):

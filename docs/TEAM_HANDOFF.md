@@ -1,6 +1,6 @@
 # modulo — team setup and handoffs
 
-Read [DEVELOPMENT.md](DEVELOPMENT.md) for setup and [PLAN.md](PLAN.md) for the full requirements. Browser amp/live capture, fixture presets and the main Tone Match [workflow](LOCAL_SEPARATION.md) are implemented increments. The workflow includes confirmed-reference, budget-gated starting presets and editable Apply/Play; calibrated source/target tone matching and physical-rig acceptance remain incomplete. Generation defaults to disabled, and the earlier smoke allowance is consumed. Check live issues for unpublished teammate work before integrating. Deadline: **31 October 2026, 01:00 MYT**; submission target **30 October, 22:00 MYT**.
+Read [DEVELOPMENT.md](DEVELOPMENT.md) for setup and [PLAN.md](PLAN.md) for the full requirements. Browser amp/live capture, fixture presets and the main Tone Match [workflow](LOCAL_SEPARATION.md) are implemented increments. The workflow includes confirmed-reference starting presets and editable Apply/Play; calibrated source/target tone matching and physical-rig acceptance remain incomplete. Isyraf removed application attempt/spending caps on 31 October 2026; a backend key enables manual generation and usage records are preserved. Check live issues for unpublished teammate work before integrating. Deadline: **31 October 2026, 01:00 MYT**; submission target **30 October, 22:00 MYT**.
 
 ## Everyone
 

@@ -9,7 +9,7 @@ The user-approved main UI uses cloud model inference and a live guitar source. B
 
 The visual signal chain remains visible in Match tone and Play & record. Select a pedal/amp to open its controls; Add gear opens the library. Reorder, replace, clear, remove, Undo, export/import and custom IRs remain supported. Empty Settings/Presets pages, local/cloud selection, file calibration, supplied dry guitar, synthetic audition and backend metrics are absent from the main flow.
 
-Full-song tabs are under Practice with full-song tabs and require an explicit Generate action. Draft accuracy/fingering limitations remain visible. Generation budgets, authentication, source validation and bounded worker behavior are unchanged.
+Full-song tabs are under Practice with full-song tabs and require an explicit Generate action. Draft accuracy/fingering limitations remain visible. Isyraf removed application request/spending caps on 31 October 2026; usage ledgers remain cumulative. Authentication, source validation and bounded worker execution remain in place.
 
 ## Verification
 

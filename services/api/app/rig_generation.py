@@ -48,7 +48,6 @@ class RigGenerator(PresetGenerator):
             raise PresetError("provider_configuration", "Unsupported rig model.")
         self.model = model
         self.reservation_model = model
-        self.max_model_requests = 6 if model == SUPER_MODEL else 100
         if type(allow_super_fallback) is not bool:
             raise PresetError("provider_configuration", "Use an explicit bounded fallback policy.")
         self.allow_super_fallback = allow_super_fallback
@@ -66,12 +65,7 @@ class RigGenerator(PresetGenerator):
                 if separator and name == "NEBIUS_RIG_FALLBACK": fallback = value.strip().strip('"').strip("'")
         fallback = os.environ.get("NEBIUS_RIG_FALLBACK", fallback)
         if fallback not in {"0", "1"}: raise PresetError("provider_configuration", "NEBIUS_RIG_FALLBACK must be 0 or 1.")
-        return cls(base.directory, key=base.key, budget_usd=base.budget if base.budget is not None else "unlimited",
-                   max_requests=base.max_requests, model=os.environ.get("NEBIUS_RIG_MODEL", model), allow_super_fallback=fallback == "1")
-
-    @property
-    def available(self):
-        return bool(self.key and self.max_requests and self.budget is not None and self.budget >= self.reservation_usd)
+        return cls(base.directory, key=base.key, model=os.environ.get("NEBIUS_RIG_MODEL", model), allow_super_fallback=fallback == "1")
 
     @property
     def cache_key(self):
@@ -83,8 +77,7 @@ class RigGenerator(PresetGenerator):
         except PresetError as error:
             if not (self.allow_super_fallback and self.model == MODEL and error.code == "invalid_provider_rig"):
                 raise
-            fallback = RigGenerator(self.directory, key=self.key, budget_usd=self.budget, max_requests=self.max_requests,
-                                    transport=self.transport, model=SUPER_MODEL)
+            fallback = RigGenerator(self.directory, key=self.key, transport=self.transport, model=SUPER_MODEL)
             return fallback.generate_once(reference, source_calibration)
 
     def generate_once(self, reference, source_calibration=None):

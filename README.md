@@ -2,7 +2,7 @@
 
 Turn a guitar sound in a mixed song into a browser preset you can play through.
 
-**Status:** Tone Match follows **Connect → Choose sound → Match tone → Play & record**. The app uses cloud guitar separation, live-interface calibration and NVIDIA/Nebius generation of individual rig parameters, followed by automatic browser refinement and an explicit **Use this tone** action. The visual pedal/amp chain remains editable. [Cloud setup](docs/TEAM_CLOUD_SETUP.md) requires no local GPU. Paid generation is disabled by default. [Current flow and verification](docs/GUIDED_FLOW.md). Audible matching and physical-interface acceptance remain open.
+**Status:** Tone Match follows **Connect → Choose sound → Match tone → Play & record**. The app uses cloud guitar separation, live-interface calibration and NVIDIA/Nebius generation of individual rig parameters, followed by automatic browser refinement and an explicit **Use this tone** action. The visual pedal/amp chain remains editable. [Cloud setup](docs/TEAM_CLOUD_SETUP.md) requires no local GPU. A backend key enables manual generation without application usage caps. [Current flow and verification](docs/GUIDED_FLOW.md). Audible matching and physical-interface acceptance remain open.
 
 - **Team:** Isyraf — AI/backend/integration; Dinnie — browser audio/DSP; Shazlin — frontend/UX.
 - **Deadline:** 31 October 2026, 01:00 MYT (30 October, 17:00 UTC).
@@ -21,7 +21,7 @@ After updating to the shared skill, start a Codex session with `$modulo Isyraf`,
 4. Apply the preset to a working browser amp/effects chain.
 5. Play through it with a guitar audio interface and optionally record guitar, backing and camera.
 
-Full-song draft tablature now uses a separate private Modal GPU worker; see [song tabs](docs/SONG_TABS.md) for playback, setup, shared allowance and accuracy limits. It transcribes the complete extracted guitar track independently of tone-reference selection.
+Full-song draft tablature now uses a separate private Modal GPU worker; see [song tabs](docs/SONG_TABS.md) for playback, setup, usage accounting and accuracy limits. It transcribes the complete extracted guitar track independently of tone-reference selection.
 modulo aims for a useful approximation, not exact amp identification or perfect tone cloning.
 
 ## Repository layout

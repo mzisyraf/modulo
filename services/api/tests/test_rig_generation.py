@@ -20,7 +20,7 @@ def response(value=PROPOSAL):
 
 def test_custom_values_validated_before_return_and_durable_reservation(tmp_path):
     calls = []
-    engine = RigGenerator(tmp_path, key="test-only", budget_usd="1", max_requests=2,
+    engine = RigGenerator(tmp_path, key="test-only",
                           transport=lambda key, payload: calls.append(payload) or response())
     source = {**SOURCE, "tone_features": FEATURES, "origin": "file"}
     result = engine.generate({**REFERENCE, "tone_features": FEATURES}, source)
@@ -37,9 +37,8 @@ def test_custom_values_validated_before_return_and_durable_reservation(tmp_path)
     assert "factory" not in packet and calls[0]["response_format"]["json_schema"]["strict"]
     assert json.loads((tmp_path / "budget.json").read_text())["reserved_usd"] == "0.20"
     engine.generate({**REFERENCE, "tone_features": FEATURES}, source)
-    with pytest.raises(PresetError, match="allowance"):
-        engine.generate({**REFERENCE, "tone_features": FEATURES}, source)
-    assert len(calls) == 2
+    engine.generate({**REFERENCE, "tone_features": FEATURES}, source)
+    assert len(calls) == 3
 
 
 @pytest.mark.parametrize("patch", [{"parameters": {"time_ms": 237}}, {"parameters": {"time_ms": 237, "mix": .2, "invented": 1}},
@@ -52,7 +51,7 @@ def test_missing_and_unsupported_controls_rejected(patch):
 
 def test_missing_calibration_never_reserves_and_bad_model_output_keeps_reservation(tmp_path):
     calls = []
-    engine = RigGenerator(tmp_path, key="test", budget_usd="1", max_requests=2, transport=lambda *args: calls.append(1) or response({}))
+    engine = RigGenerator(tmp_path, key="test", transport=lambda *args: calls.append(1) or response({}))
     with pytest.raises(PresetError): engine.generate(REFERENCE)
     assert not calls and not (tmp_path / "budget.json").exists()
     with pytest.raises(PresetError) as error: engine.generate({**REFERENCE, "tone_features": FEATURES}, {**SOURCE, "tone_features": FEATURES})
@@ -60,20 +59,21 @@ def test_missing_calibration_never_reserves_and_bad_model_output_keeps_reservati
     assert json.loads((tmp_path / "budget.json").read_text())["attempts"] == 1
 
 
-def test_rig_requires_bounded_budget_and_rejects_forged_result(tmp_path):
-    assert not RigGenerator(tmp_path, key="test", budget_usd="unlimited", max_requests=2).available
+def test_rig_requires_key_and_rejects_forged_result(tmp_path):
+    assert not RigGenerator(tmp_path).available
+    assert RigGenerator(tmp_path, key="test").available
     with pytest.raises(ValueError): validate_generated_rig({"proposal": PROPOSAL})
 
 
-def test_super_reservations_have_a_durable_six_request_stop(tmp_path):
+def test_super_continues_exhausted_reservations_after_restart(tmp_path):
     from app.rig_generation import SUPER_MODEL
-    engine = RigGenerator(tmp_path, key="test-only", budget_usd="10", max_requests=30, model=SUPER_MODEL)
-    for _ in range(6): engine.reserve()
-    restarted = RigGenerator(tmp_path, key="test-only", budget_usd="10", max_requests=30, model=SUPER_MODEL)
-    with pytest.raises(PresetError) as error: restarted.reserve()
-    assert error.value.code == "budget_exhausted"
+    (tmp_path / "budget.json").write_text(json.dumps({"attempts": 100, "reserved_usd": "20", "model_attempts": {SUPER_MODEL: 100, MODEL: 7}}))
+    engine = RigGenerator(tmp_path, key="test-only", model=SUPER_MODEL)
+    engine.reserve()
+    restarted = RigGenerator(tmp_path, key="test-only", model=SUPER_MODEL)
+    restarted.reserve()
     ledger = json.loads((tmp_path / "budget.json").read_text())
-    assert ledger["attempts"] == 6 and ledger["model_attempts"][SUPER_MODEL] == 6 and ledger["reserved_usd"] == "1.20"
+    assert ledger["attempts"] == 102 and ledger["model_attempts"] == {SUPER_MODEL: 102, MODEL: 7} and ledger["reserved_usd"] == "20.40"
 
 
 def test_approved_schema_fallback_is_one_counted_super_call(tmp_path):
@@ -82,18 +82,18 @@ def test_approved_schema_fallback_is_one_counted_super_call(tmp_path):
     def transport(_key, payload):
         calls.append(payload["model"])
         return {**response({} if payload["model"] == MODEL else PROPOSAL), "model": payload["model"]}
-    engine = RigGenerator(tmp_path, key="test", budget_usd="1", max_requests=3, transport=transport, allow_super_fallback=True)
+    engine = RigGenerator(tmp_path, key="test", transport=transport, allow_super_fallback=True)
     result = engine.generate({**REFERENCE, "tone_features": FEATURES}, {**SOURCE, "tone_features": FEATURES})
     assert calls == [MODEL, SUPER_MODEL] and result["provenance"]["model"] == SUPER_MODEL
     ledger = json.loads((tmp_path / "budget.json").read_text())
     assert ledger["attempts"] == 2 and ledger["reserved_usd"] == "0.40"
 
 
-def test_fallback_does_not_retry_provider_or_budget_errors_or_loop(tmp_path):
+def test_fallback_does_not_retry_provider_errors_or_loop(tmp_path):
     calls = []
     def unavailable(_key, payload):
         calls.append(payload["model"]); raise PresetError("provider_unavailable", "Unavailable")
-    engine = RigGenerator(tmp_path, key="test", budget_usd="1", max_requests=3, transport=unavailable, allow_super_fallback=True)
+    engine = RigGenerator(tmp_path, key="test", transport=unavailable, allow_super_fallback=True)
     with pytest.raises(PresetError): engine.generate({**REFERENCE, "tone_features": FEATURES}, {**SOURCE, "tone_features": FEATURES})
     assert len(calls) == 1
     calls.clear()
@@ -112,7 +112,7 @@ def test_rig_api_measures_target_caches_own_kind_and_invalidates_reference(tmp_p
     from test_jobs import success
     from test_job_presets import confirmed_job, wait_generation
     calls = []
-    rig = RigGenerator(tmp_path / "budget", key="test", budget_usd="1", max_requests=3,
+    rig = RigGenerator(tmp_path / "budget", key="test",
                        transport=lambda _key, payload: calls.append(payload) or response())
     store = JobStore(tmp_path / "jobs"); monkeypatch.setattr(store, "run_worker", success)
     with TestClient(create_app(store, PresetGenerator(tmp_path / "legacy"), rig), base_url="http://127.0.0.1") as client:

@@ -13,14 +13,16 @@ import tabs_common
 import client
 
 class TabsChecks(unittest.TestCase):
-    def test_eight_total_reservations_survive_failure_and_refuse_corruption(self):
+    def test_reservations_continue_past_old_caps_and_refuse_duplicates_and_corruption(self):
         with tempfile.TemporaryDirectory()as d:
             path=Path(d)/'attempts.json'
             first=str(uuid4());tabs_common.reserve(path,first)
             with self.assertRaises(RuntimeError):tabs_common.reserve(path,first)
-            for _ in range(7):tabs_common.reserve(path,str(uuid4()))
-            self.assertEqual(len(json.loads(path.read_text())),8)
-            with self.assertRaises(RuntimeError):tabs_common.reserve(path,str(uuid4()))
+            for _ in range(120):tabs_common.reserve(path,str(uuid4()))
+            entries=json.loads(path.read_text())
+            self.assertEqual(len(entries),121)
+            self.assertEqual(entries[0],first)
+            self.assertGreater(path.stat().st_size,4096)
             path.write_text('{}')
             with self.assertRaises(RuntimeError):tabs_common.reserve(path,str(uuid4()))
 
@@ -48,6 +50,7 @@ class TabsChecks(unittest.TestCase):
                 fn.return_value.spawn.return_value=call
                 with self.assertRaises(RuntimeError):client.run(source,root/'output')
             call.cancel.assert_called_once_with(terminate_containers=True)
+            volume.read_file.assert_not_called()
             self.assertEqual(json.loads((root/'output/modal-tabs-call.json').read_text())['call_id'],'fc-test')
             self.assertTrue(json.loads((root/'output/tabs-cancel.json').read_text())['confirmed'])
 

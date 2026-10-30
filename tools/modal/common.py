@@ -15,8 +15,8 @@ ARTIFACTS = ("mix.wav", "guitar.wav", "backing.wav", "result.json")
 
 def reserve_attempt(ledger):
     attempts = json.loads(ledger.read_text()) if ledger.exists() else 0
-    if type(attempts) is not int or not 0 <= attempts < 10:
-        raise RuntimeError("Initial ten-attempt allowance exhausted or invalid; review billing before extending it.")
+    if type(attempts) is not int or attempts < 0:
+        raise RuntimeError("Invalid separation usage ledger; preserve it and repair before retrying.")
     temporary = ledger.with_suffix(".tmp")
     temporary.write_text(json.dumps(attempts + 1))
     temporary.replace(ledger)

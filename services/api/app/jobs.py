@@ -372,7 +372,7 @@ class JobStore:
             if job_id in self.preset_running:
                 raise JobError("generation_busy", "The previous attempt is finishing. Wait before generating for the new passage.", 409, True)
             if generator is None or not generator.available:
-                raise PresetError("generation_disabled", "Starting-preset generation is disabled. A separate approved backend request/budget allowance is required.")
+                raise PresetError("generation_disabled", "Configure the backend Nebius API key before generating.")
             request_id = str(uuid4())
             generation = {"request_id": request_id, "reference_revision": revision, "status": "generating"}
             if kind != "preset":

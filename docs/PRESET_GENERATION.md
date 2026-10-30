@@ -1,6 +1,6 @@
 # Preset and custom model-rig generation
 
-Status: main Tone Match supports a full model rig with explicit individual parameters, alongside the legacy six-control preset under its disclosure. The standalone `/separation.html` page was removed. Runtime generation remains disabled by default; offline API/browser tests inject transport. Explicit operator configuration enables paid manual generation. Full rigs require a bounded numeric allowance; the legacy uncapped option does not enable them. Technical checks and spectral proxies do not establish musical quality.
+Status: main Tone Match supports full model rigs and a legacy six-control endpoint. On **31 October 2026**, Isyraf authorized removing all application attempt and spending caps. A backend API key enables manual generation; old allowance environment settings are ignored. Usage records survive failures and restarts. Provider quotas/credits and charges still apply. Technical checks and spectral proxies do not establish musical quality.
 
 ## Custom model rigs
 
@@ -16,7 +16,7 @@ Validated refinement requires at least six seconds of prepared source. Only its 
 
 Rendering retains two seconds of tails for safety inspection; appended silence is excluded from active-span features/RMS. Output is separately calibrated within -36 to -6dB and peak headroom; source input gain stays fixed. Rich descriptors add eight log-band cepstral coefficients, estimated first-six-harmonic power/confidence, centered envelope correlations at10ms intervals, and isolated-attack decay ratios with observation counts. Periodicity confidence is reduced when usable frames are scarce. These are uncertain signal measurements, not a learned embedding, effect classifier or equipment identification. Browser/Python implementations are parity-tested. Review/apply remains deliberate; model controls stay editable. Approximate processors, different notes/pickups and separation bleed limit accuracy.
 
-Exact runtime IDs: Nano `nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B`, conditional approved Super `nvidia/nemotron-3-super-120b-a12b`, selected by backend `NEBIUS_RIG_MODEL`. Full-rig calls reserve US$0.20 before transport against the existing shared local ledger; errors retain reservations. This exceeds the worst-case full 262144-token context plus 10000 output at Super's US$0.30/US$0.90 per million, checked against the official catalog on 30 October. A 180-second transport timeout allows bounded reasoning. Explicit `NEBIUS_RIG_FALLBACK=1` permits one Super repair only after invalid Nano rig output; both attempts reserve funds. Auth, rate, transport and budget failures do not trigger this repair. Super has a durable six-request stop. A numeric US$0–10 allowance and cumulative request limit are required. These remain local controls, not a global cap on a shared key.
+Exact runtime IDs: Nano `nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B` and Super `nvidia/nemotron-3-super-120b-a12b`, selected by backend `NEBIUS_RIG_MODEL`. Full-rig calls record a conservative US$0.20 reservation before transport in the existing local usage ledger; errors retain reservations. This is accounting, not a spending cap or invoice. A 180-second transport timeout allows bounded reasoning. Explicit `NEBIUS_RIG_FALLBACK=1` permits one Super repair only after invalid Nano rig output; both attempts are recorded. Auth, rate and transport failures do not trigger this repair. Nano and Super have no application request or spending stop.
 
 Cache scope includes source measurements, reference revision, catalog, all audio source files, model and prompt/analysis versions. New rich-feature requests use `rig-features-v3`; cached v2 outputs remain valid inputs for offline search comparisons and are labelled as cached, not fresh inference. Catalog or response mismatches fail before application. See [the approved execution plan](OVERNIGHT_EXECUTION_PLAN.md), [declared evaluations](../.Codex/evals/tone-reliability.md) and [GPUless team setup](TEAM_CLOUD_SETUP.md).
 
@@ -44,7 +44,7 @@ Isyraf's application-integration session incorporated the research chat's releas
 from app.preset_generation import PresetGenerator, PresetError
 
 generator = PresetGenerator.from_env()
-generator.available  # key and a configured allowance; not live account verification
+generator.available  # backend key configured; not live account verification
 preset = generator.generate(confirmed_reference)
 ```
 
@@ -74,33 +74,30 @@ The panel owns its isolated AudioEngine. When Shazlin moves the flow into Tone M
 
 ## Runtime configuration
 
-The existing private `services/api/.env` stays unchanged. Environment variables override the same names in that file. Only the official fixed HTTPS Nano endpoint is accepted; redirects cannot forward the credential. No dependency is added.
+The existing private `services/api/.env` stays unchanged. Environment variables override the same names in that file. Only the official fixed HTTPS Nano endpoint is accepted; redirects cannot forward the credential. `NEBIUS_BUDGET_USD` and `NEBIUS_MAX_REQUESTS` are retired and ignored, including existing zero or exhausted settings. No dependency is added.
 
 ```dotenv
 NEBIUS_API_KEY=
 NEBIUS_BASE_URL=https://api.tokenfactory.nebius.com/v1
 NEBIUS_MODEL=nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B
-# Default disabled. Set only an explicitly approved separate runtime allowance.
-NEBIUS_BUDGET_USD=0
-NEBIUS_MAX_REQUESTS=0
 ```
 
-The previous US$0.10 / three-request experiment is finished; do not reuse its unused dollars as authorization for more requests. Integrate without changing the real .env or making live calls. Add the two zero-default fields to .env.example and explain activation only when the split includes that file.
+Adding a backend key enables paid manual generation. Missing credentials keep generation unavailable. Restart the API after updating code; no allowance edits or ledger resets are needed.
 
-The local starter accepts a numeric US$0–1 budget, or the explicit `unlimited` value to remove its dollar cap, with 0–100 configured requests. These settings are not provider-side billing limits. The durable `data/preset-inference/budget.json` reserves US$0.01608864 BEFORE each call. This overcounts an entire 262144-token input context plus 1500 completion tokens at the public Nano rates US$0.06/US$0.24 per million checked 27 October 2026. Recheck rates/model context before enabling a new allowance. The request itself is much smaller. Limits are cumulative against that directory; restart does not reset them. Corrupt/busy budget data fails closed. Errors/timeouts retain the reservation; do not delete/reset this ledger to retry. Local reservation is not a provider-side billing cap or invoice. Cloud deployment needs its own access/rate/budget design.
+The durable `data/preset-inference/budget.json` remains the cumulative usage record. Legacy presets record US$0.01608864 and full rigs US$0.20 before each call, preserving existing counts, per-model counts and reserved totals. These are conservative historical estimates, not invoices. Corrupt/busy usage data fails closed. Errors/timeouts retain their records; do not delete/reset the ledger to retry. Authentication, bounded inputs/responses, strict schema validation and explicit generation remain.
 
-## Current evidence and remaining gaps
+## Earlier integration evidence and remaining gaps
 
 Existing real Nano smoke: 3/3 responses satisfy the six-control preset schema, 2/3 satisfy all original checks, with inconsistent settings for identical synthetic inputs. That is access/format evidence only. The integrated provider/API/browser checks use injected transport; the browser harness uses synthetic separation input and a preset named TEST ONLY. They establish wiring, warnings, controls/lifecycle and cost guards, not hosted generation, real source calibration, listening quality or tone similarity. See `artifacts/nebius-model-access-20261027T143605Z/RESULTS.md` for the earlier real results. No additional paid request is authorized or performed by this integration.
 
 Official references: [chat completion limits](https://docs.tokenfactory.nebius.com/api-reference/inference/create-chat-completion), [public model/rate catalog](https://tokenfactory.nebius.com/api/public/models_info).
 
 
-## Explicit operator opt-in without a dollar cap
+## Usage authorization
 
-An operator may set `NEBIUS_BUDGET_USD=unlimited` and `NEBIUS_MAX_REQUESTS=100` in their ignored local `.env`, then restart the API without zero-valued process overrides. Only the explicit text `unlimited` removes the monetary check; invalid/NaN/infinite numeric inputs still fail closed. Zero defaults keep new checkouts disabled. The cumulative 100-request stop, 1500 completion tokens, single output, manual action/no automatic retry, strict validation and durable reservation ledger remain. Existing reservations and failed attempts are not reset. The health response exposes `preset_budget_unlimited`; enabled uncapped UI states disclose that new generations/retries can incur charges. Unlimited local dollars do not remove provider charges or account credit limits.
+Isyraf explicitly approved removing application usage caps across Modal separation, Modal tabs and Nebius Nano/Super on 31 October 2026. This supersedes the earlier dollar/request allowances, including the old 100-request and six-Super stops. Existing counters are preserved and continue increasing. The health response retains `preset_budget_unlimited` for existing clients. Output-token bounds, single output, deliberate generation/retry and strict validation remain.
 
-For this Isyraf session, the user explicitly requested removing the dollar cap on 28 October 2026; that instruction supersedes the earlier consumed smoke-only allowance for subsequent local manual generation. The feature does not authorize deployment or a team-wide `.env` change. New real-flow evidence uses the already-confirmed server reference and prepared user recording; it still does not supply source-calibration features or establish musical similarity.
+Update from the reviewed staging integration and restart each laptop's local API. The old allowance values in private `.env` files no longer need changes. No provider-side quota, credit limit or charge is removed by this application change.
 
 
 ### Recorded-guitar live checkpoint — 28 October 2026

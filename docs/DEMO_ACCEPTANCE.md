@@ -20,11 +20,11 @@ Those delivery/access requirements come from the [rules, sections 1 and 4](https
 
 1. Preserve local changes, fetch and merge reviewed staging into the operator's named branch. Use Node24 and Python3.12; follow [DEVELOPMENT](DEVELOPMENT.md) and [TEAM_CLOUD_SETUP](TEAM_CLOUD_SETUP.md). Install API and separate Modal-client environments. Privately place the two ignored credential files at their documented paths; preserve existing ledgers.
 2. Run the API8000 and frontend5173, or build/preview4173. Choose **Tone Match → Guitar audio → Use supplied dry guitar**. Confirm calibration without a microphone request. Keep browser refresh/HMR away from recordings; download any takes before restarting.
-3. With coordinated remaining allowance, upload one rights-cleared30–60s song using **Cloud API**. Listen to guitar/backing, choose a clear10–20s passage and confirm. Reuse that job for later CPU tests. An existing result is reused audio, not a fresh cloud run.
+3. For a deliberate cloud check, upload one rights-cleared30–60s song using **Cloud API**. Listen to guitar/backing, choose a clear10–20s passage and confirm. Reuse that job for later CPU tests. An existing result is reused audio, not a fresh cloud run.
 4. Choose **Generate custom rig**. Automatic refinement is on by default and makes no extra model request. Review validation/protection results, deliberately Apply, play the dry recording, change an individual control and record5–10s. Finish, replay/download the take and export rig JSON. Restore/Check permits comparison with the original AI proposal. A short source/error must retain manual recovery.
 5. Cancel rendering; reconnect/navigate/return; change source/reference/project. Nothing may restart refinement, resurrect stale results or begin capture/playback. Confirm layout at390px and check browser console. Record exact commit, OS/browser, file/live source, actual provider model, outcomes and any error.
 
-The model may be disabled intentionally in a test API process even when private `.env` is configured. Review the approved allowance and restart the API normally for deliberate service testing; never delete counters or change limits to make a test pass. Missing hardware does not block the supplied-file rehearsal. It does block physical-interface acceptance.
+Test APIs inject offline transport or omit credentials. Restart the API normally for deliberate service testing; preserve all cumulative usage records. Application usage caps were removed by Isyraf on 31 October 2026. Missing hardware does not block the supplied-file rehearsal. It does block physical-interface acceptance.
 
 ## Connected-guitar acceptance — 20 minutes, hardware required
 

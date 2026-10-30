@@ -8,8 +8,6 @@ services:
     init: true
     environment:
       NEBIUS_API_KEY: ${NEBIUS_API_KEY:-}
-      NEBIUS_BUDGET_USD: ${NEBIUS_BUDGET_USD:-0}
-      NEBIUS_MAX_REQUESTS: ${NEBIUS_MAX_REQUESTS:-0}
     volumes:
       - jobs:/app/data
       - models:/app/models/torch
