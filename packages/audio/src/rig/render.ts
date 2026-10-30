@@ -17,14 +17,31 @@ export function encodeRigWav(buffer: AudioBuffer): Blob {
 }
 
 export interface RigRenderOptions { sampleRate?: number; channel?: 0 | 1; tailSeconds?: number; signal?: AbortSignal }
-export async function renderRigFile(file: File, value: RigPreset, options: RigRenderOptions = {}, irs = new CabinetIRLibrary()) {
-  const rig = parseRigPreset(value), rate = options.sampleRate ?? 48000, tail = options.tailSeconds ?? 2, channel = options.channel ?? 0;
+function renderSettings(options: RigRenderOptions, defaultRate = 48000) {
+  const rate = options.sampleRate ?? defaultRate, tail = options.tailSeconds ?? 2, channel = options.channel ?? 0;
   if (![44100, 48000, 96000].includes(rate) || !Number.isFinite(tail) || tail < 0 || tail > 8 || ![0, 1].includes(channel)) throw new Error("Invalid offline render options.");
+  return { rate, tail, channel };
+}
+export async function renderRigFile(file: File, value: RigPreset, options: RigRenderOptions = {}, irs = new CabinetIRLibrary()) {
+  const rig = parseRigPreset(value), { rate } = renderSettings(options);
   if (file.size <= 0 || file.size > 20 * 1024 * 1024) throw new Error("Render input must be at most 20 MiB.");
-  const aborted = () => { if (options.signal?.aborted) throw new DOMException("Rig render canceled.", "AbortError"); };
+  options.signal?.throwIfAborted();
+  const decoder = new OfflineAudioContext(1, 1, rate), decoded = await decoder.decodeAudioData(await file.arrayBuffer());
+  const rendered = await renderRigBuffer(decoded, rig, options, irs);
+  return { ...rendered, blob: encodeRigWav(rendered.buffer), mimeType: "audio/wav" };
+}
+
+/** Score prepared audio without decoding or encoding a download for every candidate. */
+export async function renderRigBuffer(decoded: AudioBuffer, value: RigPreset, options: RigRenderOptions = {}, irs = new CabinetIRLibrary()) {
+  options.signal?.throwIfAborted();
+  if (typeof AudioBuffer === "undefined" || !(decoded instanceof AudioBuffer)) throw new Error("Use a decoded AudioBuffer for rendering.");
+  const rig = parseRigPreset(value), { rate, tail, channel } = renderSettings(options, decoded.sampleRate);
+  const aborted = () => options.signal?.throwIfAborted();
   aborted();
-  const decoder = new OfflineAudioContext(1, 1, rate), decoded = await decoder.decodeAudioData(await file.arrayBuffer()); aborted();
+  if (decoded.sampleRate !== rate) throw new Error("Prepare audio at the requested render sample rate.");
   if (decoded.duration > 180 || channel >= decoded.numberOfChannels || decoded.numberOfChannels > 2) throw new Error("Render supports mono/stereo inputs up to 180 seconds and an available input channel.");
+  if (!Number.isFinite(decoded.duration) || decoded.duration <= 0 || decoded.length < 1 || decoded.numberOfChannels < 1) throw new Error("Render input must contain audio.");
+  for (const sample of decoded.getChannelData(channel)) if (!Number.isFinite(sample)) throw new Error("Render input contains non-finite samples.");
   const frames = Math.ceil((decoded.duration + tail) * rate);
   if (frames * 4 + 44 > 50 * 1024 * 1024) throw new Error("Rendered WAV would exceed 50 MiB.");
   const context = new OfflineAudioContext(2, frames, rate); await prepareRig(context, rig); aborted();
@@ -36,6 +53,6 @@ export async function renderRigFile(file: File, value: RigPreset, options: RigRe
   const start = performance.now();
   try {
     source.start(); const buffer = await context.startRendering(); aborted();
-    return { blob: encodeRigWav(buffer), mimeType: "audio/wav", sampleRate: rate, durationSeconds: buffer.duration, renderMilliseconds: performance.now() - start, buffer };
+    return { sampleRate: rate, durationSeconds: buffer.duration, renderMilliseconds: performance.now() - start, buffer };
   } finally { options.signal?.removeEventListener("abort", onAbort); graph.dispose(); source.disconnect(); guard.disconnect(); }
 }

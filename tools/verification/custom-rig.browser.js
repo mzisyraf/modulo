@@ -51,7 +51,7 @@ async (page) => {
   await p.getByRole("button",{name:"Use supplied dry guitar",exact:true}).click();
   await p.getByText("Guitar audio calibrated",{exact:true}).waitFor();
   check(await p.evaluate(()=>window.__micRequests)===0,"file calibration never requests capture");
-  await p.getByLabel("Mixed-song audio",{exact:true}).setInputFiles({name:"TEST ONLY.wav",mimeType:"audio/wav",buffer:wav});
+  await p.locator("#separation-file").setInputFiles({name:"TEST ONLY.wav",mimeType:"audio/wav",buffer:wav});
   await p.getByRole("button",{name:"Separate guitar",exact:true}).click(); await p.getByRole("heading",{name:"Compare the same passage"}).waitFor();
   await p.getByRole("button",{name:"Manual selection",exact:true}).click(); await p.locator("#reference-end").fill("12"); await p.getByRole("button",{name:"Confirm reference",exact:true}).click();
   await p.getByRole("button",{name:"Generate custom rig",exact:true}).click();

@@ -48,7 +48,7 @@ async (page) => {
   try{
     await p.goto('http://127.0.0.1:5173/?verification=live-backing');
     await p.getByRole('button',{name:'Tone Match',exact:true}).click();
-    await p.getByLabel('Mixed-song audio',{exact:true}).setInputFiles({name:'TEST ONLY.wav',mimeType:'audio/wav',buffer:wav});
+    await p.locator('#separation-file').setInputFiles({name:'TEST ONLY.wav',mimeType:'audio/wav',buffer:wav});
     await p.getByRole('button',{name:'Separate guitar',exact:true}).click();
     await p.getByRole('heading',{name:'Compare the same passage'}).waitFor();
     await startLive();

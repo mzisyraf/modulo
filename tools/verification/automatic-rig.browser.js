@@ -66,7 +66,7 @@ async (page) => {
     await p.getByRole('button',{name:'Guitar audio',exact:true}).click();
     await p.getByRole('button',{name:'Use supplied dry guitar',exact:true}).click();
     await p.getByText('Guitar audio calibrated',{exact:true}).waitFor();
-    await p.getByLabel('Mixed-song audio',{exact:true}).setInputFiles({name:'TEST ONLY.wav',mimeType:'audio/wav',buffer:song});
+    await p.locator('#separation-file').setInputFiles({name:'TEST ONLY.wav',mimeType:'audio/wav',buffer:song});
     await p.getByRole('button',{name:'Separate guitar',exact:true}).click();
     await p.getByRole('heading',{name:'Compare the same passage'}).waitFor();
     await p.getByRole('button',{name:'Manual selection',exact:true}).click();

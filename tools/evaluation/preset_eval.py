@@ -124,6 +124,7 @@ def serve(output, *, rig=False, port=5175):
             name = self.path.removeprefix("/save/")
             pattern = (r"rig-(targets|report)\.(json|html)|(clean|crunch|space|external)(-heldout)?(-(nano|super))?-r[0-2]-(target|neutral|nemotron|refined)(-listen)?\.wav" if rig
                        else r"report\.(json|html)|(eq|drive)(-heldout)?-(target|neutral|nemotron|refined)(-listen)?\.wav")
+            if rig: pattern += r"|scorer-manifest\.json|[ab]-(clean|crunch|space)-(target|near)\.wav"
             if not self.path.startswith("/save/") or not re.fullmatch(pattern, name):
                 self.send_error(400); return
             try: size = int(self.headers.get("Content-Length", "0"))

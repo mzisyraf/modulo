@@ -20,7 +20,7 @@ export * from "./rig/proposal.ts";
 import { modelFor, parameterToDSP } from "./rig/models.ts";
 export { editRig, recommendedModels, type RigEdit } from "./rig/editor.ts";
 export { CabinetIRLibrary } from "./rig/impulses.ts";
-export { renderRigFile, encodeRigWav, type RigRenderOptions } from "./rig/render.ts";
+export { renderRigFile, renderRigBuffer, encodeRigWav, type RigRenderOptions } from "./rig/render.ts";
 export type { RigTake, RigRecordingOptions } from "./rig/recording.ts";
 
 export interface LiveInputInfo {

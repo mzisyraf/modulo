@@ -1,0 +1,7 @@
+# Optional local benchmark only; reuse an isolated CUDA Torch2.0.1/torchaudio2.0.2 environment.
+torchlibrosa==0.1.0
+librosa==0.10.2.post1
+numpy==1.24.4
+scipy==1.14.1
+numba==0.60.0
+llvmlite==0.43.0

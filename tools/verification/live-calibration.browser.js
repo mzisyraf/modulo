@@ -38,7 +38,8 @@ async (page) => {
     await p.getByText("Live guitar calibrated", { exact: true }).waitFor({ timeout: 18000 });
     assert(await p.evaluate(() => window.captureTracks.every(track => track.readyState === "ended")), "Capture not released");
     assert(await p.getByText("Input level and six spectral bands measured from your playing.", { exact: true }).count() === 1, "Measurements missing");
-    await p.locator("#calibration-channel").selectOption("1");
+    await p.locator("#calibration-channel").click();
+    await p.locator("#calibration-channel-options").getByRole("button", { name: "Input 2", exact: true }).click();
     assert(await p.getByText("Live guitar calibrated", { exact: true }).count() === 0, "Channel change retained calibration");
     await p.evaluate(() => { window.captureMode = "denied"; });
     await p.getByRole("button", { name: "Calibrate live guitar", exact: true }).click();

@@ -1,3 +1,4 @@
+const fftTwiddles = new Map<number, { cosine: Float64Array; sine: Float64Array }>();
 export function spectrum(samples: ArrayLike<number>): Float64Array {
   const n = samples.length;
   if (n < 2 || (n & (n-1))) throw Error("FFT size must be a power of two");
@@ -8,8 +9,13 @@ export function spectrum(samples: ArrayLike<number>): Float64Array {
   }
   for (let size=2;size<=n;size*=2) {
     const angle=-2*Math.PI/size;
+    let twiddles=fftTwiddles.get(size);
+    if(!twiddles){
+      twiddles={cosine:Float64Array.from({length:size/2},(_,k)=>Math.cos(angle*k)),sine:Float64Array.from({length:size/2},(_,k)=>Math.sin(angle*k))};
+      if(size<=8192)fftTwiddles.set(size,twiddles);
+    }
     for (let offset=0;offset<n;offset+=size) for(let k=0;k<size/2;k++) {
-      const c=Math.cos(angle*k),s=Math.sin(angle*k),i=offset+k,j=i+size/2;
+      const c=twiddles.cosine[k],s=twiddles.sine[k],i=offset+k,j=i+size/2;
       const r=re[j]*c-im[j]*s, q=re[j]*s+im[j]*c;
       re[j]=re[i]-r;im[j]=im[i]-q;re[i]+=r;im[i]+=q;
     }

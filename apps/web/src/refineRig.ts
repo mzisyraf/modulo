@@ -1,4 +1,4 @@
-import { compileRigProposal, getGearModel, normalizeModelValue, denormalizeModelValue, parseRigProposal, renderRigFile, createGearModule, modelValues, type RigProposal } from "@modulo/audio";
+import { compileRigProposal, getGearModel, normalizeModelValue, denormalizeModelValue, parseRigProposal, renderRigBuffer, createGearModule, modelValues, type RigProposal, type RigPreset } from "@modulo/audio";
 import { toneFeatures, validToneFeatures, type ToneFeatures } from "./audioFeatures.ts";
 import { encodeMonoWav } from "./localAudio.ts";
 import { temporalFeatures, type TemporalFeatures } from "./temporalFeatures.ts";
@@ -8,7 +8,14 @@ export interface RigTargetWindow { tone: ToneFeatures; temporal?: TemporalFeatur
 
 export async function scoreRig(file: File, proposal: RigProposal, inputGainDb: number, target: ToneFeatures, signal?: AbortSignal, temporal?: TemporalFeatures, outputLevelDb = -18): Promise<RigScore> {
   if(!validToneFeatures(target))throw Error("Invalid target spectrum.");
-  const rendered = await renderRigFile(file, compileRigProposal(proposal, inputGainDb, outputLevelDb), { sampleRate: 44100, tailSeconds: 2, signal });
+  const rig=compileRigProposal(proposal,inputGainDb,outputLevelDb);
+  if(!file.size||file.size>20*1024*1024)throw Error("Choose guitar audio up to 20 MiB.");
+  signal?.throwIfAborted();
+  const decoded=await new OfflineAudioContext(1,1,44100).decodeAudioData(await file.arrayBuffer());
+  return scoreBuffer(decoded,rig,target,signal,temporal);
+}
+async function scoreBuffer(decoded: AudioBuffer, rig: RigPreset, target: ToneFeatures, signal?: AbortSignal, temporal?: TemporalFeatures): Promise<RigScore> {
+  const rendered = await renderRigBuffer(decoded, rig, { sampleRate: 44100, tailSeconds: 2, signal });
   const channels = Array.from({ length: rendered.buffer.numberOfChannels }, (_, i) => rendered.buffer.getChannelData(i));
   const activeFrames=rendered.buffer.length-2*44100,mono = new Float32Array(activeFrames); let peak=0,guarded=0,energy=0;
   for(let i=0;i<rendered.buffer.length;i++)for(const channel of channels){if(!Number.isFinite(channel[i]))throw Error("Nonfinite rig output.");peak=Math.max(peak,Math.abs(channel[i]));if(Math.abs(channel[i])>=.949)guarded++;if(i<activeFrames)mono[i]+=channel[i]/channels.length;}
@@ -28,11 +35,13 @@ export async function refineRig(file:File,value:RigProposal,inputGainDb:number,t
   if(options.targetWindows&&(options.targetWindows.length!==2||options.targetWindows.some(w=>!validToneFeatures(w.tone))))throw Error("Invalid target validation windows.");
   if(!file.size||file.size>20*1024*1024)throw Error("Choose guitar audio up to 20 MiB.");
   options.signal?.throwIfAborted();
-  const decoded=await new OfflineAudioContext(1,1,44100).decodeAudioData(await file.arrayBuffer());
+  const decoder=new OfflineAudioContext(1,1,44100),decoded=await decoder.decodeAudioData(await file.arrayBuffer());
   if(decoded.numberOfChannels!==1||decoded.duration<6||decoded.duration>90)throw Error("Validated refinement needs 6–90 seconds of prepared mono guitar audio.");
   const samples=decoded.getChannelData(0).slice(0,44100*15),split=Math.min(Math.round(samples.length*.6),samples.length-44100*3);
   const chunks=[samples.slice(0,split),samples.slice(split)];
-  const files=chunks.map((x,i)=>new File([encodeMonoWav(x,44100)],`rig-${i?"validation":"training"}.wav`,{type:"audio/wav"}));
+  // Decode each former PCM16 excerpt once; browser PCM conversion differs from hand normalization.
+  const buffers=await Promise.all(chunks.map(async samples=>decoder.decodeAudioData(await encodeMonoWav(samples,44100).arrayBuffer())));
+  options.signal?.throwIfAborted();
   const targets=options.targetWindows??[{tone:target,temporal:options.temporal},{tone:target,temporal:options.temporal}];
   const cache=new Map<string,RigScore>();let renders=0;
   async function score(proposal:RigProposal,validation=false,output=-18,full=false){
@@ -40,7 +49,7 @@ export async function refineRig(file:File,value:RigProposal,inputGainDb:number,t
     if(cache.has(key))return cache.get(key)!;
     if(renders>=80)throw Error("Local rendering budget exhausted.");
     const t=full?{tone:target,temporal:options.temporal}:targets[validation?1:0];
-    const result=await scoreRig(full?file:files[validation?1:0],proposal,inputGainDb,t.tone,options.signal,t.temporal,output);
+    const result=await scoreBuffer(full?decoded:buffers[validation?1:0],compileRigProposal(proposal,inputGainDb,output),t.tone,options.signal,t.temporal);
     cache.set(key,result);renders++;options.progress?.(renders);return result;
   }
   const baseline=await score(original),baselineValidation=await score(original,true);
