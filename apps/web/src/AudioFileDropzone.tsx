@@ -1,4 +1,4 @@
-import { useRef, useState, type DragEvent } from "react";
+import { useEffect, useRef, useState, type DragEvent } from "react";
 
 interface AudioFileDropzoneProps {
   accept: string;
@@ -6,9 +6,11 @@ interface AudioFileDropzoneProps {
   disabled?: boolean;
   file?: File;
   formats: string;
+  help?: string;
   id: string;
   maxBytes: number;
   onFile: (file?: File) => void;
+  readyLabel?: string;
 }
 
 const knownAudioExtension = /\.(aac|flac|m4a|mp3|ogg|opus|wav|webm)$/i;
@@ -28,10 +30,31 @@ function AudioDocumentIcon() {
   return <svg aria-hidden="true" viewBox="0 0 32 32"><path d="M8.5 3.5h10l5 5v20h-15z" /><path d="M18.5 3.5v6h5" /><path d="M18.5 14v8.5" /><path d="M18.5 16.5l-5.5 1.4v6" /><circle cx="11.4" cy="24.2" r="2.1" /><circle cx="16.8" cy="22.8" r="2.1" /></svg>;
 }
 
-export function AudioFileDropzone({ accept, compact = false, disabled = false, file, formats, id, maxBytes, onFile }: AudioFileDropzoneProps) {
+function durationLabel(seconds: number): string {
+  const whole = Math.max(0, Math.round(seconds));
+  return `${Math.floor(whole / 60)}:${String(whole % 60).padStart(2, "0")}`;
+}
+
+export function AudioFileDropzone({ accept, compact = false, disabled = false, file, formats, help, id, maxBytes, onFile, readyLabel = "ready locally" }: AudioFileDropzoneProps) {
   const input = useRef<HTMLInputElement>(null);
   const [dragging, setDragging] = useState(false);
   const [error, setError] = useState("");
+  const [duration, setDuration] = useState<number>();
+
+  useEffect(() => {
+    setDuration(undefined);
+    if (!file) return;
+    const url = URL.createObjectURL(file);
+    const audio = new Audio(url);
+    const loaded = () => { if (Number.isFinite(audio.duration)) setDuration(audio.duration); };
+    audio.addEventListener("loadedmetadata", loaded);
+    return () => {
+      audio.removeEventListener("loadedmetadata", loaded);
+      audio.removeAttribute("src");
+      audio.load();
+      URL.revokeObjectURL(url);
+    };
+  }, [file]);
 
   function selectFile(nextFile?: File) {
     if (!nextFile) return;
@@ -85,13 +108,13 @@ export function AudioFileDropzone({ accept, compact = false, disabled = false, f
       <strong><span>Drop an audio file</span> here</strong>
       <small>or click to browse</small>
       <span className="audio-upload-button">Choose file</span>
-      <span className="audio-upload-help" id={`${id}-help`}>{formats} · up to {fileSize(maxBytes)} · stays on this device</span>
+      <span className="audio-upload-help" id={`${id}-help`}>{help ?? `${formats} · up to ${fileSize(maxBytes)} · stays on this device`}</span>
     </label>
 
     {error && <p className="audio-upload-error" id={`${id}-error`} role="alert">{error}</p>}
     {file && <div className="audio-file-card">
       <span className="audio-file-mark"><AudioDocumentIcon /></span>
-      <span className="audio-file-copy"><strong title={file.name}>{file.name}</strong><small>{fileFormat(file)} · {fileSize(file.size)} · ready locally</small></span>
+      <span className="audio-file-copy"><strong title={file.name}>{file.name}</strong><small>{fileFormat(file)} · {fileSize(file.size)}{duration === undefined ? "" : ` · ${durationLabel(duration)}`} · {readyLabel}</small></span>
       <button type="button" className="audio-file-remove" disabled={disabled} aria-label={`Remove ${file.name}`} onClick={removeFile}>×</button>
     </div>}
   </div>;

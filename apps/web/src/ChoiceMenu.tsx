@@ -9,6 +9,7 @@ export interface ChoiceMenuProps {
   disabled?: boolean;
   id: string;
   kind?: "device" | "compact";
+  label?: string;
   onChange: (value: string) => void;
   options: ChoiceMenuOption[];
   placeholder: string;
@@ -34,6 +35,7 @@ export function ChoiceMenu({
   disabled = false,
   id,
   kind = "compact",
+  label,
   onChange,
   options,
   placeholder,
@@ -119,6 +121,7 @@ export function ChoiceMenu({
     <button
       aria-controls={open ? panelId : undefined}
       aria-expanded={open}
+      aria-label={label ? `${label}: ${selectedLabel}` : undefined}
       className="choice-menu-trigger"
       disabled={disabled}
       id={id}
