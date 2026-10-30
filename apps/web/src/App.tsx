@@ -285,12 +285,6 @@ export function App() {
     setView("tone-match");
   }
 
-  function changeControl(key: keyof Preset["parameters"], value: number) {
-    const next = parsePreset({ ...preset, parameters: { ...preset.parameters, [key]: value } });
-    engine.current?.applyPreset(next);
-    setPreset(next);
-  }
-
   function stopEngineAudio(message = "Stopped", stopWorkflow = true) {
     audioRun.current++; setBusy(false);
     if (stopWorkflow) workflow.current?.stop();
@@ -404,20 +398,6 @@ export function App() {
     setChannel(Number(value) as 0 | 1);
   }
 
-  async function loadApiExample() {
-    const run = audioRun.current;
-    setError("");
-    try {
-      const response = await fetch("/api/presets/example", { signal: AbortSignal.timeout(5000) });
-      if (!response.ok) throw new Error("Start the local API to load its example preset.");
-      const next = parsePreset(await response.json());
-      if (run !== audioRun.current) return;
-      engine.current?.applyPreset(next);
-      setPreset(next);
-      setRigOrigin(undefined);
-    } catch (failure) { if (run === audioRun.current) setError(failure instanceof Error ? failure.message : "Could not load the preset."); }
-  }
-
   function navigate(nextView: AppView) {
     stopEngineAudio();
     setView(nextView);
@@ -487,10 +467,9 @@ export function App() {
 
       <ModelRigPanel key={`rig-${sessionKey}`} engineRef={engine} value={modelRig} legacyPreset={preset} />
       <div className="grid">
-        <section aria-labelledby="amp-title"><span className="step">06 / AMP</span><h2 id="amp-title">{modelRig?.name ?? preset.name}</h2><p>{modelRig?.description ?? preset.description}</p><div className="provenance"><strong>{modelRig ? rigOrigin ? "AI custom rig · editable" : "Manual model rig" : hasResult ? "AI starting preset · editable" : "Manual example preset"}</strong><span>{modelRig && rigOrigin ? `${rigOrigin.provenance.provider} · ${rigOrigin.provenance.model} · tone unverified` : hasResult ? `${preset.provenance.provider} · ${preset.provenance.model} · tone unverified` : "Manually made · not generated from your song"}</span></div>{modelRig && <p>Model rig active above. Use demo preset to return to these controls.</p>}<div className="controls">{controls.map(([key, label, min, max, step, unit]) => <label key={key} htmlFor={key}><span>{label}<output>{preset.parameters[key]} {unit}</output></span><input id={key} type="range" disabled={Boolean(modelRig)} min={min} max={max} step={step} value={preset.parameters[key]} onChange={(event) => changeControl(key, Number(event.target.value))} /></label>)}</div><button className="secondary" onClick={() => void loadApiExample()}>Load demo preset</button></section>
-        <section aria-labelledby="audition-title"><span className="step">07 / AUDITION</span><h2 id="audition-title">Hear the browser amp</h2><p>Play through the active preset or model rig. Start at a comfortable listening level.</p><button disabled={busy} onClick={() => void play(false)}>Play test signal</button><p className="hint">A two-second synthesized pluck, not an isolated guitar or AI result.</p><label className="file-label" htmlFor="dry-file">Dry guitar recording · local audition only</label><AudioFileDropzone key={`dry-${sessionKey}`} id="dry-file" accept="audio/*" formats="Browser-supported audio" maxBytes={20 * 1024 * 1024} file={dryFile} onFile={next => { workflow.current?.invalidateCalibration?.(); setDryFile(next); }} /><button className="secondary" disabled={!dryFile || busy} onClick={() => void play(true)}>Play dry recording</button><label className="toggle"><input type="checkbox" checked={bypass} onChange={(event) => { setBypass(event.target.checked); engine.current?.setBypass(event.target.checked); }} />Bypass effects</label><button className="stop" onClick={() => stopEngineAudio()}>Stop audio</button><p role="status">{audioState}</p></section>
+        <section aria-labelledby="audition-title"><span className="step">06 / AUDITION</span><h2 id="audition-title">Hear your rig</h2><p>Play through the active preset or model rig. Start at a comfortable listening level.</p><button disabled={busy} onClick={() => void play(false)}>Play test signal</button><p className="hint">A two-second synthesized pluck, not an isolated guitar or AI result.</p><label className="file-label" htmlFor="dry-file">Dry guitar recording · local audition only</label><AudioFileDropzone key={`dry-${sessionKey}`} id="dry-file" accept="audio/*" formats="Browser-supported audio" maxBytes={20 * 1024 * 1024} file={dryFile} onFile={next => { workflow.current?.invalidateCalibration?.(); setDryFile(next); }} /><button className="secondary" disabled={!dryFile || busy} onClick={() => void play(true)}>Play dry recording</button><label className="toggle"><input type="checkbox" checked={bypass} onChange={(event) => { setBypass(event.target.checked); engine.current?.setBypass(event.target.checked); }} />Bypass effects</label><button className="stop" onClick={() => stopEngineAudio()}>Stop audio</button><p role="status">{audioState}</p></section>
         <section aria-labelledby="live-title" className="live-panel">
-          <span className="step">08 / LIVE INPUT</span><h2 id="live-title">Connect your guitar</h2>
+          <span className="step">07 / LIVE INPUT</span><h2 id="live-title">Connect your guitar</h2>
           <p>Use a local audio interface to play through the active preset or model rig. Starting rigs still require listening verification.</p>
 
           <label className="select-label" htmlFor="device">Input device</label>
