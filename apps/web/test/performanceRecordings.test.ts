@@ -20,10 +20,24 @@ test("creates a bounded browser-memory performance recording", () => {
   assert.equal(recording.sampleRate, 48_000);
 });
 
-test("rejects empty, non-audio and overlong takes", () => {
+test("rejects empty, mismatched camera and overlong takes", () => {
   assert.throws(() => createPerformanceRecording({ blob: new Blob(), durationSeconds: 1, mimeType: "audio/webm", stopReason: "manual" }, details), /empty/);
-  assert.throws(() => createPerformanceRecording({ blob: new Blob(["data"]), durationSeconds: 1, mimeType: "video/webm", stopReason: "manual" }, details), /audio format/);
+  assert.throws(() => createPerformanceRecording({ blob: new Blob(["data"]), durationSeconds: 1, mimeType: "video/webm", stopReason: "manual" }, { ...details, camera: false }), /Camera recordings/);
   assert.throws(() => createPerformanceRecording({ blob: new Blob(["data"]), durationSeconds: 181, mimeType: "audio/webm", stopReason: "duration_limit" }, details), /3 minutes/);
+});
+
+test("labels mixed camera takes and retains the processed-guitar master", async () => {
+  const presentation = new Blob(["video"], { type: "video/webm" });
+  const master = new Blob(["guitar"], { type: "audio/webm;codecs=opus" });
+  const recording = createPerformanceRecording({
+    blob: presentation, durationSeconds: 8, mimeType: presentation.type, stopReason: "manual",
+    guitarOnly: { blob: master, durationSeconds: 8, mimeType: master.type, stopReason: "manual" },
+  }, { ...details, mode: "mix", camera: true, backing: { jobId: "job-12345678", title: "Song.wav", startSeconds: 12, gainDb: -6 } });
+  assert.equal(recording.mode, "mix");
+  assert.equal(recording.camera, true);
+  assert.equal(await recording.guitarOnly!.blob.text(), "guitar");
+  assert.equal(recording.backing?.startSeconds, 12);
+  assert.equal(recordingFileExtension(recording.mimeType), "webm");
 });
 
 test("keeps the newest unique recordings within the tab limit", () => {

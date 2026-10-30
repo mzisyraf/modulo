@@ -31,7 +31,8 @@ function setup(run: (context: any, output: any, destination: any) => Promise<voi
   Object.defineProperty(globalThis, "MediaRecorder", { configurable: true, value: Recorder });
   Recorder.supported = "audio/webm;codecs=opus"; Recorder.failStart = false;
   const track = { stopped: false, stop() { this.stopped = true; } };
-  const destination = { disconnected: false, disconnect() { this.disconnected = true; }, stream: { getTracks: () => [track] }, track };
+  const tracks: any[] = [track];
+  const destination = { disconnected: false, disconnect() { this.disconnected = true; }, stream: { getTracks: () => tracks, addTrack(value: any) { tracks.push(value); } }, track, tracks };
   const output = { routes: ["headphones"] as unknown[], connect(node: unknown) { this.routes.push(node); }, disconnect(node: unknown) { this.routes = this.routes.filter(route => route !== node); } };
   const context = { currentTime: 0, sampleRate: 48000, createMediaStreamDestination: () => destination };
   return Promise.resolve().then(() => run(context, output, destination)).finally(() => {
@@ -119,6 +120,18 @@ test("codec negotiation permits supported alternatives or the browser default", 
     assert.equal((await session.result).mimeType, supported || "audio/mp4");
   });
 });
+
+test("camera capture clones the video track and records a combined video container", () => setup(async (context, output, destination) => {
+  Recorder.supported = "video/webm;codecs=vp8,opus";
+  const clone = { kind: "video", readyState: "live", stopped: false, stop() { this.stopped = true; }, clone() { throw new Error("nested clone"); } };
+  const camera = { kind: "video", readyState: "live", clone: () => clone } as unknown as MediaStreamTrack;
+  const session = recordProcessedOutput(context, output, { videoTrack: camera });
+  assert.equal(destination.tracks.includes(clone), true);
+  context.currentTime = 2; Recorder.current.data("video"); session.stop(); Recorder.current.finalized();
+  const take = await session.result;
+  assert.equal(take.mimeType, "video/webm;codecs=vp8,opus");
+  assert.equal(clone.stopped, true);
+}));
 
 test("source stop is idempotent, errors and failed starts release the destination", async () => {
   await setup(async (context, output) => {

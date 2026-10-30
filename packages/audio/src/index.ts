@@ -2,9 +2,19 @@ import { parsePreset, type Preset } from "@modulo/contracts";
 import { driveSettings, saturationCurve, pluckSamples } from "./dsp.ts";
 import { CalibrationBuffer, calibrationFrameLimit, inputLevel, type CalibrationAudio, type InputLevel } from "./calibration.ts";
 export type { CalibrationAudio, CalibrationFlag, InputLevel } from "./calibration.ts";
-import { recordProcessedOutput, type ProcessedRecording, type PerformanceRecordingOptions, type PerformanceTake } from "./recording.ts";
+import { MAX_RECORDING_BYTES, recordProcessedOutput, type ProcessedRecording, type PerformanceRecordingOptions, type PerformanceTake } from "./recording.ts";
 export { MAX_RECORDING_SECONDS, MAX_RECORDING_BYTES } from "./recording.ts";
 export type { PerformanceTake, PerformanceRecordingOptions } from "./recording.ts";
+
+export interface PerformanceCaptureOptions extends PerformanceRecordingOptions {
+  includeBacking?: boolean;
+  retainGuitarMaster?: boolean;
+}
+
+export interface PerformanceCaptureTake extends PerformanceTake {
+  /** Present for mixed/video captures so processed guitar remains independently downloadable. */
+  guitarOnly?: PerformanceTake;
+}
 import { RigGraph, prepareRig } from "./rig/graph.ts";
 import { CabinetIRLibrary } from "./rig/impulses.ts";
 import { allRigModules, parseRigPreset, applyRigSnapshot, snapshotRig, validateControl, type RigPreset } from "./rig/preset.ts";
@@ -54,6 +64,11 @@ export class AudioEngine {
   private master?: GainNode;
   private outputGuard?: WaveShaperNode;
   private performanceRecording?: ProcessedRecording;
+  private performanceMix?: GainNode;
+  private backingGain?: GainNode;
+  private backingElement?: HTMLMediaElement;
+  private backingSource?: MediaElementAudioSourceNode;
+  private backingSources = new WeakMap<HTMLMediaElement, MediaElementAudioSourceNode>();
   private rigRecording?: RigRecording;
   private rawTap?: GainNode;
   private rig?: RigGraph;
@@ -199,6 +214,8 @@ export class AudioEngine {
       this.outputGuard = outputGuard;
       outputGuard.curve = new Float32Array([-0.95, 0, 0.95]);
       this.master.connect(outputGuard).connect(context.destination);
+      this.performanceMix = context.createGain();
+      outputGuard.connect(this.performanceMix);
       this.updateLegacyPreset();
       this.setBypass(this.bypass);
     }
@@ -421,15 +438,59 @@ export class AudioEngine {
   /** Discard a pending take; its start promise rejects with AbortError. */
   cancelCalibration(): void { this.calibration?.cancel(); }
 
-  /** Resolve with an encoded processed take on finish/limit/source stop; catch cancellation. */
-  async startPerformanceRecording(options?: PerformanceRecordingOptions): Promise<PerformanceTake> {
+  /** Route an existing backing player outside the amp and into the optional recording sum. */
+  async connectBackingElement(element: HTMLMediaElement): Promise<void> {
+    const context = await this.initialize();
+    if (this.backingElement === element && this.backingSource && this.backingGain) return;
+    if (this.backingSource && this.backingGain) this.backingSource.disconnect(this.backingGain);
+    let source = this.backingSources.get(element);
+    if (!source) {
+      source = context.createMediaElementSource(element);
+      this.backingSources.set(element, source);
+    }
+    if (!this.backingGain) {
+      this.backingGain = context.createGain();
+      this.backingGain.gain.value = 10 ** (-6 / 20);
+      this.backingGain.connect(context.destination);
+      this.backingGain.connect(this.performanceMix!);
+    }
+    source.connect(this.backingGain);
+    this.backingElement = element;
+    this.backingSource = source;
+  }
+
+  setBackingGain(decibels: number): void {
+    if (!Number.isFinite(decibels) || decibels < -48 || decibels > 6) throw new Error("Backing level must be between -48 and +6 dB.");
+    if (this.context && this.backingGain) this.backingGain.gain.setTargetAtTime(10 ** (decibels / 20), this.context.currentTime, 0.015);
+  }
+
+  /** Resolve with an encoded presentation and, for mixes, a separate processed-guitar master. */
+  async startPerformanceRecording(options: PerformanceCaptureOptions = {}): Promise<PerformanceCaptureTake> {
     if (!this.context || !("createMediaStreamDestination" in this.context) || this.context.state !== "running" || !this.outputGuard || (!this.liveStream && !this.source)) {
       throw new Error("Start live input or sample playback before recording a performance.");
     }
+    if (options.includeBacking && (!this.performanceMix || !this.backingElement || !this.backingSource)) throw new Error("Connect the guitar-reduced backing track before recording the mix.");
     if (this.performanceRecording || this.rigRecording) throw new Error("A performance recording is already recording or finalizing.");
-    const session = recordProcessedOutput(this.context, this.outputGuard, options);
+    const keepMaster = Boolean((options.includeBacking || options.videoTrack) && options.retainGuitarMaster);
+    const maxBytes = options.maxBytes ?? MAX_RECORDING_BYTES;
+    const perTakeBytes = keepMaster ? Math.floor(maxBytes / 2) : maxBytes;
+    const presentation = recordProcessedOutput(this.context, options.includeBacking ? this.performanceMix! : this.outputGuard, { ...options, maxBytes: perTakeBytes });
+    let master: ProcessedRecording | undefined;
+    try {
+      if (keepMaster) master = recordProcessedOutput(this.context, this.outputGuard, { ...options, videoTrack: undefined, maxBytes: perTakeBytes });
+    } catch (error) {
+      void presentation.result.catch(() => {}); presentation.cancel(); throw error;
+    }
+    const sessions = [presentation, ...(master ? [master] : [])];
+    const session: ProcessedRecording = {
+      result: Promise.all(sessions.map(item => item.result)).then(([take, guitarOnly]) => ({ ...take, ...(guitarOnly ? { guitarOnly } : {}) } as PerformanceCaptureTake))
+        .catch(error => { sessions.forEach(item => item.cancel()); throw error; }),
+      stop: reason => sessions.forEach(item => item.stop(reason)),
+      cancel: () => sessions.forEach(item => item.cancel()),
+      state: () => sessions.some(item => item.state() === "stopping") ? "stopping" : "recording",
+    };
     this.performanceRecording = session;
-    try { return await session.result; }
+    try { return await session.result as PerformanceCaptureTake; }
     finally { if (this.performanceRecording === session) this.performanceRecording = undefined; }
   }
 
@@ -614,6 +675,9 @@ export class AudioEngine {
     if (this.rig) { this.releaseRig(this.rig); this.rig = undefined; }
     this.clearRetiredRigs();
     this.irs.clear();
+    this.backingSource?.disconnect(); this.backingGain?.disconnect(); this.performanceMix?.disconnect();
+    this.backingElement = undefined; this.backingSource = undefined; this.backingGain = undefined; this.performanceMix = undefined;
+    this.backingSources = new WeakMap();
     if (this.context && "close" in this.context) await this.context.close();
 
     this.context = undefined;
