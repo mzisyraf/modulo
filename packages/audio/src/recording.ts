@@ -4,6 +4,8 @@ export const MAX_RECORDING_BYTES = 50 * 1024 * 1024;
 export interface PerformanceRecordingOptions {
   maxSeconds?: number;
   maxBytes?: number;
+  /** Optional camera track, cloned so the recorder never owns the live preview. */
+  videoTrack?: MediaStreamTrack;
 }
 
 export interface PerformanceTake {
@@ -35,7 +37,15 @@ export function recordProcessedOutput(context: AudioContext, output: AudioNode, 
   const destination = context.createMediaStreamDestination();
   let recorder: MediaRecorder;
   try {
-    const mimeType = ["audio/webm;codecs=opus", "audio/ogg;codecs=opus", "audio/mp4"]
+    if (options.videoTrack) {
+      if (options.videoTrack.kind !== "video" || options.videoTrack.readyState === "ended") throw new Error("Choose an active camera before recording video.");
+      if (typeof destination.stream.addTrack !== "function") throw new Error("This browser cannot combine camera and processed audio.");
+      destination.stream.addTrack(options.videoTrack.clone());
+    }
+    const candidates = options.videoTrack
+      ? ["video/webm;codecs=vp9,opus", "video/webm;codecs=vp8,opus", "video/webm", "video/mp4"]
+      : ["audio/webm;codecs=opus", "audio/ogg;codecs=opus", "audio/mp4"];
+    const mimeType = candidates
       .find((type) => MediaRecorder.isTypeSupported(type));
     recorder = new MediaRecorder(destination.stream, mimeType ? { mimeType } : undefined);
   } catch (error) {
@@ -108,8 +118,9 @@ export function recordProcessedOutput(context: AudioContext, output: AudioNode, 
       return;
     }
     const mimeType = recorder.mimeType || chunks.find((chunk) => chunk.type)?.type || "";
-    if (!bytes || durationSeconds <= 0 || !mimeType.toLowerCase().startsWith("audio/")) {
-      fail(new Error("No playable audio was recorded. Start input and try again."));
+    const expectedPrefix = options.videoTrack ? "video/" : "audio/";
+    if (!bytes || durationSeconds <= 0 || !mimeType.toLowerCase().startsWith(expectedPrefix)) {
+      fail(new Error(options.videoTrack ? "No playable camera performance was recorded. Check camera permission and try again." : "No playable audio was recorded. Start input and try again."));
       return;
     }
     const blob = new Blob(chunks, { type: mimeType });

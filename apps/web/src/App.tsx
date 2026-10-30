@@ -30,7 +30,8 @@ const controls = [
 type JobStage = "idle" | "queued" | "running" | "ready" | "failed";
 
 type LiveState = "stopped" | "starting" | "live" | "error";
-type PerformanceRecordingState = "idle" | "recording" | "finalizing" | "error";
+type PerformanceRecordingState = "idle" | "countdown" | "recording" | "finalizing" | "error";
+type PerformanceMode = "guitar" | "mix";
 type EngineSource = "none" | "sample" | "live";
 
 interface StoredProject {
@@ -74,6 +75,12 @@ export function App() {
   const [recordings, setRecordings] = useState<PerformanceRecording[]>([]);
   const [performanceState, setPerformanceState] = useState<PerformanceRecordingState>("idle");
   const [performanceMessage, setPerformanceMessage] = useState("Start live input or an audition, then record your processed sound.");
+  const [performanceMode, setPerformanceMode] = useState<PerformanceMode>("guitar");
+  const [backingPlayer, setBackingPlayer] = useState<HTMLAudioElement | null>(null);
+  const [backingGainDb, setBackingGainDb] = useState(-6);
+  const [useCountdown, setUseCountdown] = useState(true);
+  const [cameraState, setCameraState] = useState<"off" | "starting" | "ready" | "error">("off");
+  const [cameraMessage, setCameraMessage] = useState("Camera off");
   const [sessionKey, setSessionKey] = useState(0);
   const engine = useRef<AudioEngine | null>(null);
   const workflow = useRef<PresetAudition | null>(null);
@@ -83,6 +90,10 @@ export function App() {
   const liveRequests = useRef(new LiveRequestGate());
   const performanceRun = useRef(0);
   const performanceStateRef = useRef<PerformanceRecordingState>("idle");
+  const performanceBacking = useRef<HTMLAudioElement | null>(null);
+  const cameraStream = useRef<MediaStream | null>(null);
+  const cameraPreview = useRef<HTMLVideoElement | null>(null);
+  const cameraRequest = useRef(0);
   const engineSource = useRef<EngineSource>("none");
   const processing = jobStage === "queued" || jobStage === "running";
   const hasResult = preset.provenance.kind === "generated" || Boolean(modelRig && rigOrigin);
@@ -93,6 +104,44 @@ export function App() {
     setPerformanceState(state);
     setPerformanceMessage(message);
   }, []);
+
+  const stopCamera = useCallback((message = "Camera off") => {
+    cameraRequest.current++;
+    cameraStream.current?.getTracks().forEach(track => track.stop());
+    cameraStream.current = null;
+    if (cameraPreview.current) cameraPreview.current.srcObject = null;
+    setCameraState("off");
+    setCameraMessage(message);
+  }, []);
+
+  async function enableCamera() {
+    if (!navigator.mediaDevices?.getUserMedia) {
+      setCameraState("error"); setCameraMessage("Camera capture requires HTTPS or localhost in a supported browser."); return;
+    }
+    const request = ++cameraRequest.current;
+    setCameraState("starting"); setCameraMessage("Requesting camera permission…");
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ video: { width: { ideal: 1280 }, height: { ideal: 720 }, facingMode: "user" }, audio: false });
+      if (request !== cameraRequest.current) { stream.getTracks().forEach(track => track.stop()); return; }
+      const track = stream.getVideoTracks()[0];
+      if (!track || track.readyState === "ended") throw new Error("No active camera was returned.");
+      cameraStream.current?.getTracks().forEach(current => current.stop());
+      cameraStream.current = stream;
+      if (cameraPreview.current) { cameraPreview.current.srcObject = stream; void cameraPreview.current.play().catch(() => {}); }
+      setCameraState("ready"); setCameraMessage(track.label ? `Camera ready · ${track.label}` : "Camera ready");
+    } catch (failure) {
+      if (request !== cameraRequest.current) return;
+      cameraStream.current?.getTracks().forEach(track => track.stop()); cameraStream.current = null;
+      if (cameraPreview.current) cameraPreview.current.srcObject = null;
+      setCameraState("error");
+      setCameraMessage(failure instanceof DOMException && failure.name === "NotAllowedError" ? "Camera permission was denied. Allow it in browser settings and retry." : failure instanceof Error ? failure.message : "Camera could not start.");
+    }
+  }
+
+  function setCameraPreview(element: HTMLVideoElement | null) {
+    cameraPreview.current = element;
+    if (element && cameraStream.current) { element.srcObject = cameraStream.current; void element.play().catch(() => {}); }
+  }
 
   const refreshInputDevices = useCallback(async () => {
     if (!navigator.mediaDevices?.enumerateDevices) {
@@ -118,7 +167,11 @@ export function App() {
     audio.onRigChange = setModelRig;
     audio.onRigError = message => { audio.onEnded?.(); setError(message); setLiveState("error"); setLiveMessage(message); };
     audio.onEnded = () => {
-      if (performanceStateRef.current === "recording") {
+      if (performanceStateRef.current === "countdown") {
+        performanceRun.current++;
+        stopCamera();
+        updatePerformanceStatus("idle", "The audio source stopped before recording began. Start it again and retry.");
+      } else if (performanceStateRef.current === "recording") {
         updatePerformanceStatus("finalizing", "The audio source stopped. Finalizing your take…");
       }
       if (engineSource.current === "live") {
@@ -150,11 +203,12 @@ export function App() {
       liveRequests.current.cancel();
       performanceRun.current++;
       audio.cancelPerformanceRecording();
+      stopCamera();
       audio.onRigChange = undefined;
       engineSource.current = "none";
       void audio.dispose();
     };
-  }, [refreshInputDevices, updatePerformanceStatus]);
+  }, [refreshInputDevices, stopCamera, updatePerformanceStatus]);
 
   useEffect(() => {
     void refreshInputDevices();
@@ -219,22 +273,57 @@ export function App() {
   function discardPerformanceRecording(message = "Take discarded. Record again when you’re ready.") {
     performanceRun.current++;
     engine.current?.cancelPerformanceRecording();
+    performanceBacking.current?.pause();
+    performanceBacking.current = null;
+    stopCamera();
     updatePerformanceStatus("idle", message);
   }
 
   async function recordPerformance() {
     const audio = engine.current;
-    if (!audio || engineSource.current === "none" || performanceStateRef.current === "recording" || performanceStateRef.current === "finalizing") return;
+    if (!audio || engineSource.current === "none" || ["countdown", "recording", "finalizing"].includes(performanceStateRef.current)) return;
+    const mode = performanceMode;
+    const player = mode === "mix" ? backingPlayer : null;
+    if (mode === "mix" && !player) { updatePerformanceStatus("error", "Separate a song and load its guitar-reduced backing before recording a mix."); return; }
 
     const run = ++performanceRun.current;
+    if (player) player.pause();
+    if (useCountdown) {
+      for (let count = 3; count > 0; count--) {
+        updatePerformanceStatus("countdown", `Recording starts in ${count}…`);
+        await new Promise(resolve => window.setTimeout(resolve, 1000));
+        if (run !== performanceRun.current) return;
+      }
+    }
+    const backingStartSeconds = player?.currentTime ?? 0;
+    const videoTrack = cameraState === "ready" ? cameraStream.current?.getVideoTracks()[0] : undefined;
     const details = {
       projectId: activeProjectId,
       projectTitle: projectTitle(songFile?.name),
       presetName: modelRig?.name ?? preset.name,
+      mode,
+      camera: Boolean(videoTrack),
+      backing: player ? { jobId, title: songFile?.name ?? "Separated backing", startSeconds: backingStartSeconds, gainDb: backingGainDb } : undefined,
     };
-    updatePerformanceStatus("recording", "Recording processed audio… Finish when you’re done, or discard this take.");
+    performanceBacking.current = player;
+    updatePerformanceStatus("recording", `${videoTrack ? "Recording camera, " : "Recording "}${mode === "mix" ? "processed guitar + backing" : "processed guitar"}… Finish when you’re done, or discard this take.`);
+    const finishAtBackingEnd = () => {
+      if (performanceStateRef.current !== "recording") return;
+      updatePerformanceStatus("finalizing", "The backing track ended. Finalizing your take…");
+      audio.finishPerformanceRecording();
+    };
+    player?.addEventListener("ended", finishAtBackingEnd, { once: true });
     try {
-      const take = await audio.startPerformanceRecording();
+      if (player) {
+        await audio.connectBackingElement(player);
+        audio.setBackingGain(backingGainDb);
+      }
+      const capture = audio.startPerformanceRecording({ includeBacking: mode === "mix", retainGuitarMaster: mode === "mix" || Boolean(videoTrack), videoTrack });
+      if (player) {
+        try { await player.play(); }
+        catch (failure) { audio.cancelPerformanceRecording(); void capture.catch(() => {}); throw failure; }
+      }
+      const take = await capture;
       if (run !== performanceRun.current) return;
       const recording = createPerformanceRecording(take, details);
       setRecordings((current) => addPerformanceRecording(current, recording));
@@ -242,21 +331,28 @@ export function App() {
         ? "The 3-minute limit was reached. Your take was saved."
         : take.stopReason === "source_stopped"
           ? "The audio source stopped. Your take was saved."
-          : "Take saved to Recordings for playback or download.";
+          : `${videoTrack ? "Camera performance" : mode === "mix" ? "Mixed performance" : "Take"} saved to Recordings for playback or download.`;
+      stopCamera();
       updatePerformanceStatus("idle", message);
     } catch (failure) {
       if (run !== performanceRun.current) return;
       if (failure instanceof DOMException && failure.name === "AbortError") {
-        updatePerformanceStatus("idle", "Take discarded. Record again when you’re ready.");
+        stopCamera(); updatePerformanceStatus("idle", "Take discarded. Record again when you’re ready.");
         return;
       }
+      stopCamera();
       updatePerformanceStatus("error", failure instanceof Error ? failure.message : "The performance recording failed. Try again.");
+    } finally {
+      player?.removeEventListener("ended", finishAtBackingEnd);
+      player?.pause();
+      performanceBacking.current = null;
     }
   }
 
   function finishPerformanceRecording() {
     if (performanceStateRef.current !== "recording") return;
     updatePerformanceStatus("finalizing", "Finalizing the recording so it can be played back…");
+    performanceBacking.current?.pause();
     engine.current?.finishPerformanceRecording();
   }
 
@@ -400,6 +496,7 @@ export function App() {
 
   function navigate(nextView: AppView) {
     stopEngineAudio();
+    stopCamera();
     setView(nextView);
   }
 
@@ -463,7 +560,7 @@ export function App() {
       </header>
       <SeparationPage key={activeProjectId} ref={workflow} embedded active={view === "tone-match"} onInputChosen={(device, inputChannel) => { setSelectedDeviceId(device); setChannel(inputChannel); }} initialJobId={jobId} initialFile={songFile}
         onJobChange={(id, file, status) => { setJobId(id); setSongFile(file); setJobStage(status); }}
-        onApplyPreset={applyStartingPreset} onApplyRig={applyStartingRig} onSourceChange={source => setDryFile(source?.file)} onStopAudio={track => { if (track !== "backing" || engineSource.current !== "live") stopEngineAudio("Stopped — song preview took over the audio output.", false); }} onInvalidatePreset={invalidateStartingPreset} />
+        onApplyPreset={applyStartingPreset} onApplyRig={applyStartingRig} onSourceChange={source => setDryFile(source?.file)} onBackingPlayerChange={setBackingPlayer} onStopAudio={track => { if (track !== "backing" || engineSource.current !== "live") stopEngineAudio("Stopped — song preview took over the audio output.", false); }} onInvalidatePreset={invalidateStartingPreset} />
 
       <ModelRigPanel key={`rig-${sessionKey}`} engineRef={engine} value={modelRig} legacyPreset={preset} />
       <div className="grid">
@@ -484,10 +581,19 @@ export function App() {
           <p className="hint">Calibrate your connected guitar at the top of this page before generating a tone. Live input here monitors your playing through the amp; keep volume low and select the physical instrument input.</p>
           {inputLevel && <p role="status">Dry input: RMS {levelDb(inputLevel.rms).toFixed(1)} dBFS · peak {levelDb(inputLevel.peak).toFixed(1)} dBFS{inputLevel.clipping ? " · Clipping — lower interface gain" : ""}</p>}
           <div className="performance-capture" aria-labelledby="performance-capture-title">
-            <div className="calibration-heading"><div><span className="step">PERFORMANCE</span><h3 id="performance-capture-title">Record your processed guitar</h3></div><span className={`calibration-chip ${performanceState}`}>{performanceState === "recording" ? "Recording" : performanceState === "finalizing" ? "Finalizing" : performanceState === "error" ? "Error" : "Ready"}</span></div>
-            <p>Capture the protected output of the active preset or model rig. Takes stay in this tab for playback, download or deletion.</p>
+            <div className="calibration-heading"><div><span className="step">PERFORMANCE</span><h3 id="performance-capture-title">Record your performance</h3></div><span className={`calibration-chip ${performanceState}`}>{performanceState === "countdown" ? "Get ready" : performanceState === "recording" ? "Recording" : performanceState === "finalizing" ? "Finalizing" : performanceState === "error" ? "Error" : "Ready"}</span></div>
+            <p>Capture processed guitar alone or with the guitar-reduced backing. Mixed and camera takes also retain a separate guitar-only master.</p>
+            <div className="recording-options">
+              <fieldset disabled={["countdown", "recording", "finalizing"].includes(performanceState)}><legend>Record mode</legend><div className="segmented-control" role="group" aria-label="Performance recording mode"><button type="button" className={performanceMode === "guitar" ? "segmented-option is-selected" : "segmented-option"} aria-pressed={performanceMode === "guitar"} onClick={() => setPerformanceMode("guitar")}>Guitar only</button><button type="button" className={performanceMode === "mix" ? "segmented-option is-selected" : "segmented-option"} aria-pressed={performanceMode === "mix"} disabled={!backingPlayer} onClick={() => setPerformanceMode("mix")}>Guitar + backing</button></div></fieldset>
+              {performanceMode === "mix" && <label className="backing-level">Backing level <span>{backingGainDb} dB</span><input type="range" min={-36} max={6} step={1} value={backingGainDb} disabled={["countdown", "recording", "finalizing"].includes(performanceState)} onChange={event => setBackingGainDb(Number(event.target.value))} /></label>}
+              <label className="switch-control recording-switch"><span className="switch-control-copy"><strong>Include camera</strong><small>Preview and save video with the performance.</small></span><input className="modulo-switch" type="checkbox" role="switch" checked={cameraState === "ready" || cameraState === "starting"} disabled={["countdown", "recording", "finalizing"].includes(performanceState)} onChange={event => { if (event.target.checked) void enableCamera(); else stopCamera(); }} /></label>
+              <label className="switch-control recording-switch"><span className="switch-control-copy"><strong>3-second countdown</strong><small>Give yourself time to get ready before capture starts.</small></span><input className="modulo-switch" type="checkbox" role="switch" checked={useCountdown} disabled={["countdown", "recording", "finalizing"].includes(performanceState)} onChange={event => setUseCountdown(event.target.checked)} /></label>
+            </div>
+            {cameraState !== "off" && <div className={`camera-preview ${cameraState}`}><video ref={setCameraPreview} muted playsInline aria-label="Camera preview" /><p role={cameraState === "error" ? "alert" : "status"}>{cameraMessage}</p>{cameraState === "error" && <button className="secondary compact-action" onClick={() => void enableCamera()}>Retry camera</button>}</div>}
+            {performanceMode === "mix" && <p className="hint">Starts from the backing player’s current position at {backingPlayer ? `${Math.floor(backingPlayer.currentTime / 60)}:${String(Math.floor(backingPlayer.currentTime % 60)).padStart(2, "0")}` : "—"}. Residual separated guitar may remain. Use headphones.</p>}
             <div className="performance-actions">
-              {(performanceState === "idle" || performanceState === "error") && <button disabled={engineSource.current === "none"} onClick={() => void recordPerformance()}>{performanceState === "error" ? "Retry recording" : "Record"}</button>}
+              {(performanceState === "idle" || performanceState === "error") && <button disabled={engineSource.current === "none" || cameraState === "starting" || (performanceMode === "mix" && !backingPlayer)} onClick={() => void recordPerformance()}>{performanceState === "error" ? "Retry recording" : cameraState === "ready" ? "Start camera performance" : performanceMode === "mix" ? "Start mixed performance" : "Record"}</button>}
+              {performanceState === "countdown" && <><button disabled>Get ready…</button><button className="secondary" onClick={() => discardPerformanceRecording("Countdown cancelled.")}>Cancel</button></>}
               {performanceState === "recording" && <><button onClick={finishPerformanceRecording}>Finish</button><button className="secondary" onClick={() => discardPerformanceRecording()}>Discard</button></>}
               {performanceState === "finalizing" && <><button disabled>Finalizing…</button><button className="secondary" onClick={() => discardPerformanceRecording()}>Discard</button></>}
             </div>
