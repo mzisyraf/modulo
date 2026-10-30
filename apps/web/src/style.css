@@ -98,7 +98,7 @@ p { color: var(--muted); line-height: 1.6; font-size: 14px; }
 .empty-art .accent-lavender { top: 2px; left: 27px; background: #d2a85e; }
 .empty-art .accent-mint { top: 15px; left: 46px; background: #9d8870; }
 .workflow-grid { display: grid; grid-template-columns: .9fr 1.1fr; gap: 18px; margin-bottom: 18px; }
-.grid { display: grid; grid-template-columns: 1.05fr .9fr 1.05fr; gap: 18px; }
+.grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 18px; }
 section { min-width: 0; padding: 26px; background: rgba(37, 25, 22, .82); border: 1px solid rgba(178, 139, 105, .26); border-radius: 14px; }
 button { border: 1px solid var(--accent); border-radius: 7px; background: linear-gradient(135deg, #ffe15a, var(--accent-strong)); color: #241607; padding: 12px 15px; font-size: 13px; font-weight: 750; cursor: pointer; box-shadow: 0 8px 22px rgba(245, 185, 20, .12); }
 .button-link { display: inline-flex; align-items: center; justify-content: center; border: 1px solid var(--accent); border-radius: 7px; background: transparent; color: var(--text); padding: 11px 14px; font-size: 12px; font-weight: 750; text-decoration: none; }
