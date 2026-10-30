@@ -9,7 +9,7 @@ import {ToneQualityCheck} from "./ToneQualityCheck";
 import {measureListeningLevels,type ListeningLevels} from "./listeningLevels";
 import { apiJson, parsePresetGeneration, parseSeparationJob, type PresetGeneration } from "./separation";
 
-export interface PresetAudition { stop(): void; invalidateCalibration?(): void }
+export interface PresetAudition { stop(): void; prepareLiveInput?(): void; invalidateCalibration?(): void }
 interface Props {
   jobId: string;
   revision: number;

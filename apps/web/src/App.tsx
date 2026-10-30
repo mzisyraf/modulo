@@ -365,7 +365,7 @@ export function App() {
     audioRun.current++; setBusy(false);
     markPerformanceFinalizing("The previous audio source stopped. Finalizing your take…");
     engineSource.current = "live";
-    workflow.current?.stop();
+    workflow.current?.prepareLiveInput?.();
     setAudioState("Stopped");
     setError("");
     setLiveInfo(undefined);
@@ -483,7 +483,7 @@ export function App() {
       </header>
       <SeparationPage key={activeProjectId} ref={workflow} embedded active={view === "tone-match"} onInputChosen={(device, inputChannel) => { setSelectedDeviceId(device); setChannel(inputChannel); }} initialJobId={jobId} initialFile={songFile}
         onJobChange={(id, file, status) => { setJobId(id); setSongFile(file); setJobStage(status); }}
-        onApplyPreset={applyStartingPreset} onApplyRig={applyStartingRig} onSourceChange={source => setDryFile(source?.file)} onStopAudio={() => stopEngineAudio("Stopped — song preview took over the audio output.", false)} onInvalidatePreset={invalidateStartingPreset} />
+        onApplyPreset={applyStartingPreset} onApplyRig={applyStartingRig} onSourceChange={source => setDryFile(source?.file)} onStopAudio={track => { if (track !== "backing" || engineSource.current !== "live") stopEngineAudio("Stopped — song preview took over the audio output.", false); }} onInvalidatePreset={invalidateStartingPreset} />
 
       <ModelRigPanel key={`rig-${sessionKey}`} engineRef={engine} value={modelRig} legacyPreset={preset} />
       <div className="grid">

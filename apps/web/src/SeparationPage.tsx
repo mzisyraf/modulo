@@ -34,7 +34,7 @@ interface Props {
   onApplyPreset?: (preset: Preset) => void;
   onApplyRig?: (rig: RigPreset, generated: GeneratedRig) => Promise<void>;
   onSourceChange?: (recording?: CalibratedRecording) => void;
-  onStopAudio?: () => void;
+  onStopAudio?: (track?: "mix" | "guitar" | "backing") => void;
   onInvalidatePreset?: () => void;
   ref?: Ref<PresetAudition>;
 }
@@ -74,9 +74,9 @@ export function SeparationPage({ embedded = false, active = true, onInputChosen,
   invalidatePreset.current = onInvalidatePreset;
   useEffect(() => { jobChanged.current?.(jobId, file, job?.status ?? (jobId ? "queued" : "idle")); }, [jobId, file, job?.status]);
   function saveJob(id: string) { if (!embedded) rememberJob(id); }
-  useImperativeHandle(ref, () => ({ stop: () => pausePlayers(), invalidateCalibration: () => liveCalibration.current?.invalidate() }));
+  useImperativeHandle(ref, () => ({ stop: () => pausePlayers(), prepareLiveInput: () => pausePlayers(players.current.backing), invalidateCalibration: () => liveCalibration.current?.invalidate() }));
 
-  function pausePlayers(except?: HTMLAudioElement) {
+  function pausePlayers(except?: HTMLAudioElement | null) {
     liveCalibration.current?.stop();
     presetAudition.current?.stop();
     rigAudition.current?.stop();
@@ -187,7 +187,7 @@ export function SeparationPage({ embedded = false, active = true, onInputChosen,
     if (!player || !result) return;
     try {
       const interval = referenceBounds(start, end, result.duration_seconds);
-      onStopAudio?.(); pausePlayers(player); player.currentTime = interval.start_seconds;
+      onStopAudio?.(name); pausePlayers(player); player.currentTime = interval.start_seconds;
       preview.current = { player, end: interval.end_seconds };
       await player.play();
     } catch (failure) { preview.current = null; setError(message(failure)); }
@@ -208,7 +208,7 @@ export function SeparationPage({ embedded = false, active = true, onInputChosen,
       </fieldset><label className="file-label" htmlFor="separation-file">Mixed-song audio</label><input id="separation-file" type="file" accept="audio/wav,audio/mpeg,.wav,.mp3" disabled={processing || confirming} onChange={(event) => chooseFile(event.target.files?.[0])} />{file && <p className="file-summary"><strong>{file.name}</strong><span>{(file.size / 1024 / 1024).toFixed(1)} MiB</span></p>}<button disabled={!file || processing || confirming} onClick={() => void separate()}>{uploading ? "Uploading…" : job?.status === "failed" ? "Retry separation" : "Separate guitar"}</button><p className="hint">One separation job runs at a time. Separation does not generate a tone preset.</p></section>
       <section className="progress-panel" aria-labelledby="local-progress-title"><span className="step">02 / SEPARATION</span><h2 id="local-progress-title">Job status</h2><p className="job-state" role="status">{uploading ? "Uploading to this laptop…" : connectionLost ? "Connection lost — status unverified" : job?.status === "ready" ? `${backend === "modal" ? "Cloud API" : "Local"} separation ready — review the audio below` : job?.status === "failed" ? "Separation failed" : job?.status === "running" ? `Running ${backend === "modal" ? "Cloud API" : "Local"} guitar separation…` : job?.status === "queued" ? `Queued for ${backend === "modal" ? "Cloud API" : "Local"} separation…` : jobId ? "Reconnecting to your job…" : "Choose a song to begin."}</p>{job?.status === "failed" && <p className="error" role="alert">{job.error?.message}</p>}{connectionLost && <button className="secondary" onClick={() => setReconnect((value) => value + 1)}>Reconnect to job</button>}{jobId && <p className="hint">Job <code>{jobId}</code> · {embedded ? "saved with this project in this tab; refreshing clears in-tab projects." : "refreshing this tab reconnects to it."}</p>}{result && <p className="hint">{timestamp(result.duration_seconds)} · {result.sample_rate.toLocaleString()} Hz · {result.provenance.model} · {result.provenance.device}</p>}</section>
     </div>
-    {result && <section className="result-panel" aria-labelledby="separated-audio-title"><div className="result-heading"><div><span className="step">03 / LISTEN</span><h2 id="separated-audio-title">Compare the same passage</h2></div><span className="quality-badge warning">Separation quality unverified</span></div><p>The tracks share one gain and timeline. The backing plays directly and does not pass through the guitar amp.</p><div className="players">{tracks.map(([name, title, description]) => <div key={name}><h3>{title}</h3><p>{description}</p><audio aria-label={title} controls preload="metadata" src={result.artifacts[name]} ref={(element) => { players.current[name] = element; }} onPlay={(event) => { onStopAudio?.(); pausePlayers(event.currentTarget); }} onPause={(event) => { if (preview.current?.player === event.currentTarget) preview.current = null; }} onTimeUpdate={(event) => { if (preview.current?.player === event.currentTarget && event.currentTarget.currentTime >= preview.current.end) { event.currentTarget.pause(); } }} onError={() => setError("An audio artifact could not load. Reconnect to the job; it may have expired.")} />{name === "backing" && <button className="secondary" onClick={() => void playPassage(name)}>Play backing passage</button>}</div>)}</div>
+    {result && <section className="result-panel" aria-labelledby="separated-audio-title"><div className="result-heading"><div><span className="step">03 / LISTEN</span><h2 id="separated-audio-title">Compare the same passage</h2></div><span className="quality-badge warning">Separation quality unverified</span></div><p>The tracks share one gain and timeline. Play the backing alongside live input; Stop audio stops both. Recording captures your processed guitar. The backing does not pass through the guitar amp.</p><div className="players">{tracks.map(([name, title, description]) => <div key={name}><h3>{title}</h3><p>{description}</p><audio aria-label={title} controls preload="metadata" src={result.artifacts[name]} ref={(element) => { players.current[name] = element; }} onPlay={(event) => { onStopAudio?.(name); pausePlayers(event.currentTarget); }} onPause={(event) => { if (preview.current?.player === event.currentTarget) preview.current = null; }} onTimeUpdate={(event) => { if (preview.current?.player === event.currentTarget && event.currentTarget.currentTime >= preview.current.end) { event.currentTarget.pause(); } }} onError={() => setError("An audio artifact could not load. Reconnect to the job; it may have expired.")} />{name === "backing" && <button className="secondary" onClick={() => void playPassage(name)}>Play backing passage</button>}</div>)}</div>
       <div className="reference-selection"><span className="step">04 / REFERENCE</span><h2>Choose your reference passage</h2>
         <ReferenceSelector key={jobId} jobId={jobId} duration={result.duration_seconds} start={start} end={end} confirmed={Boolean(confirmed)} confirming={confirming}
           onChange={changeInterval} onPreview={(track) => void playPassage(track)} onStop={() => pausePlayers()} onConfirm={() => void confirmPassage()} />

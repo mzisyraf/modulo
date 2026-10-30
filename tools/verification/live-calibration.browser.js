@@ -32,8 +32,8 @@ async (page) => {
     });
     await p.goto("http://127.0.0.1:5173/");
     await p.getByRole("button", { name: /New Tone Match/ }).click();
-    assert(await p.locator("#calibration-file").count() === 0, "Recording upload still exists");
-    assert(await p.getByRole("heading", { name: "Calibrate your live guitar" }).count() === 1, "Missing live calibration");
+    assert(await p.getByRole("button", { name: "Live guitar", exact: true }).getAttribute("aria-pressed") === "true", "Live input is not selected");
+    assert(await p.getByRole("heading", { name: "Calibrate your guitar source" }).count() === 1, "Missing source calibration");
     await p.getByRole("button", { name: "Calibrate live guitar", exact: true }).click();
     await p.getByText("Live guitar calibrated", { exact: true }).waitFor({ timeout: 18000 });
     assert(await p.evaluate(() => window.captureTracks.every(track => track.readyState === "ended")), "Capture not released");
@@ -56,6 +56,6 @@ async (page) => {
     await p.getByRole("button", { name: "Workspace", exact: true }).click();
     await p.waitForFunction(() => window.captureTracks.every(track => track.readyState === "ended"));
     assert(errors.length === 0, errors.join("; "));
-    return { passed: true, checks: ["main live-only UI", "10-second PCM measurements", "track release", "channel invalidation", "denial/retry", "late-permission cancellation", "navigation cleanup"], pageErrors: errors };
+    return { passed: true, checks: ["main live-input mode", "10-second PCM measurements", "track release", "channel invalidation", "denial/retry", "late-permission cancellation", "navigation cleanup"], pageErrors: errors };
   } finally { await p.close(); }
 }
