@@ -32,6 +32,7 @@ test("live PCM supplies source level/spectra and a temporary comparison sample w
   const result = await calibrateLiveInput(samples, rate);
   assert.equal(result.originalName, "Live guitar calibration");
   assert.equal(result.measurements.method, "browser_level_v1");
+  assert.equal(result.measurements.origin, "live");
   assert.equal(result.measurements.duration_seconds, 4);
   assert.match(result.measurements.id, /^[a-f0-9]{64}$/);
   assert.equal(result.measurements.tone_features?.bands.length, 6);

@@ -1,11 +1,9 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { AudioEngine, type InputLevel, type LiveInputInfo, type RigPreset } from "@modulo/audio";
+import { AudioEngine, type InputLevel, type RigPreset } from "@modulo/audio";
 
 import { parsePreset, type Preset } from "@modulo/contracts";
 import example from "../../../fixtures/preset.example.json";
 import { AppShell, type AppView } from "./AppShell";
-import { AudioFileDropzone } from "./AudioFileDropzone";
-import { ChoiceMenu } from "./ChoiceMenu";
 import { audioInputOptions, DEFAULT_AUDIO_INPUT, LiveRequestGate, liveInputErrorMessage, type AudioInputOption } from "./liveInput";
 import { projectTitle, upsertProject } from "./projectSessions";
 import { SeparationPage } from "./SeparationPage";
@@ -32,13 +30,12 @@ type JobStage = "idle" | "queued" | "running" | "ready" | "failed";
 type LiveState = "stopped" | "starting" | "live" | "error";
 type PerformanceRecordingState = "idle" | "countdown" | "recording" | "finalizing" | "error";
 type PerformanceMode = "guitar" | "mix";
-type EngineSource = "none" | "sample" | "live";
+type EngineSource = "none" | "live";
 
 interface StoredProject {
   id: string;
   updatedAt: number;
   songFile?: File;
-  dryFile?: File;
   jobStage: JobStage;
   jobId: string;
   preset: Preset;
@@ -47,7 +44,6 @@ interface StoredProject {
   bypass: boolean;
 }
 
-const levelDb = (value: number) => 20 * Math.log10(Math.max(value, 1e-8));
 export function App() {
   const [view, setView] = useState<AppView>("workspace");
   const [preset, setPreset] = useState<Preset>(initialPreset);
@@ -59,7 +55,8 @@ export function App() {
   const [busy, setBusy] = useState(false);
   const [bypass, setBypass] = useState(false);
   const [songFile, setSongFile] = useState<File>();
-  const [dryFile, setDryFile] = useState<File>();
+  const [sourceReady, setSourceReady] = useState(false);
+  const [stage, setStage] = useState(1);
   const [jobStage, setJobStage] = useState<JobStage>("idle");
   const [jobId, setJobId] = useState("");
   const [inputDevices, setInputDevices] = useState<AudioInputOption[]>([]);
@@ -68,13 +65,12 @@ export function App() {
   const [deviceMessage, setDeviceMessage] = useState("Looking for audio inputs…");
   const [liveState, setLiveState] = useState<LiveState>("stopped");
   const [liveMessage, setLiveMessage] = useState("Stopped");
-  const [liveInfo, setLiveInfo] = useState<LiveInputInfo>();
   const [inputLevel, setInputLevel] = useState<InputLevel | null>(null);
   const [activeProjectId, setActiveProjectId] = useState<string>(() => crypto.randomUUID());
   const [savedProjects, setSavedProjects] = useState<StoredProject[]>([]);
   const [recordings, setRecordings] = useState<PerformanceRecording[]>([]);
   const [performanceState, setPerformanceState] = useState<PerformanceRecordingState>("idle");
-  const [performanceMessage, setPerformanceMessage] = useState("Start live input or an audition, then record your processed sound.");
+  const [performanceMessage, setPerformanceMessage] = useState("Start playing, then record a take.");
   const [performanceMode, setPerformanceMode] = useState<PerformanceMode>("guitar");
   const [backingPlayer, setBackingPlayer] = useState<HTMLAudioElement | null>(null);
   const [backingGainDb, setBackingGainDb] = useState(-6);
@@ -193,7 +189,7 @@ export function App() {
         if (health.status !== "ok" || health.mode !== "scaffold") throw new Error();
         setApiState(health.separation_available ? "API connected · separation available" : "API connected · separation unavailable");
       })
-      .catch(() => { if (!controller.signal.aborted) setApiState("API unavailable · local amp still works"); else setApiState("API check timed out · local amp still works"); })
+      .catch(() => { if (!controller.signal.aborted) setApiState("Song service unavailable"); else setApiState("Song service connection timed out"); })
       .finally(() => window.clearTimeout(timeout));
     return () => {
       controller.abort();
@@ -243,7 +239,6 @@ export function App() {
       id: activeProjectId,
       updatedAt: Date.now(),
       songFile,
-      dryFile,
       jobStage,
       jobId,
       preset,
@@ -257,7 +252,6 @@ export function App() {
     return Boolean(
       project.songFile
       || project.jobId
-      || project.dryFile
       || project.jobStage !== "idle"
       || project.bypass
       || project.rigPreset
@@ -366,7 +360,7 @@ export function App() {
     stopEngineAudio();
     setActiveProjectId(project.id);
     setSongFile(project.songFile);
-    setDryFile(project.dryFile);
+    setSourceReady(false); setStage(1);
     setJobStage(project.jobStage);
     setJobId(project.jobId);
     setPreset(project.preset);
@@ -396,21 +390,12 @@ export function App() {
     setLiveMessage(message);
   }
 
-  function applyStartingPreset(next: Preset) {
-    stopEngineAudio();
-    const validated = parsePreset(next);
-    engine.current?.applyPreset(validated);
-    engine.current?.setBypass(false);
-    setPreset(validated); setBypass(false);
-    setRigOrigin(undefined);
-  }
-
   async function applyStartingRig(next: RigPreset, origin: GeneratedRig) {
     stopEngineAudio("Stopped — applying your custom rig.", false);
     const audio = engine.current, request = rigRestoreRun.current;
     if (!audio) throw Error("The audio engine is unavailable.");
     if (!await audio.applyRigPreset(next) || request !== rigRestoreRun.current) throw Error("Rig application was cancelled because the source or project changed.");
-    audio.setBypass(false); setBypass(false); setRigOrigin(origin);
+    audio.setBypass(false); setBypass(false); setRigOrigin(origin); setStage(4);
   }
 
   function invalidateStartingPreset() {
@@ -422,34 +407,8 @@ export function App() {
     }
   }
 
-  async function play(useFile: boolean) {
-    stopEngineAudio();
-    const run = ++audioRun.current;
-    liveRequests.current.cancel();
-    markPerformanceFinalizing("The previous audio source stopped. Finalizing your take…");
-    engineSource.current = "sample";
-    setLiveState("stopped");
-    setLiveMessage("Stopped — local audition took over the audio engine.");
-    setBusy(true);
-    setError("");
-    setAudioState("Starting…");
-    try {
-      workflow.current?.stop();
-      const audio = engine.current!;
-      const started = await (useFile && dryFile ? audio.playFile(dryFile) : audio.playTestSignal());
-      if (run !== audioRun.current) return;
-      if (!started) engineSource.current = "none";
-      setAudioState(started ? (useFile ? "Playing local dry recording" : "Playing synthetic test signal") : "Stopped");
-    } catch (failure) {
-      if (run !== audioRun.current) return;
-      engineSource.current = "none";
-      setAudioState("Stopped");
-      setError(failure instanceof Error ? failure.message : "Audio could not start.");
-    } finally { if (run === audioRun.current) setBusy(false); }
-  }
-
   async function startLiveInput() {
-    if (!selectedDeviceId || !engine.current) return;
+    if (!sourceReady || !selectedDeviceId || !engine.current) return;
     const request = liveRequests.current.begin();
     if (request === undefined) return;
     audioRun.current++; setBusy(false);
@@ -458,7 +417,6 @@ export function App() {
     workflow.current?.prepareLiveInput?.();
     setAudioState("Stopped");
     setError("");
-    setLiveInfo(undefined);
     setLiveState("starting");
     setLiveMessage("Starting… Allow microphone access if your browser asks.");
     try {
@@ -471,7 +429,6 @@ export function App() {
         setLiveMessage("Stopped");
         return;
       }
-      setLiveInfo(info);
       setLiveState("live");
       setLiveMessage(`Live · ${info.trackLabel || inputDevices.find((device) => device.deviceId === selectedDeviceId)?.label || "audio input"} · Input ${info.channel + 1}`);
       await refreshInputDevices();
@@ -482,16 +439,6 @@ export function App() {
       setLiveMessage(liveInputErrorMessage(failure));
       await refreshInputDevices();
     }
-  }
-
-  function changeLiveDevice(deviceId: string) {
-    workflow.current?.invalidateCalibration?.();
-    setSelectedDeviceId(deviceId);
-  }
-
-  function changeLiveChannel(value: string) {
-    workflow.current?.invalidateCalibration?.();
-    setChannel(Number(value) as 0 | 1);
   }
 
   function navigate(nextView: AppView) {
@@ -507,7 +454,7 @@ export function App() {
     discardPerformanceRecording("Ready to record a take for your new project.");
     stopEngineAudio();
     setSongFile(undefined);
-    setDryFile(undefined);
+    setSourceReady(false); setStage(1);
     setJobStage("idle");
     setJobId("");
     setPreset(initialPreset);
@@ -516,18 +463,21 @@ export function App() {
     setBypass(false);
     engine.current?.setBypass(false);
     setError("");
-    setLiveInfo(undefined);
     setInputLevel(null);
     setActiveProjectId(crypto.randomUUID());
     setSessionKey((current) => current + 1);
     setView("tone-match");
   }
 
+  function chooseStage(next: number) {
+    stopEngineAudio(); stopCamera(); setStage(next);
+  }
+
   return <AppShell apiState={apiState} onNavigate={navigate} view={view}>
     {view === "workspace" && <div className="workspace-view">
       <section className="workspace-intro" aria-labelledby="workspace-heading">
         <div><span className="eyebrow">YOUR WORKSPACE</span><h2 id="workspace-heading">Good to see you.</h2><p>Continue your tone match or start with a new song.</p></div>
-        <button onClick={startNewToneMatch}><span aria-hidden="true">ï¼‹</span> New Tone Match</button>
+        <button onClick={startNewToneMatch}><span aria-hidden="true">＋</span> New Tone Match</button>
       </section>
 
       <section className="continue-section" aria-labelledby="continue-heading">
@@ -535,7 +485,7 @@ export function App() {
         <article className="project-card">
           <div className="amp-preview" aria-hidden="true"><div className="amp-grille" /><div className="amp-panel"><span /><span /><span /><span /></div></div>
           <div className="project-copy">
-            <span className="project-kicker">LOCAL PROJECT</span>
+            <span className="project-kicker">YOUR PROJECT</span>
             <h3>{projectTitle(songFile?.name)}</h3>
             <p>{modelRig?.name ?? preset.name} · Custom amp preset</p>
             <div className="project-meta"><span className={hasResult ? "state-dot complete" : "state-dot"} />{hasResult ? "Tone ready to preview" : processing ? "Separating your song" : songFile ? "Song added — ready to continue" : "No reference song added yet"}</div>
@@ -554,41 +504,30 @@ export function App() {
     </div>}
 
     <div className="tone-match-view" hidden={view !== "tone-match"}>
-      <header className="hero">
-        <div><span className="eyebrow">TONE MATCH</span><h2 className="display-title">Find the sound.<br /><em>Make it yours.</em></h2><p>Choose a song, confirm the reference and apply a starting preset to your browser amp.</p></div>
-        <div className="mode-badge"><strong>Local or Cloud API separation</strong><span>Tone match remains unverified</span></div>
-      </header>
-      <SeparationPage key={activeProjectId} ref={workflow} embedded active={view === "tone-match"} onInputChosen={(device, inputChannel) => { setSelectedDeviceId(device); setChannel(inputChannel); }} initialJobId={jobId} initialFile={songFile}
+      <header className="hero guided-hero"><div><span className="eyebrow">YOUR SOUND, REIMAGINED</span><h2 className="display-title">Find the sound. <em>Make it yours.</em></h2><p>Connect your guitar, choose a song and play your own take.</p></div><button className="stop global-stop" onClick={() => { stopEngineAudio(); stopCamera(); }}>Stop all</button></header>
+      <nav className="flow-stages" aria-label="Tone match stages">{["Connect", "Choose sound", "Match tone", "Play & record"].map((label, index) => <button key={label} aria-current={stage === index + 1 ? "step" : undefined} className={stage === index + 1 ? "is-current" : ""} onClick={() => chooseStage(index + 1)}><span>{index + 1 === 1 && sourceReady ? "✓" : index + 1}</span><strong>{label}</strong><small>{[sourceReady ? "Guitar ready" : "Set up your input", songFile ? projectTitle(songFile.name) : "Pick a guitar passage", hasResult ? "Tone applied" : "Shape your sound", "Make it yours"][index]}</small></button>)}</nav>
+      <SeparationPage key={activeProjectId} ref={workflow} embedded stage={stage} onStageChange={chooseStage} active={view === "tone-match"} onInputChosen={(device, inputChannel) => { setSelectedDeviceId(device); setChannel(inputChannel); }} initialJobId={jobId} initialFile={songFile}
         onJobChange={(id, file, status) => { setJobId(id); setSongFile(file); setJobStage(status); }}
-        onApplyPreset={applyStartingPreset} onApplyRig={applyStartingRig} onSourceChange={source => setDryFile(source?.file)} onBackingPlayerChange={setBackingPlayer} onStopAudio={track => { if (track !== "backing" || engineSource.current !== "live") stopEngineAudio("Stopped — song preview took over the audio output.", false); }} onInvalidatePreset={invalidateStartingPreset} />
+        onApplyRig={applyStartingRig} onSourceChange={source => setSourceReady(source?.measurements.origin === "live")} onBackingPlayerChange={setBackingPlayer} onStopAudio={track => { if (track !== "backing" || engineSource.current !== "live") stopEngineAudio("Stopped — song preview took over the audio output.", false); }} onInvalidatePreset={invalidateStartingPreset} />
 
-      <ModelRigPanel key={`rig-${sessionKey}`} engineRef={engine} value={modelRig} legacyPreset={preset} />
-      <div className="grid">
-        <section aria-labelledby="audition-title"><span className="step">06 / AUDITION</span><h2 id="audition-title">Hear your rig</h2><p>Play through the active preset or model rig. Start at a comfortable listening level.</p><button disabled={busy} onClick={() => void play(false)}>Play test signal</button><p className="hint">A two-second synthesized pluck, not an isolated guitar or AI result.</p><label className="file-label" htmlFor="dry-file">Dry guitar recording · local audition only</label><AudioFileDropzone key={`dry-${sessionKey}`} id="dry-file" accept="audio/*" formats="Browser-supported audio" maxBytes={20 * 1024 * 1024} file={dryFile} onFile={next => { workflow.current?.invalidateCalibration?.(); setDryFile(next); }} /><button className="secondary" disabled={!dryFile || busy} onClick={() => void play(true)}>Play dry recording</button><label className="toggle"><input type="checkbox" checked={bypass} onChange={(event) => { setBypass(event.target.checked); engine.current?.setBypass(event.target.checked); }} />Bypass effects</label><button className="stop" onClick={() => stopEngineAudio()}>Stop audio</button><p role="status">{audioState}</p></section>
+      <div hidden={stage !== 3 && stage !== 4}><ModelRigPanel key={`rig-${sessionKey}`} engineRef={engine} value={modelRig} /></div>
+      <div className="play-stage" hidden={stage !== 4}>
         <section aria-labelledby="live-title" className="live-panel">
-          <span className="step">07 / LIVE INPUT</span><h2 id="live-title">Connect your guitar</h2>
-          <p>Use a local audio interface to play through the active preset or model rig. Starting rigs still require listening verification.</p>
-
-          <label className="select-label" htmlFor="device">Input device</label>
-          <ChoiceMenu id="device" kind="device" searchable value={selectedDeviceId} disabled={!inputDevices.length || liveState === "starting" || liveState === "live"} onChange={changeLiveDevice} options={inputDevices.map((device) => ({ label: device.label, value: device.deviceId }))} placeholder="No audio inputs found" />
-          <button className="secondary compact-action" disabled={liveState === "starting" || liveState === "live"} onClick={() => void refreshInputDevices()}>Refresh inputs</button>
-          <label className="select-label" htmlFor="channel">Channel</label>
-          <ChoiceMenu id="channel" value={String(channel)} disabled={!selectedDeviceId || liveState === "starting" || liveState === "live"} onChange={changeLiveChannel} options={[{ label: "Input 1", value: "0" }, { label: "Input 2", value: "1" }]} placeholder="Choose a channel" />
-          <div className="live-actions"><button disabled={!selectedDeviceId || liveState === "starting" || liveState === "live"} onClick={() => void startLiveInput()}>Start live input</button><button className="stop" disabled={liveState !== "starting" && liveState !== "live"} onClick={() => stopEngineAudio()}>Stop</button></div>
-          <p className="hint">{deviceMessage} Device names may appear after the first permission grant.</p>
-          <p className={`live-status ${liveState}`} role="status"><strong>{liveState === "starting" ? "Starting" : liveState === "live" ? "Live" : liveState === "error" ? "Error" : "Stopped"}</strong><span>{liveMessage}</span></p>
-
-          <p className="hint">Calibrate your connected guitar at the top of this page before generating a tone. Live input here monitors your playing through the amp; keep volume low and select the physical instrument input.</p>
-          {inputLevel && <p role="status">Dry input: RMS {levelDb(inputLevel.rms).toFixed(1)} dBFS · peak {levelDb(inputLevel.peak).toFixed(1)} dBFS{inputLevel.clipping ? " · Clipping — lower interface gain" : ""}</p>}
+          <span className="step">04 / PLAY &amp; RECORD</span><h2 id="live-title">Make it yours</h2>
+          <p>Use headphones. Start at a comfortable volume.</p>
+          {!sourceReady && <p className="notice">Calibrate your connected guitar before playing. <button className="text-action" onClick={() => chooseStage(1)}>Connect guitar</button></p>}
+          <div className="live-actions"><button disabled={!sourceReady || !selectedDeviceId || liveState === "starting" || liveState === "live"} onClick={() => void startLiveInput()}>{liveState === "starting" ? "Connecting…" : liveState === "live" ? "Playing live" : "Start playing"}</button><label className="switch-control"><span>Effects on</span><input className="modulo-switch" type="checkbox" role="switch" checked={!bypass} onChange={event => { setBypass(!event.target.checked); engine.current?.setBypass(!event.target.checked); }} /></label></div>
+          <p className={`live-status ${liveState}`} role="status">{liveMessage}</p>
+          {inputLevel && <p role="status">{inputLevel.clipping ? "Clipping — lower your interface gain" : inputLevel.rms < .003 ? "Input is quiet — check your guitar and interface gain" : "Good input level"}</p>}
           <div className="performance-capture" aria-labelledby="performance-capture-title">
             <div className="calibration-heading"><div><span className="step">PERFORMANCE</span><h3 id="performance-capture-title">Record your performance</h3></div><span className={`calibration-chip ${performanceState}`}>{performanceState === "countdown" ? "Get ready" : performanceState === "recording" ? "Recording" : performanceState === "finalizing" ? "Finalizing" : performanceState === "error" ? "Error" : "Ready"}</span></div>
-            <p>Capture processed guitar alone or with the guitar-reduced backing. Mixed and camera takes also retain a separate guitar-only master.</p>
-            <div className="recording-options">
+            <p>Save a take to listen back or download. Recordings stay in this tab.</p>
+            <details className="recording-settings"><summary>Recording options</summary><div className="recording-options">
               <fieldset disabled={["countdown", "recording", "finalizing"].includes(performanceState)}><legend>Record mode</legend><div className="segmented-control" role="group" aria-label="Performance recording mode"><button type="button" className={performanceMode === "guitar" ? "segmented-option is-selected" : "segmented-option"} aria-pressed={performanceMode === "guitar"} onClick={() => setPerformanceMode("guitar")}>Guitar only</button><button type="button" className={performanceMode === "mix" ? "segmented-option is-selected" : "segmented-option"} aria-pressed={performanceMode === "mix"} disabled={!backingPlayer} onClick={() => setPerformanceMode("mix")}>Guitar + backing</button></div></fieldset>
               {performanceMode === "mix" && <label className="backing-level">Backing level <span>{backingGainDb} dB</span><input type="range" min={-36} max={6} step={1} value={backingGainDb} disabled={["countdown", "recording", "finalizing"].includes(performanceState)} onChange={event => setBackingGainDb(Number(event.target.value))} /></label>}
               <label className="switch-control recording-switch"><span className="switch-control-copy"><strong>Include camera</strong><small>Preview and save video with the performance.</small></span><input className="modulo-switch" type="checkbox" role="switch" checked={cameraState === "ready" || cameraState === "starting"} disabled={["countdown", "recording", "finalizing"].includes(performanceState)} onChange={event => { if (event.target.checked) void enableCamera(); else stopCamera(); }} /></label>
               <label className="switch-control recording-switch"><span className="switch-control-copy"><strong>3-second countdown</strong><small>Give yourself time to get ready before capture starts.</small></span><input className="modulo-switch" type="checkbox" role="switch" checked={useCountdown} disabled={["countdown", "recording", "finalizing"].includes(performanceState)} onChange={event => setUseCountdown(event.target.checked)} /></label>
-            </div>
+            </div></details>
             {cameraState !== "off" && <div className={`camera-preview ${cameraState}`}><video ref={setCameraPreview} muted playsInline aria-label="Camera preview" /><p role={cameraState === "error" ? "alert" : "status"}>{cameraMessage}</p>{cameraState === "error" && <button className="secondary compact-action" onClick={() => void enableCamera()}>Retry camera</button>}</div>}
             {performanceMode === "mix" && <p className="hint">Starts from the backing player’s current position at {backingPlayer ? `${Math.floor(backingPlayer.currentTime / 60)}:${String(Math.floor(backingPlayer.currentTime % 60)).padStart(2, "0")}` : "—"}. Residual separated guitar may remain. Use headphones.</p>}
             <div className="performance-actions">
@@ -601,17 +540,13 @@ export function App() {
             <button className="text-action" onClick={() => navigate("recordings")}>View {recordings.length ? `${recordings.length} saved ${recordings.length === 1 ? "take" : "takes"}` : "recordings"} <span aria-hidden="true">→</span></button>
           </div>
 
-          {liveInfo && <dl className="capture-info"><div><dt>Capture sample rate</dt><dd>{liveInfo.settings.sampleRate ?? "unknown"}</dd></div><div><dt>Capture channels</dt><dd>{liveInfo.settings.channelCount ?? "unknown"}</dd></div><div><dt>Audio-context rate</dt><dd>{liveInfo.contextSampleRate}</dd></div><div><dt>Echo cancellation</dt><dd>{liveInfo.settings.echoCancellation === undefined ? "unknown" : liveInfo.settings.echoCancellation ? "on" : "off"}</dd></div><div><dt>Noise suppression</dt><dd>{liveInfo.settings.noiseSuppression === undefined ? "unknown" : liveInfo.settings.noiseSuppression ? "on" : "off"}</dd></div><div><dt>Automatic gain</dt><dd>{liveInfo.settings.autoGainControl === undefined ? "unknown" : liveInfo.settings.autoGainControl ? "on" : "off"}</dd></div>{liveInfo.baseLatencySeconds !== undefined && <div><dt>Browser base estimate</dt><dd>{(liveInfo.baseLatencySeconds * 1000).toFixed(1)} ms</dd></div>}{liveInfo.outputLatencySeconds !== undefined && <div><dt>Browser output estimate</dt><dd>{(liveInfo.outputLatencySeconds * 1000).toFixed(1)} ms</dd></div>}</dl>}
         </section>
       </div>
       {error && <p className="error" role="alert">{error}</p>}
-      <footer>Separation runs on the local API · measured descriptors, not audio, go to the model on Generate · tone similarity remains unverified</footer>
+      <details className="workflow-help"><summary>Help &amp; credits</summary><p>Song audio is processed to isolate the guitar. Tone matching sends measured guitar features to the AI service. Your live guitar and recordings stay in this browser. Suggestions approximate a sound; separation and playing style affect the result.</p><p>Projects and recordings last for this tab only. Download takes before refreshing. Song audio expires after 24 hours.</p><a href="/audio/ATTRIBUTION.txt" target="_blank" rel="noreferrer">Audio credits</a></details>
     </div>
-
-    {view === "presets" && <section className="library-panel" aria-labelledby="preset-library-title"><div className="section-heading"><div><span className="step">CURRENT TONE</span><h2 id="preset-library-title">Ready to play</h2></div><span className="quality-badge">1 current preset</span></div><p>Your current preset stays in this tab. Saving a library comes later.</p><article className="preset-row"><div className="preset-thumbnail" aria-hidden="true"><span>MOD</span></div><div><strong>{preset.name}</strong><span>{preset.description}</span></div><span className="manual-tag">{hasResult ? "AI starting preset" : "Manual example"}</span><button className="secondary" onClick={() => navigate("tone-match")}>Open controls</button></article></section>}
 
     {view === "recordings" && <RecordingLibrary recordings={recordings} onDelete={(recordingId) => setRecordings((current) => current.filter((recording) => recording.id !== recordingId))} onOpenToneMatch={() => navigate("tone-match")} />}
 
-    {view === "settings" && <section className="availability-panel" aria-labelledby="settings-title"><span className="availability-icon lavender" aria-hidden="true">⚙</span><span className="step">DEMO MODE</span><h2 id="settings-title">Nothing to configure yet</h2><p>There are no accounts or cloud settings in this demo. Guitar recording audio stays in this browser; numeric descriptors go to the provider on Generate. Mixed songs go to the local separation API.</p><button className="secondary" onClick={() => navigate("workspace")}>Return to Workspace</button></section>}
   </AppShell>;
 }

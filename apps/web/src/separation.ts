@@ -48,8 +48,8 @@ export const isJobId = (value: unknown): value is string => typeof value === "st
 
 export async function apiJson(url: string, options: RequestInit) {
   const response = await fetch(url, options);
-  const value = await response.json().catch(() => { throw new Error("The API did not return JSON. Start the local API and reconnect."); });
-  if (!response.ok) throw Object.assign(new Error(typeof value?.error?.message === "string" ? value.error.message : `The local API returned HTTP ${response.status}.`), { status: response.status });
+  const value = await response.json().catch(() => { throw new Error("The song service did not respond correctly. Check its connection and retry."); });
+  if (!response.ok) throw Object.assign(new Error(typeof value?.error?.message === "string" ? value.error.message : `The song service returned HTTP ${response.status}.`), { status: response.status });
   return value;
 }
 

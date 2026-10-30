@@ -2,9 +2,8 @@ import { useEffect, useImperativeHandle, useRef, useState, type Ref } from "reac
 import { AudioEngine, type InputLevel } from "@modulo/audio";
 import { parsePreset } from "@modulo/contracts";
 import example from "../../../fixtures/preset.example.json";
-import { calibrateLiveInput, calibrateGuitarFile, type CalibratedRecording } from "./recordingCalibration";
+import { calibrateLiveInput, type CalibratedRecording } from "./recordingCalibration";
 import { audioInputOptions, DEFAULT_AUDIO_INPUT, liveInputErrorMessage, type AudioInputOption } from "./liveInput";
-import { AudioFileDropzone } from "./AudioFileDropzone";
 import { ChoiceMenu } from "./ChoiceMenu";
 
 export interface LiveCalibrationControl { stop: () => void; invalidate: () => void }
@@ -20,9 +19,6 @@ export function GuitarCalibration({ onChange, onStart, onInputChosen, active = t
   const [channel, setChannel] = useState<0 | 1>(0);
   const [calibration, setCalibration] = useState<CalibratedRecording>();
   const [busy, setBusy] = useState(false);
-  const [mode, setMode] = useState<"live" | "file">("live");
-  const modeRef = useRef(mode); modeRef.current = mode;
-  const [file, setFile] = useState<File>();
   const [level, setLevel] = useState<InputLevel | null>(null);
   const [error, setError] = useState("");
   const run = useRef(0);
@@ -45,7 +41,7 @@ export function GuitarCalibration({ onChange, onStart, onInputChosen, active = t
   }
   useEffect(() => {
     void refresh();
-    const changed = () => { if (modeRef.current === "live") invalidate(); void refresh(); };
+    const changed = () => { invalidate(); void refresh(); };
     navigator.mediaDevices?.addEventListener("devicechange", changed);
     return () => navigator.mediaDevices?.removeEventListener("devicechange", changed);
   }, []);
@@ -55,23 +51,6 @@ export function GuitarCalibration({ onChange, onStart, onInputChosen, active = t
     return () => window.clearInterval(timer);
   }, [busy]);
   function invalidate() { stop(); setCalibration(undefined); setError(""); onChange(); }
-  async function measureFile(sample = false) {
-    if (busy || !active) return;
-    onStart(); onChange(); const request = ++run.current; setBusy(true); setError(""); setCalibration(undefined);
-    try {
-      let input = file;
-      if (sample) {
-        const response = await fetch("/audio/guitar-techs-dry-di.wav", { signal: AbortSignal.timeout(15000) });
-        if (!response.ok) throw Error("The supplied dry recording could not load.");
-        input = new File([await response.blob()], "Guitar-TECHS dry DI.wav", { type: "audio/wav" });
-      }
-      if (!input) throw Error("Choose a dry guitar recording first.");
-      const measured = await calibrateGuitarFile(input, channel);
-      if (request !== run.current) return;
-      setFile(input); setCalibration(measured); onChange(measured);
-    } catch (failure) { if (request === run.current) setError(failure instanceof Error ? failure.message : "Recording calibration failed."); }
-    finally { if (request === run.current) setBusy(false); }
-  }
   async function start() {
     if (engine.current || !device) return;
     onStart(); onChange();
@@ -104,27 +83,9 @@ export function GuitarCalibration({ onChange, onStart, onInputChosen, active = t
       if (request === run.current) { engine.current = null; setBusy(false); setLevel(null); }
     }
   }
-  const db = (value: number) => (20 * Math.log10(Math.max(value, 1e-8))).toFixed(1);
-  const channelOptions = mode === "live"
-    ? [{ value: "0", label: "Input 1" }, { value: "1", label: "Input 2" }]
-    : [{ value: "0", label: "Channel 1 / mono" }, { value: "1", label: "Channel 2" }];
+  const channelOptions = [{ value: "0", label: "Input 1" }, { value: "1", label: "Input 2" }];
   return <section className="result-panel calibration-panel" aria-labelledby="guitar-calibration-title">
-    <header className="calibration-title">
-      <span className="step">YOUR STARTING POINT</span>
-      <h2 id="guitar-calibration-title">Calibrate your guitar source</h2>
-      <p>Set a clean baseline from the guitar, pickup and volume you plan to use. Modulo measures the source before shaping a rig around the song.</p>
-    </header>
-
-    <div className="workflow-card calibration-source-card">
-      <span className="workflow-card-icon" aria-hidden="true">◇</span>
-      <div className="workflow-card-copy"><h3>Guitar source</h3><p>Choose how you’ll provide clean guitar audio for calibration.</p></div>
-      <div className="segmented-control" role="group" aria-label="Guitar source">
-        <button type="button" disabled={busy} aria-pressed={mode === "live"} className={mode === "live" ? "segmented-option is-selected" : "segmented-option"} onClick={() => { if (mode !== "live") { invalidate(); setMode("live"); } }}><span aria-hidden="true">⌁</span>Live guitar</button>
-        <button type="button" disabled={busy} aria-pressed={mode === "file"} className={mode === "file" ? "segmented-option is-selected" : "segmented-option"} onClick={() => { if (mode !== "file") { invalidate(); setMode("file"); } }}><span aria-hidden="true">≋</span>Guitar audio</button>
-      </div>
-    </div>
-
-    {mode === "live" ? <>
+    <header className="panel-title"><span className="step">01 / CONNECT</span><h2 id="guitar-calibration-title">Connect your guitar</h2><p>Plug into your audio interface. Use headphones and keep the output low.</p></header>
       <div className="workflow-card calibration-config-card">
         <div className="workflow-card-heading"><span className="workflow-card-icon" aria-hidden="true">⌇</span><div><h3>Input &amp; channel</h3><p>Select your instrument input and the channel carrying the guitar.</p></div></div>
         <div className="calibration-control-grid">
@@ -137,29 +98,12 @@ export function GuitarCalibration({ onChange, onStart, onInputChosen, active = t
       <div className="workflow-card calibration-guide">
         <div className="workflow-card-heading"><span className="workflow-card-icon" aria-hidden="true">☷</span><div><h3>How to calibrate</h3><p>Use the same pickup and guitar volume you’ll play with.</p></div></div>
         <ol className="calibration-steps"><li><span>1</span><p>Press Calibrate and allow input access.</p></li><li><span>2</span><p>Play single notes across the strings, then normal and strong chords for about 10 seconds.</p></li><li><span>3</span><p>If the input clips, lower the interface gain and retry.</p></li></ol>
-        <div className="calibration-action-row"><button className="calibration-primary" disabled={busy || !device || !active} onClick={() => void start()}><span aria-hidden="true">≋</span>{calibration ? "Calibrate again" : "Calibrate live guitar"}</button>{busy && <button className="stop" onClick={stop}>Cancel calibration</button>}<p className="calibration-privacy">Calibration is silent through the app. Select the physical instrument input, avoiding Loopback or Stereo Mix.</p></div>
+        <div className="calibration-action-row"><button className="calibration-primary" disabled={busy || !device || !active} onClick={() => void start()}><span aria-hidden="true">≋</span>{calibration ? "Calibrate again" : "Calibrate live guitar"}</button>{busy && <button className="stop" onClick={stop}>Cancel calibration</button>}<p className="calibration-privacy">Choose the instrument input, not Loopback or Stereo Mix. Calibration is silent.</p></div>
         {busy && <p className="calibration-live-status" role="status">Listening for up to 10 seconds after access is granted — play notes and chords now.</p>}
-        {level && <p className={`calibration-live-status${level.clipping ? " is-clipping" : ""}`} role="status">Dry input: RMS {db(level.rms)} dBFS · peak {db(level.peak)} dBFS{level.clipping ? " · Clipping — lower interface gain" : ""}</p>}
-        {calibration && <div className="success-state" role="status"><strong>Live guitar calibrated</strong><p>RMS {calibration.measurements.rms_dbfs.toFixed(1)} dBFS · peak {calibration.measurements.peak_dbfs.toFixed(1)} dBFS · starting input gain {calibration.inputGainDb.toFixed(1)} dB.</p><p>Input level and six spectral bands measured from your playing.</p></div>}
+        {level && <p className={`calibration-live-status${level.clipping ? " is-clipping" : ""}`} role="status">{level.clipping ? "Clipping — lower your interface gain" : level.rms < .003 ? "Too quiet — turn up the interface gain" : "Good input level"}</p>}
+        {calibration && <div className="success-state" role="status"><strong>Live guitar calibrated</strong><p>You’re ready to match a song’s guitar tone.</p></div>}
       </div>
-    </> : <>
-      <div className="workflow-card calibration-config-card calibration-file-card">
-        <div className="workflow-card-heading"><span className="workflow-card-icon" aria-hidden="true">▱</span><div><h3>Dry guitar audio</h3><p>Choose an unprocessed guitar recording. Microphone access is not required.</p></div></div>
-        <div className="calibration-file-grid">
-          <AudioFileDropzone compact accept="audio/*" disabled={busy} file={file} formats="Audio file" help="3–90 seconds · up to 20 MB · measured only in this browser" id="calibration-file" maxBytes={20 * 1024 * 1024} readyLabel="ready to measure" onFile={next => { invalidate(); setFile(next); }} />
-          <div className="field-group"><span className="field-label">Recording channel</span><ChoiceMenu id="file-channel" label="Recording channel" value={String(channel)} disabled={busy} placeholder="Choose a channel" options={channelOptions} onChange={value => { invalidate(); setChannel(Number(value) as 0 | 1); }} /></div>
-        </div>
-      </div>
-      <div className="workflow-card calibration-guide calibration-file-guide">
-        <div className="workflow-card-heading"><span className="workflow-card-icon" aria-hidden="true">☷</span><div><h3>Measure your recording</h3><p>Use a dry performance without an amp, effects or backing track.</p></div></div>
-        <ol className="calibration-steps"><li><span>1</span><p>Choose a 3–90 second dry guitar recording.</p></li><li><span>2</span><p>Select the channel that contains the guitar.</p></li><li><span>3</span><p>Measure it locally, then review the input level before continuing.</p></li></ol>
-        <div className="calibration-action-row"><button className="calibration-primary" disabled={!file || busy || !active} onClick={() => void measureFile()}>Calibrate guitar audio</button><button className="secondary" disabled={busy || !active} onClick={() => void measureFile(true)}>Use supplied dry guitar</button>{busy && <button className="stop" onClick={stop}>Cancel calibration</button>}</div>
-        {busy && <p className="calibration-live-status" role="status">Measuring the recording locally…</p>}
-        {calibration && <div className="success-state" role="status"><strong>Guitar audio calibrated</strong><p>{calibration.originalName} · RMS {calibration.measurements.rms_dbfs.toFixed(1)} dBFS · peak {calibration.measurements.peak_dbfs.toFixed(1)} dBFS.</p><p>This recording is now the source for rig comparisons and audition. It does not calibrate a physical guitar/interface.</p></div>}
-        <p className="calibration-privacy">Supplied recording: Guitar-TECHS (2025), CC BY 4.0. <a href="/audio/ATTRIBUTION.txt" target="_blank" rel="noreferrer">Credits and recording changes</a>.</p>
-      </div>
-    </>}
-    <p className="calibration-disclosure">Temporary live samples and selected guitar audio stay in browser memory for measurement and comparison. Only numeric measurements go to the configured provider when you Generate. Recalibrate after changing guitar, pickup, volume or interface gain. Tone similarity remains unverified.</p>
+    <p className="hint">Recalibrate after changing your guitar, pickup, volume or interface gain.</p>
     {error && <p className="error" role="alert">{error}</p>}
   </section>;
 }

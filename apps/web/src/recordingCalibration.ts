@@ -61,7 +61,7 @@ export async function calibrateLiveInput(samples: Float32Array, sampleRate: numb
   const id = Array.from(new Uint8Array(digest), value => value.toString(16).padStart(2, "0")).join("");
   return { file: new File([prepared], "live-calibration.wav", { type: "audio/wav" }), originalName: "Live guitar calibration",
     skippedSeconds: measured.skippedSeconds, inputGainDb: measured.inputGainDb,
-    measurements: { id, method: "browser_level_v1", ...measured.levels, tone_features: toneFeatures(measured.trimmed, sampleRate), temporal_features: temporalFeatures(measured.trimmed, sampleRate) } };
+    measurements: { id, method: "browser_level_v1", origin: "live", ...measured.levels, tone_features: toneFeatures(measured.trimmed, sampleRate), temporal_features: temporalFeatures(measured.trimmed, sampleRate) } };
 }
 
 /** Decode locally and keep the exact prepared dry channel for all subsequent comparisons. */

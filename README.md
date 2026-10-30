@@ -2,7 +2,7 @@
 
 Turn a guitar sound in a mixed song into a browser preset you can play through.
 
-**Status:** the main Tone Match flow supports Local or Modal Cloud API separation, confirmed guitar passages, live/file calibration, and NVIDIA/Nebius generation of individual parameters for Dinnie's implemented model rig. Check, refine locally, apply, audition and record through the shared browser engine. [Cloud setup](docs/TEAM_CLOUD_SETUP.md) requires no local GPU. Paid generation is disabled by default. [Measured tone follow-up](docs/TONE_RELIABILITY_RESULTS.md) improves crunch/ambience fitting but retains a clean-case regression; audible matching and physical-interface acceptance remain open.
+**Status:** Tone Match follows **Connect → Choose sound → Match tone → Play & record**. The app uses cloud guitar separation, live-interface calibration and NVIDIA/Nebius generation of individual rig parameters, followed by automatic browser refinement and an explicit **Use this tone** action. The visual pedal/amp chain remains editable. [Cloud setup](docs/TEAM_CLOUD_SETUP.md) requires no local GPU. Paid generation is disabled by default. [Current flow and verification](docs/GUIDED_FLOW.md). Audible matching and physical-interface acceptance remain open.
 
 - **Team:** Isyraf — AI/backend/integration; Dinnie — browser audio/DSP; Shazlin — frontend/UX.
 - **Deadline:** 31 October 2026, 01:00 MYT (30 October, 17:00 UTC).
@@ -19,7 +19,7 @@ After updating to the shared skill, start a Codex session with `$modulo Isyraf`,
 2. Separate the guitar and automatically select a useful reference passage.
 3. Analyse that passage and use an NVIDIA open-source model through Nebius to generate a validated tone preset.
 4. Apply the preset to a working browser amp/effects chain.
-5. Play through it with a guitar audio interface, or audition a provided dry guitar recording.
+5. Play through it with a guitar audio interface and optionally record guitar, backing and camera.
 
 Full-song draft tablature now uses a separate private Modal GPU worker; see [song tabs](docs/SONG_TABS.md) for playback, setup, shared allowance and accuracy limits. It transcribes the complete extracted guitar track independently of tone-reference selection.
 modulo aims for a useful approximation, not exact amp identification or perfect tone cloning.
@@ -44,7 +44,7 @@ npm ci
 npm run dev
 ```
 
-Open **http://127.0.0.1:5173**. Run `npm run check` for TypeScript, unit checks and the production build. The existing app can audition a synthetic test signal or your own dry recording without a backend. For real local song upload/separation, open **Tone Match** with the API and isolated separator running; see [the checkpoint setup and limits](docs/LOCAL_SEPARATION.md).
+Open **http://127.0.0.1:5173**. Run `npm run check` for TypeScript, unit checks and the production build. Run the API with the team's configured cloud credentials for song preparation and tone generation. A guitar/interface is required for calibration and live playing; song exploration and full-song tabs can be used without one. See [cloud setup](docs/TEAM_CLOUD_SETUP.md).
 
 Python 3.12 API setup and tests are in [DEVELOPMENT.md](docs/DEVELOPMENT.md). The API exposes health, a manual example preset, bounded separation jobs and a separate confirmed-reference [starting-preset action](docs/PRESET_GENERATION.md). A separated song does not imply a generated preset or calibrated matching. The shared preset schema remains a reviewable draft with implemented controls only.
 

@@ -476,6 +476,41 @@ input[type="checkbox"] { accent-color: var(--accent-strong); }
 .hint { font-size: 12px; color: #a6968e; }
 .error { border: 1px solid #9d6770; background: #302326; padding: 14px; border-radius: 7px; color: #f1cad1; }
 footer { font-size: 12px; color: #9e8e85; padding-top: 28px; }
+
+/* Guided tone matching keeps setup focused while preserving the gear workbench. */
+[hidden] { display: none !important; }
+.guided-hero { align-items: center; margin-bottom: 24px; }
+.guided-hero .display-title { font-size: clamp(28px, 3.4vw, 46px); line-height: 1.12; }
+.guided-hero .global-stop { flex: 0 0 auto; min-width: 100px; }
+.flow-stages { display: grid; grid-template-columns: repeat(4,minmax(0,1fr)); gap: 10px; margin-bottom: 28px; }
+.flow-stages button { display: grid; grid-template-columns: 30px minmax(0,1fr); gap: 4px 10px; align-items: center; margin: 0; padding: 16px; border: 1px solid #553a2b; border-radius: 14px; background: #21150f; color: var(--text); text-align: left; }
+.flow-stages button>span { grid-row: span 2; display: grid; place-items: center; width: 30px; height: 30px; border: 1px solid #78573e; border-radius: 50%; color: #d3bba1; }
+.flow-stages strong { font-size: 14px; }
+.flow-stages small { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 11px; font-weight: 400; color: var(--muted); }
+.flow-stages .is-current { border-color: var(--accent); background: linear-gradient(120deg,#423019,#26190f); box-shadow: 0 0 22px #ffd21f0a; }
+.flow-stages .is-current>span { background: var(--accent); color: #251600; border-color: var(--accent); }
+.stage-next,.button-row,.matching-status { display: flex; align-items: center; flex-wrap: wrap; gap: 12px; margin: 20px 0; }
+.stage-next button,.button-row button { margin: 0; }
+.song-setup,.tone-suggestion,.calibration-panel { padding: clamp(20px,3vw,32px); }
+.song-setup .audio-dropzone { min-height: 150px; }
+.song-player { margin: 18px 0; }
+.song-player audio { width: 100%; }
+.track-switch { display: flex; width: fit-content; margin-top: 18px; }
+.track-switch button { flex: 1; margin: 0; }
+.practice-tabs,.workflow-help,.recording-settings { padding: 18px 22px; border: 1px solid #523a2c; border-radius: 14px; background: #1b120e; margin: 18px 0; }
+.practice-tabs summary,.workflow-help summary,.recording-settings summary { cursor: pointer; color: var(--text); font-weight: 650; }
+.practice-tabs .song-tabs { margin-top: 20px; }
+.workflow-help { color: var(--muted); font-size: 13px; line-height: 1.6; }
+.workflow-help a { color: var(--accent); }
+.play-stage { margin-top: 24px; }
+.play-stage .live-actions { display: flex; align-items: center; flex-wrap: wrap; gap: 18px; }
+.play-stage .live-actions .switch-control { margin: 0; }
+.guided-rig-grid { grid-template-columns: 1fr; }
+.rig-editor-toolbar { margin-top: 16px; }
+.model-rig-footer .model-rig-status { position: relative; z-index: 1; }
+.model-rig-footer { clear: both; }
+@media(max-width:900px) { .flow-stages { grid-template-columns: repeat(2,minmax(0,1fr)); } }
+@media(max-width:500px) { .flow-stages { gap: 8px; } .flow-stages button { padding: 12px 9px; gap: 4px 7px; } .flow-stages small { display: none; } .flow-stages strong { font-size: 12px; } .guided-hero { gap: 12px; } .guided-hero .global-stop { align-self: flex-start; } .practice-tabs,.workflow-help,.recording-settings { padding: 15px; } .track-switch { width: 100%; } }
 :focus-visible { outline: 2px solid var(--accent); outline-offset: 4px; }
 @media (max-width: 1120px) { .project-card { grid-template-columns: 130px minmax(220px, 1fr) auto; } .project-song { display: none; } }
 @media (max-width: 1000px) { .app-shell, .app-shell.sidebar-collapsed { grid-template-columns: 84px minmax(0, 1fr); } .sidebar { padding-inline: 10px; } .sidebar-header { flex-direction: column; } .brand { justify-content: center; width: auto; }.brand > span:last-child, .nav-item > span:nth-child(2), .nav-status, .sidebar-signoff, .collapse-button { display: none; } .nav-item { display: flex; justify-content: center; padding: 12px; } .nav-icon { font-size: 17px; } .workflow-grid, .grid { grid-template-columns: 1fr; } .hero { align-items: flex-start; flex-direction: column; } .mode-badge { width: 100%; } .app-content { padding: 28px 22px; } .calibration-control-grid { grid-template-columns: minmax(0, 1.6fr) minmax(150px, .7fr); } .refresh-inputs { grid-column: 1 / -1; justify-self: start; } }

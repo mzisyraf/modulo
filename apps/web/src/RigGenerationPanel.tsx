@@ -1,5 +1,5 @@
 import { useEffect, useImperativeHandle, useRef, useState, type Ref } from "react";
-import { compileRigProposal, getGearModel, parseRigProposal, type RigProposal, type RigPreset } from "@modulo/audio";
+import { compileRigProposal, parseRigProposal, type RigProposal, type RigPreset } from "@modulo/audio";
 import { apiJson, parseSeparationJob } from "./separation";
 import { parseRigGeneration, rigSourceMatches, type GeneratedRig, type RigGeneration } from "./rigGeneration";
 import { calibrationKey, type CalibratedRecording } from "./recordingCalibration";
@@ -18,7 +18,8 @@ export function RigGenerationPanel({ jobId, revision, recording, onApply, onRefe
   const [quality, setQuality] = useState<{ candidate: RigScore; neutral: RigScore; key: string }>();
   const [refinement, setRefinement] = useState<{ before: number; after: number; renders: number; validationBefore: number; validationAfter: number; retained: boolean }>();
   const [outputLevelDb, setOutputLevelDb] = useState(-18);
-  const [automatic, setAutomatic] = useState(true), [automaticNotice, setAutomaticNotice] = useState("");
+  const automatic = true;
+  const [automaticNotice, setAutomaticNotice] = useState("");
   const gate = useRef(new AutomaticRigRefinement());
   const action = useRef<AbortController | null>(null), renderRun = useRef(0), submittingRef = useRef(false), busyRef = useRef(false);
   const sourceKey = calibrationKey(recording?.measurements), draftKey = JSON.stringify([draft, outputLevelDb]), lastCandidate = useRef("");
@@ -26,7 +27,7 @@ export function RigGenerationPanel({ jobId, revision, recording, onApply, onRefe
   const changed = useRef(onReferenceChanged); changed.current = onReferenceChanged;
   function stop() {
     gate.current.cancel(); renderRun.current++; action.current?.abort();
-    if (busyRef.current) setAutomaticNotice("Local rendering cancelled. Check the proposal manually before applying; it will not restart automatically.");
+    if (busyRef.current) setAutomaticNotice("Tone matching paused. Choose Finish matching to continue.");
     busyRef.current = false; setBusy(false);
   }
   useImperativeHandle(ref, () => ({ stop }));
@@ -44,10 +45,10 @@ export function RigGenerationPanel({ jobId, revision, recording, onApply, onRefe
       const proposal = parseRigProposal(next.rig_proposal.proposal);
       setDraft(proposal); setOutputLevelDb(-18); setRefinement(undefined); setQuality(undefined); setApplied(false);
       lastCandidate.current = next.request_id;
-      setAutomaticNotice(decision === "short" ? "Automatic refinement needs at least six seconds of prepared guitar audio. Check this original proposal manually, or calibrate a longer source."
+      setAutomaticNotice(decision === "short" ? "Calibrate again and play for the full ten seconds."
         : decision === "manual" ? "Automatic refinement is off. Check or refine this proposal manually."
-        : decision === "refine" ? "Refining this requested rig locally. Apply and playback remain manual."
-        : "Reconnected proposal. Check or refine manually; reconnecting does not start automatic refinement.");
+        : decision === "refine" ? "Matching your guitar to the selected sound…"
+        : "A previous suggestion is available. Choose Finish matching to review it.");
       if (decision === "refine") void check(true, { recording, generation: next, draft: proposal, output: -18 });
     }
   }
@@ -108,13 +109,13 @@ export function RigGenerationPanel({ jobId, revision, recording, onApply, onRefe
       const [score, neutral] = await Promise.all([scoreRig(source.file, candidate, source.inputGainDb, generated.target_tone_features, controller.signal, generated.target_temporal_features, output),
         scoreRig(source.file, neutralRigProposal(), source.inputGainDb, generated.target_tone_features, controller.signal, generated.target_temporal_features)]);
       if (run === renderRun.current && !controller.signal.aborted) {
-        if (result) { setDraft(candidate); setOutputLevelDb(output); setApplied(false); setRefinement(result); setAutomaticNotice("Local refinement and output check finished. Review the result, then Apply deliberately."); }
+        if (result) { setDraft(candidate); setOutputLevelDb(output); setApplied(false); setRefinement(result); setAutomaticNotice("Suggested tone ready. Use it, then listen and adjust to taste."); }
         setQuality({ candidate: score, neutral, key: JSON.stringify([candidate, output]) });
       }
     } catch (failure) {
       if (run === renderRun.current && !controller.signal.aborted) {
-        setError(`${refine ? "Local refinement failed. Previous settings are unchanged; use Check custom rig to review them. " : ""}${failure instanceof Error ? failure.message : "Rig rendering failed."}`);
-        if (refine) setAutomaticNotice("Refinement did not complete. The original proposal remains available for a manual Check; no automatic retry or extra model request was made.");
+        setError(`${refine ? "Tone matching could not finish. " : ""}${failure instanceof Error ? failure.message : "Rig rendering failed."}`);
+        if (refine) setAutomaticNotice("Choose Finish matching to try again with the existing suggestion.");
       }
     } finally { if (run === renderRun.current) { busyRef.current = false; setBusy(false); } }
   }
@@ -125,29 +126,23 @@ export function RigGenerationPanel({ jobId, revision, recording, onApply, onRefe
     catch (failure) { if (run === renderRun.current) setError(failure instanceof Error ? failure.message : "Rig could not be applied."); }
     finally { if (run === renderRun.current) { busyRef.current = false; setBusy(false); } }
   }
-  return <section className="result-panel" aria-labelledby="custom-rig-title">
-    <span className="step">05 / CUSTOM RIG</span><h2 id="custom-rig-title">Match individual gear settings</h2>
-    <p>Generate a custom chain and individual parameter values from your guitar source and confirmed passage. Automatically refine locally, then review before applying. No sound starts automatically.</p>
-    {!recording && <p className="notice">Calibrate Live guitar or Guitar audio above first.</p>}
-    {!available && <p className="notice">Rig generation is disabled until the backend has a key and a bounded approved allowance.</p>}
-    <label className="switch-control refinement-preference"><span className="switch-control-copy"><strong>Refine automatically after generation</strong><small id="automatic-refinement-status" aria-live="polite">{automatic ? "On — runs locally without another AI request" : "Off — use Check or Refine manually"}</small></span><input className="modulo-switch" type="checkbox" role="switch" aria-describedby="automatic-refinement-status" checked={automatic} disabled={busy || submitting || generation?.status === "generating"} onChange={event => setAutomatic(event.currentTarget.checked)} /></label>
-    <button disabled={!recording || !available || submitting || busy || generation?.status === "generating" || !active} onClick={() => void generate()}>{generation?.status === "failed" ? "Retry custom rig" : "Generate custom rig"}</button>
-    <button className="secondary" disabled={busy || submitting || !active} onClick={() => setRefresh(value => value + 1)}>Reconnect rig status</button>
-    {(submitting || generation?.status === "generating") && <p role="status">Generating individual gear settings…</p>}
+  return <section className="result-panel tone-suggestion" aria-labelledby="custom-rig-title">
+    <span className="step">03 / MATCH TONE</span><h2 id="custom-rig-title">Make that sound yours</h2>
+    <p>Match the song’s sound to your guitar. Listen before you play at full volume.</p>
+    {!recording && <p className="notice">Connect and calibrate your guitar first.</p>}
+    {!available && <p className="notice">Tone matching is unavailable. Check your song service connection.</p>}
+    {!draft && <button disabled={!recording || !available || submitting || busy || generation?.status === "generating" || !active} onClick={() => void generate()}>{generation?.status === "failed" ? "Retry tone match" : submitting || generation?.status === "generating" ? "Matching tone…" : "Match tone"}</button>}
     {generation?.status === "failed" && <p className="error" role="alert">{generation.error?.message}</p>}
     {automaticNotice && <p role="status">{automaticNotice}</p>}
-    {draft && <><h3>{draft.name}</h3><p>{draft.description}</p><p className="hint">{generation?.rig_proposal?.provenance.model} · measured feature proposal · audible match unverified</p>
-      <ol>{draft.modules.map((module, index) => { const model = getGearModel(module.model_id); return <li key={index}><strong>{model.name}{module.enabled ? "" : " (bypassed)"}</strong><p>{model.parameters.map(parameter => { const value = module.parameters[parameter.id]; return `${parameter.label}: ${typeof value === "number" ? Number(value.toFixed(3)) : typeof value === "boolean" ? value ? "On" : "Off" : value}${parameter.unit ? ` ${parameter.unit}` : ""}`; }).join(" · ")}</p></li>; })}</ol>
-      <button className="secondary" disabled={busy || submitting || generation?.status === "generating" || !active} onClick={() => void check()}>Check custom rig</button>{" "}
-      <button className="secondary" disabled={busy || submitting || generation?.status === "generating" || !active} onClick={() => void check(true)}>Refine individual settings locally</button>
-      <button className="secondary" disabled={busy || submitting || generation?.status === "generating" || !active} onClick={() => { stop(); setAutomaticNotice("Original proposal restored. Check it before applying; automatic refinement will not restart."); setDraft(parseRigProposal(generation!.rig_proposal!.proposal)); setOutputLevelDb(-18); setRefinement(undefined); setQuality(undefined); setApplied(false); }}>Restore original proposal</button>
-      {busy && <><p role="status">Rendering locally{renders ? ` · ${renders}/80 candidates` : ""}…</p><button className="stop" onClick={stop}>Cancel rendering</button></>}
-      {refinement && <p>Training feature distance {refinement.before.toFixed(2)} → {refinement.after.toFixed(2)}. Separate-excerpt validation {refinement.validationBefore.toFixed(2)} → {refinement.validationAfter.toFixed(2)}. {refinement.retained ? "Validated refinement retained." : "No validated improvement; original settings retained."} {refinement.renders}/80 local renders · protected output {outputLevelDb.toFixed(1)} dB. Feature scores still need listening review.</p>}
-      {quality && quality.key === draftKey && <p role="status">{!quality.candidate.safe ? "Output protection is heavily engaged; revise gain before applying." : quality.candidate.loss < quality.neutral.loss * .9 ? "Closer measured spectral balance than neutral; listen to verify." : "No clear spectral improvement over neutral; review or refine."} Rig {quality.candidate.loss.toFixed(2)} · neutral {quality.neutral.loss.toFixed(2)}. Lower is closer; this is not an accuracy percentage.</p>}
-      <button disabled={busy || submitting || generation?.status === "generating" || !active || !quality?.candidate.safe || quality.key !== draftKey} onClick={() => void apply()}>Apply custom rig</button>
-      {applied && <p className="success-state" role="status">Custom rig applied. Its individual controls are editable below. Use Play dry recording or live input to hear it.</p>}
+    {draft && <>
+      <h3>{draft.name}</h3><span className="quality-badge">Suggested tone</span>
+      {busy && <div className="matching-status" role="status"><span className="job-spinner" aria-hidden="true" />Matching your tone…<button className="stop" onClick={stop}>Cancel matching</button></div>}
+      {!busy && !quality && <button className="secondary" disabled={!recording || !active} onClick={() => void check(true)}>Finish matching</button>}
+      {quality && quality.key === draftKey && !quality.candidate.safe && <p className="error" role="alert">This suggestion is too loud to apply safely. Match again or adjust your input gain.</p>}
+      {quality && quality.key === draftKey && quality.candidate.safe && <p className="hint">{quality.candidate.loss < quality.neutral.loss * .9 ? "Ready to try. Compare it with the reference by ear." : "This is an approximation. Listen and adjust the gear to taste."}</p>}
+      <div className="button-row"><button disabled={busy || submitting || !active || !quality?.candidate.safe || quality.key !== draftKey} onClick={() => void apply()}>{applied ? "Tone in use" : "Use this tone"}</button><button className="text-action" disabled={busy || submitting || !active} onClick={() => void generate()}>Match again</button></div>
+      {applied && <p className="success-state" role="status">Tone applied. Your signal chain is ready below.</p>}
     </>}
-    {error && <p className="error" role="alert">{error}</p>}
-    <p className="hint">Only numeric source descriptors go to Token Factory. Local refinement makes no AI requests. Different playing and separation bleed affect this proxy; the generated settings need listening review.</p>
+    {error && <p className="error" role="alert">{error} <button className="text-action" disabled={busy || submitting || !active} onClick={() => setRefresh(value => value + 1)}>Reconnect</button></p>}
   </section>;
 }
