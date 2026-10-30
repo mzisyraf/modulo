@@ -367,6 +367,19 @@ audio { width: 100%; height: 40px; }
 .capture-info dt { color: #9f9189; font-size: 9px; letter-spacing: .07em; text-transform: uppercase; }
 .capture-info dd { margin: 4px 0 0; color: #e8e3db; font-size: 11px; overflow-wrap: anywhere; }
 input[type="checkbox"] { accent-color: var(--accent-strong); }
+.switch-control { display: flex; align-items: center; justify-content: space-between; gap: 14px; min-height: 44px; margin: 0; color: var(--text); cursor: pointer; }
+.switch-control-copy { display: grid; min-width: 0; gap: 2px; line-height: 1.25; }
+.switch-control-copy strong { color: var(--text); font-size: 13px; font-weight: 750; }
+.switch-control-copy small { color: #a9978b; font-size: 11px; line-height: 1.35; }
+.switch-control input.modulo-switch { appearance: none; flex: 0 0 46px; width: 46px; height: 26px; margin: 0; padding: 0; position: relative; border: 1px solid #806150; border-radius: 999px; background: #574039; box-shadow: inset 0 1px 3px #0005; cursor: pointer; transition: background-color .18s ease, border-color .18s ease; }
+.switch-control input.modulo-switch::before { position: absolute; top: 3px; left: 3px; width: 18px; height: 18px; border-radius: 50%; background: #f5eae0; box-shadow: 0 1px 3px #0005; content: ""; transition: transform .18s ease, background-color .18s ease; }
+.switch-control input.modulo-switch:checked { border-color: #ffca28; background: #ffca28; }
+.switch-control input.modulo-switch:checked::before { background: #211611; transform: translateX(20px); }
+.switch-control input.modulo-switch:focus-visible { outline: 2px solid #ffca28; outline-offset: 3px; }
+.switch-control:has(input:disabled) { opacity: .55; cursor: not-allowed; }
+.switch-control input.modulo-switch:disabled { cursor: not-allowed; }
+.refinement-preference { max-width: 520px; margin: 16px 0; padding: 11px 13px; border: 1px solid #4d3930; border-radius: 10px; background: #1a1210; }
+@media (prefers-reduced-motion: reduce) { .switch-control input.modulo-switch, .switch-control input.modulo-switch::before { transition: none; } }
 .hint { font-size: 12px; color: #a6968e; }
 .error { border: 1px solid #9d6770; background: #302326; padding: 14px; border-radius: 7px; color: #f1cad1; }
 footer { font-size: 12px; color: #9e8e85; padding-top: 28px; }
