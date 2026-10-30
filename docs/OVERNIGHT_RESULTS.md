@@ -1,5 +1,7 @@
 # Overnight integration evidence — 30 October 2026
 
+Follow-up: [tone refinement1–4 results](TONE_RELIABILITY_RESULTS.md) supersede the quality/search and spending snapshot below. The original overnight record is retained as the baseline.
+
 Operator: Isyraf. Approved ceilings: US$10 Modal and US$10 Token Factory, including earlier usage. This is a working integration checkpoint; **close audible matching across arbitrary songs has not passed acceptance**. Main/publication/licence decisions remain separate.
 
 ## What was demonstrated
