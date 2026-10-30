@@ -8,6 +8,7 @@ import type { CalibratedRecording } from "./recordingCalibration";
 import type { RigPreset } from "@modulo/audio";
 import type { GeneratedRig } from "./rigGeneration";
 import { RigGenerationPanel } from "./RigGenerationPanel";
+import { AudioFileDropzone } from "./AudioFileDropzone";
 
 const storageKey = "modulo.local-separation-job";
 const tracks = [["mix", "Original mix", "Decoded original with the same gain as the separated tracks."], ["guitar", "Extracted guitar", "Combined guitar stem; separation may contain bleed or missing notes."], ["backing", "Guitar-reduced backing", "Sum of the aligned non-guitar stems; residual guitar may remain."]] as const;
@@ -193,20 +194,61 @@ export function SeparationPage({ embedded = false, active = true, onInputChosen,
     } catch (failure) { preview.current = null; setError(message(failure)); }
   }
 
+  const jobState = uploading ? "uploading" : connectionLost ? "disconnected" : job?.status ?? (jobId ? "reconnecting" : "idle");
+  const jobTitle = uploading ? "Uploading your song"
+    : connectionLost ? "Connection lost"
+    : job?.status === "ready" ? "Guitar separation complete"
+    : job?.status === "failed" ? "Separation could not finish"
+    : job?.status === "running" ? "Separating the guitar"
+    : job?.status === "queued" ? "Waiting to start"
+    : jobId ? "Reconnecting to your job"
+    : "Choose a song to begin.";
+  const jobDescription = uploading ? "Preparing the selected audio for the configured processing service."
+    : connectionLost ? "The job may still be running. Reconnect to check its current state."
+    : job?.status === "ready" ? `${backend === "modal" ? "Cloud API" : "Local"} separation is ready. Review the extracted guitar and backing audio below.`
+    : job?.status === "failed" ? job.error?.message ?? "The separation service returned an error."
+    : job?.status === "running" ? `The ${backend === "modal" ? "cloud" : "local"} service is processing your song. Progress is shown only when the service reports it.`
+    : job?.status === "queued" ? `Your song is queued for ${backend === "modal" ? "cloud" : "local"} separation.`
+    : jobId ? "Checking the saved job without starting another separation."
+    : "Upload a mixed song and choose Separate guitar to start.";
+
   const Container = embedded ? "div" : "main";
   return <Container className={embedded ? "separation-page" : "separation-page app-content"}>
     {!embedded && <><header className="hero"><div><a className="separation-brand" href="/">modulo <span>↗ Browser amp</span></a><span className="eyebrow">TONE WORKFLOW</span><h1>From song to your guitar.</h1><p>Calibrate your connected guitar, choose a target song, then compare your live exercise with the rig on or off. An instrument input is required for calibration.</p></div><div className="mode-badge"><strong>{backend === "modal" ? "Cloud API separation" : "Local separation"}</strong><span>Tone match remains unverified</span></div></header>
       <ol className="local-flow-guide"><li><strong>Calibrate your live guitar.</strong> Set your guitar’s starting input level.</li><li><strong>Choose a target song.</strong> Separate it and listen to the extracted guitar.</li><li><strong>Confirm a passage.</strong> Choose a suggestion or highlight a manual region.</li><li><strong>Generate and Apply.</strong> Add the song’s starting rig over your input calibration.</li><li><strong>Compare your guitar.</strong> Compare the captured live exercise with Original / Rig applied.</li></ol></>}
-    <p className="notice">{backend === "modal" ? "Cloud API sends your song to Modal for GPU separation. Downloads are kept on this laptop; abandoned cloud jobs expire after 24–25 hours." : "Local processes your song on this laptop’s GPU."} This laptop’s API retains up to four jobs for 24 hours. Preset generation sends measured descriptors, not audio, to Nebius with a configured allowance.</p>
+    <aside className="processing-banner" aria-label="Processing and privacy information">
+      <span className="processing-banner-icon" aria-hidden="true">▦</span>
+      <div><strong>{backend === "modal" ? "Cloud separation is selected." : "Local separation is selected."}</strong><p>{backend === "modal" ? "The configured API sends the song to a Modal worker and returns the separated audio to this browser." : "The configured API processes the song through its local separation service and hardware."}</p>
+        <details><summary>Privacy, retention and preset generation</summary><p>The API keeps up to four jobs for 24 hours. Abandoned cloud jobs expire after 24–25 hours. Preset generation sends measured numeric descriptors—not raw audio—to the configured Nebius provider, and only when generation is requested.</p></details>
+      </div>
+    </aside>
     <GuitarCalibration ref={liveCalibration} active={active} onInputChosen={onInputChosen} onStart={() => { pausePlayers(); onStopAudio?.(); }} onChange={next => { pausePlayers(); invalidatePreset.current?.(); setRecording(next); onSourceChange?.(next); }} />
     <div className="workflow-grid">
-      <section className="upload-panel" aria-labelledby="local-upload-title"><span className="step">01 / SONG</span><h2 id="local-upload-title">Choose a mixed song</h2><p>Use audio you have permission to process. WAV or MP3, mono/stereo, 10 seconds–4:55, up to 50 MiB.</p><fieldset disabled={processing || confirming} className="upload-panel">
-        <legend>Separation processing</legend>
-        <button type="button" className={backend === "local" ? undefined : "secondary"} aria-pressed={backend === "local"} onClick={() => { if (backend !== "local") { chooseFile(file); setBackend("local"); } }}>Local</button>{" "}
-        <button type="button" className={backend === "modal" ? undefined : "secondary"} aria-pressed={backend === "modal"} onClick={() => { if (backend !== "modal") { chooseFile(file); setBackend("modal"); } }}>Cloud API</button>
-        <p>{backend === "modal" ? "Uses Modal GPU credits. No GPU is needed on this laptop. Cloud access must be configured on the backend." : "Uses this laptop’s NVIDIA GPU. No cloud separation charge."}</p>
-      </fieldset><label className="file-label" htmlFor="separation-file">Mixed-song audio</label><input id="separation-file" type="file" accept="audio/wav,audio/mpeg,.wav,.mp3" disabled={processing || confirming} onChange={(event) => chooseFile(event.target.files?.[0])} />{file && <p className="file-summary"><strong>{file.name}</strong><span>{(file.size / 1024 / 1024).toFixed(1)} MiB</span></p>}<button disabled={!file || processing || confirming} onClick={() => void separate()}>{uploading ? "Uploading…" : job?.status === "failed" ? "Retry separation" : "Separate guitar"}</button><p className="hint">One separation job runs at a time. Separation does not generate a tone preset.</p></section>
-      <section className="progress-panel" aria-labelledby="local-progress-title"><span className="step">02 / SEPARATION</span><h2 id="local-progress-title">Job status</h2><p className="job-state" role="status">{uploading ? "Uploading to this laptop…" : connectionLost ? "Connection lost — status unverified" : job?.status === "ready" ? `${backend === "modal" ? "Cloud API" : "Local"} separation ready — review the audio below` : job?.status === "failed" ? "Separation failed" : job?.status === "running" ? `Running ${backend === "modal" ? "Cloud API" : "Local"} guitar separation…` : job?.status === "queued" ? `Queued for ${backend === "modal" ? "Cloud API" : "Local"} separation…` : jobId ? "Reconnecting to your job…" : "Choose a song to begin."}</p>{job?.status === "failed" && <p className="error" role="alert">{job.error?.message}</p>}{connectionLost && <button className="secondary" onClick={() => setReconnect((value) => value + 1)}>Reconnect to job</button>}{jobId && <p className="hint">Job <code>{jobId}</code> · {embedded ? "saved with this project in this tab; refreshing clears in-tab projects." : "refreshing this tab reconnects to it."}</p>}{result && <p className="hint">{timestamp(result.duration_seconds)} · {result.sample_rate.toLocaleString()} Hz · {result.provenance.model} · {result.provenance.device}</p>}</section>
+      <section className="upload-panel separation-upload-panel" aria-labelledby="local-upload-title">
+        <header className="panel-title"><span className="step">01 / SONG</span><h2 id="local-upload-title">Choose a mixed song</h2><p>Use audio you have permission to process. WAV or MP3, mono/stereo, 10 seconds–4:55.</p></header>
+        <div className="processing-choice"><div className="workflow-card-heading"><span className="workflow-card-icon" aria-hidden="true">≋</span><div><h3>Separation processing</h3><p>Choose where the guitar separation should run.</p></div></div>
+          <div className="segmented-control processing-segments" role="group" aria-label="Separation processing">
+            <button type="button" disabled={processing || confirming} className={backend === "local" ? "segmented-option is-selected" : "segmented-option"} aria-pressed={backend === "local"} onClick={() => { if (backend !== "local") { chooseFile(file); setBackend("local"); } }}><span aria-hidden="true">▣</span>Local</button>
+            <button type="button" disabled={processing || confirming} className={backend === "modal" ? "segmented-option is-selected" : "segmented-option"} aria-pressed={backend === "modal"} onClick={() => { if (backend !== "modal") { chooseFile(file); setBackend("modal"); } }}><span aria-hidden="true">☁</span>Cloud API</button>
+          </div>
+          <p className="processing-description">{backend === "modal" ? "Runs through the configured Modal cloud worker. Cloud access must be enabled by the API." : "Runs through the configured local separation service. Hardware availability is reported by the API."}</p>
+        </div>
+        <div className="song-upload"><div className="song-upload-heading"><span className="workflow-card-icon" aria-hidden="true">♫</span><div><h3>Mixed-song audio</h3><p>Selecting a file does not start processing.</p></div></div>
+          <AudioFileDropzone accept="audio/wav,audio/mpeg,.wav,.mp3" disabled={processing || confirming} file={file} formats="WAV or MP3" help="WAV or MP3 · mono or stereo · 10 seconds–4:55 · up to 50 MiB" id="separation-file" maxBytes={50 * 1024 * 1024} readyLabel="ready to separate" onFile={chooseFile} />
+        </div>
+        <button className="separation-primary" disabled={!file || processing || confirming} onClick={() => void separate()}><span aria-hidden="true">✣</span>{uploading ? "Starting separation…" : job?.status === "failed" ? "Retry separation" : "Separate guitar"}</button>
+        <p className="separation-note"><span aria-hidden="true">ⓘ</span>One separation job runs at a time. Separation does not generate a tone preset.</p>
+      </section>
+      <section className="progress-panel separation-status-panel" aria-labelledby="local-progress-title">
+        <header className="panel-title"><span className="step">02 / SEPARATION</span><h2 id="local-progress-title">Job status</h2></header>
+        <div className={`separation-state is-${jobState}`} role="status" aria-live="polite"><span className="separation-state-icon" aria-hidden="true">{jobState === "ready" ? "✓" : jobState === "failed" || jobState === "disconnected" ? "!" : jobState === "idle" ? "♫" : "◌"}</span><div><strong>{jobTitle}</strong><p>{jobDescription}</p></div>{!["idle", "ready", "failed", "disconnected"].includes(jobState) && <span className="job-spinner" aria-hidden="true" />}</div>
+        {job?.status === "failed" && file && <button className="secondary status-action" disabled={processing} onClick={() => void separate()}>Retry separation</button>}
+        {connectionLost && <button className="secondary status-action" onClick={() => setReconnect((value) => value + 1)}>Reconnect to job</button>}
+        {result && <button className="secondary status-action" onClick={() => document.getElementById("separated-audio-title")?.scrollIntoView({ behavior: "smooth", block: "start" })}>Review separated audio</button>}
+        {jobId && <p className="job-detail">Job <code>{jobId}</code> · {embedded ? "saved with this project in this tab; refreshing clears in-tab projects." : "refreshing this tab reconnects to it."}</p>}
+        {result && <p className="job-detail">{timestamp(result.duration_seconds)} · {result.sample_rate.toLocaleString()} Hz · {result.provenance.model} · {result.provenance.device}</p>}
+        {!jobId && !uploading && <div className="separation-explainer"><h3>How it works</h3><p>The configured service extracts guitar audio while keeping the aligned mix and guitar-reduced backing.</p><ol><li><span>1</span><strong>Upload song</strong><small>Choose a mixed audio file.</small></li><li><span>2</span><strong>Run separation</strong><small>Process it using the selected service.</small></li><li><span>3</span><strong>Review result</strong><small>Listen and choose a reference passage.</small></li></ol></div>}
+      </section>
     </div>
     {result && <section className="result-panel" aria-labelledby="separated-audio-title"><div className="result-heading"><div><span className="step">03 / LISTEN</span><h2 id="separated-audio-title">Compare the same passage</h2></div><span className="quality-badge warning">Separation quality unverified</span></div><p>The tracks share one gain and timeline. Play the backing alongside live input; Stop audio stops both. Recording captures your processed guitar. The backing does not pass through the guitar amp.</p><div className="players">{tracks.map(([name, title, description]) => <div key={name}><h3>{title}</h3><p>{description}</p><audio aria-label={title} controls preload="metadata" src={result.artifacts[name]} ref={(element) => { players.current[name] = element; }} onPlay={(event) => { onStopAudio?.(name); pausePlayers(event.currentTarget); }} onPause={(event) => { if (preview.current?.player === event.currentTarget) preview.current = null; }} onTimeUpdate={(event) => { if (preview.current?.player === event.currentTarget && event.currentTarget.currentTime >= preview.current.end) { event.currentTarget.pause(); } }} onError={() => setError("An audio artifact could not load. Reconnect to the job; it may have expired.")} />{name === "backing" && <button className="secondary" onClick={() => void playPassage(name)}>Play backing passage</button>}</div>)}</div>
       <div className="reference-selection"><span className="step">04 / REFERENCE</span><h2>Choose your reference passage</h2>
