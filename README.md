@@ -21,7 +21,7 @@ After updating to the shared skill, start a Codex session with `$modulo Isyraf`,
 4. Apply the preset to a working browser amp/effects chain.
 5. Play through it with a guitar audio interface, or audition a provided dry guitar recording.
 
-Short tabs are optional and start only after the core flow passes acceptance checks.
+Full-song draft tablature now uses a separate private Modal GPU worker; see [song tabs](docs/SONG_TABS.md) for playback, setup, shared allowance and accuracy limits. It transcribes the complete extracted guitar track independently of tone-reference selection.
 modulo aims for a useful approximation, not exact amp identification or perfect tone cloning.
 
 ## Repository layout

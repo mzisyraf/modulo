@@ -32,6 +32,7 @@ async (page) => {
   await p.route('**/api/**',route=>{
     const request=route.request(),path=new URL(request.url()).pathname;
     const json=(value,status=200)=>route.fulfill({status,contentType:'application/json',body:JSON.stringify(value)});
+    if(path.endsWith('/tabs')&&request.method()==='GET')return json({status:'idle'});
     if(path==='/api/health')return json({status:'ok',mode:'scaffold',separation_available:true,preset_generation_available:false,rig_generation_available:false});
     if(path==='/api/jobs'&&request.method()==='POST')return json({job_id:id,status:'ready'},202);
     if(path.endsWith('/references'))return json({method:'signal_contrast_v1',duration_seconds:12,options:[],waveforms:{mix:Array(120).fill(.5),guitar:Array(120).fill(.5)}});

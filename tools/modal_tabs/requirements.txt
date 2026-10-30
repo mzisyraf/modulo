@@ -1,0 +1,7 @@
+basic-pitch==0.4.0
+onnxruntime-gpu==1.18.0
+numpy==1.26.4
+librosa==0.10.2.post1
+numba==0.60.0
+llvmlite==0.43.0
+resampy==0.4.2

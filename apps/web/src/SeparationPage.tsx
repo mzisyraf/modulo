@@ -1,4 +1,4 @@
-import { useEffect, useImperativeHandle, useRef, useState, type Ref } from "react";
+import { useCallback, useEffect, useImperativeHandle, useRef, useState, type Ref } from "react";
 import { apiJson, isJobId, parseSeparationJob, referenceBounds, type ReferencePassage, type SeparationJob } from "./separation";
 import { ReferenceSelector } from "./ReferenceSelector";
 import type { Preset } from "@modulo/contracts";
@@ -9,6 +9,7 @@ import type { RigPreset } from "@modulo/audio";
 import type { GeneratedRig } from "./rigGeneration";
 import { RigGenerationPanel } from "./RigGenerationPanel";
 import { AudioFileDropzone } from "./AudioFileDropzone";
+import { SongTabsPanel } from "./SongTabsPanel";
 
 const storageKey = "modulo.local-separation-job";
 const tracks = [["mix", "Original mix", "Decoded original with the same gain as the separated tracks."], ["guitar", "Extracted guitar", "Combined guitar stem; separation may contain bleed or missing notes."], ["backing", "Guitar-reduced backing", "Sum of the aligned non-guitar stems; residual guitar may remain."]] as const;
@@ -63,6 +64,7 @@ export function SeparationPage({ embedded = false, active = true, onInputChosen,
   const selectionController = useRef<AbortController | null>(null);
   const players = useRef<Partial<Record<(typeof tracks)[number][0], HTMLAudioElement | null>>>({});
   const preview = useRef<{ player: HTMLAudioElement; end: number } | null>(null);
+  const getBackingPlayer = useCallback(() => players.current.backing ?? undefined, []);
   const liveCalibration = useRef<LiveCalibrationControl | null>(null);
   const presetAudition = useRef<PresetAudition | null>(null);
   const rigAudition = useRef<PresetAudition | null>(null);
@@ -259,6 +261,9 @@ export function SeparationPage({ embedded = false, active = true, onInputChosen,
     </section>}
     {result && confirmed && onApplyRig && <RigGenerationPanel key={`rig-${jobId}:${result.reference_revision ?? 0}`} ref={rigAudition} active={active} recording={recording} jobId={jobId} revision={result.reference_revision ?? 0} onApply={onApplyRig} onReferenceChanged={() => { pausePlayers(); onInvalidatePreset?.(); setConfirmed(null); setReconnect(value => value + 1); setError("The confirmed passage changed. Review it and confirm again."); }} />}
     {result && (confirmed ? <details open={!onApplyRig}><summary>Legacy six-control starting preset</summary><StartingPresetPanel key={`${jobId}:${result.reference_revision ?? 0}`} recording={recording} ref={presetAudition} jobId={jobId} revision={result.reference_revision ?? 0} onApplyPreset={onApplyPreset} onPlay={() => { pausePlayers(); onStopAudio?.(); }} onReferenceChanged={() => { pausePlayers(); onInvalidatePreset?.(); setConfirmed(null); setReconnect((value) => value + 1); setError("The confirmed passage changed. Review it and confirm again."); }} /></details> : <p className="notice">Confirm a passage to unlock rig generation and audition.</p>)}
+    {result && <SongTabsPanel key={`tabs-${jobId}`} jobId={jobId} duration={result.duration_seconds} active={active} getPlayer={getBackingPlayer}
+      onPlay={async () => { const player=players.current.backing;if(!player)throw Error("Backing player is unavailable.");preview.current=null;onStopAudio?.("backing");pausePlayers(player);await player.play(); }}
+      onSeek={time => { preview.current=null;const player=players.current.backing;if(player)player.currentTime=time; }} />}
     {error && <p className="error" role="alert">{error}</p>}
     {!embedded && <footer>Measured starting rigs · render and listen · tone similarity unverified. <a href="/">Return to the browser amp</a></footer>}
   </Container>;

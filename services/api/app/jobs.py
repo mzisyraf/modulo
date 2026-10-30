@@ -65,6 +65,7 @@ class JobStore:
         self.preset_running = {}
         self.reference_cache = {}
         self.reference_pending = {}
+        self.tabs_running = set()
 
     def start(self):
         self.root.mkdir(parents=True, exist_ok=True)
@@ -140,13 +141,15 @@ class JobStore:
         with self.lock:
             for job_id, job in list(self.jobs.items()):
                 if (time.time() >= job["expires_at"] and job["status"] in {"ready", "failed"}
-                        and job_id not in self.preset_running and job_id not in self.reference_pending):
+                        and job_id not in self.preset_running and job_id not in self.reference_pending and job_id not in self.tabs_running):
                     try:
                         self.remove(job_id)
                     except JobError:
                         logger.warning("Expired job %s is still in use; cleanup will retry", job_id)
 
     def remove(self, job_id):
+        if job_id in self.tabs_running:
+            raise JobError("tabs_busy", "Cancel transcription and wait for cleanup before removing this song.", 409)
         try:
             _remove_job_directory(self.directory(job_id))
         except OSError as failure:
@@ -168,7 +171,7 @@ class JobStore:
             if any(job["status"] in {"queued", "running"} for job in self.jobs.values()):
                 raise JobError("worker_busy", "One local song is already processing. Wait for it to finish.", 429, True)
             while len(self.jobs) >= MAX_JOBS:
-                candidates = [item for item in self.jobs if item not in self.preset_running and item not in self.reference_pending]
+                candidates = [item for item in self.jobs if item not in self.preset_running and item not in self.reference_pending and item not in self.tabs_running]
                 if not candidates:
                     raise JobError("generation_busy", "Retained jobs are generating presets or loading waveforms. Wait before uploading another song.", 429, True)
                 self.remove(min(candidates, key=lambda item: self.jobs[item]["created_at"]))

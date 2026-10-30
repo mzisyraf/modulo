@@ -11,7 +11,7 @@ The decisions supplied by Isyraf are the baseline:
 - Three people: **Isyraf** owns AI, FastAPI, Nebius/NVIDIA integration and ML analysis; **Dinnie** owns the TypeScript Web Audio DSP engine; **Shazlin** owns the React/TypeScript frontend.
 - Core tone-matching flow: connect/calibrate the user's guitar, upload a mixed song, isolate guitar, let the user choose a reference segment, compare source and target audio, generate a validated NVIDIA/Nebius preset, then play and adjust it through the browser engine.
 - Recording and guitar-reduced play-along complete the requested workflow after the tone setup works. They are planned deliverables, not implemented features. Automatic passage suggestions support the user's choice rather than replacing it.
-- Short tabs are optional.
+- Full-song draft tabs were explicitly added on30October2026; see [GPU song tabs](SONG_TABS.md). They remain independent of rig generation and require their own accuracy checks.
 - Deadline: **31 October 2026 at 01:00 MYT**.
 
 The eleven-step journey below is the working product workflow requested by Dinnie. Technical contracts and acceptance evidence still need the affected owners' review; this document does not claim completed implementation or team-wide approval of new interfaces.
@@ -70,7 +70,7 @@ Proposed upload limit: WAV/MP3, up to five minutes and 50 MB, with backend valid
 | R9 | Guided guitar calibration / chord-performance analysis | Dinnie + Isyraf + Shazlin | Explicitly capture/retry a dry chord take; reject silence/clipping and report finite source-tone features. Tie the accepted baseline to the current device/channel and input settings; request recalibration when these change. Named chord recognition is not assumed to work. |
 | R10 | Performance recording | Dinnie + Shazlin | Record the processed guitar with explicit start/stop, preview, discard and downloadable output. Bound duration/storage, show the actual supported format, and verify no unintended mic/backing route is included. Stop/disconnect/dispose finalize or discard cleanly with no leaked resources. |
 | R11 | Guitar-reduced play-along | Isyraf + Dinnie + Shazlin | A backing track made from aligned non-guitar stems plays with live processed guitar, independent levels, pause/seek/restart and a shared transport position. Test alignment and sustained playback for drift; label bleed/quality. Original mix playback is a separate, explicitly labelled mode. |
-| O1 | Short tablature | Isyraf; Shazlin displays | Optional after R1–R11 work. Restrict to a short monophonic phrase; show uncertainty and allow omission. Never gate preset generation on tabs. |
+| O1 | Full-song draft tablature | Isyraf; Shazlin displays | User-expanded scope30October: GPU transcription of the full10–295s guitar stem, suggested string/fret mapping and backing-synchronized practice. Show uncertainty/unassigned notes; never gate preset generation on tabs. See SONG_TABS.md. |
 
 **Quality targets, not current measurements:** warmed analysis of a 60-second clip in at most 90 seconds on the selected cloud GPU; preset inference within 15 seconds; sustained live processing without audible dropouts for two minutes. Aim for measured live round-trip latency at or below 30 ms on the demo rig. If this is missed, document the measurement and improve the rig/graph before promising live playability. `baseLatency` alone is not a round-trip measurement.
 

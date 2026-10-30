@@ -41,6 +41,7 @@ async (page) => {
     await p.route('**/api/**', route => {
       const req = route.request(), path = new URL(req.url()).pathname;
       const json = (value,status=200) => route.fulfill({status,contentType:'application/json',body:JSON.stringify(value)});
+      if(path.endsWith('/tabs')&&req.method()==='GET')return json({status:'idle'});
       if(path==='/api/health')return json({status:'ok',mode:'scaffold',separation_available:true,rig_generation_available:true,preset_generation_available:false});
       if(path==='/api/jobs'&&req.method()==='POST')return json({job_id:'11111111-1111-4111-8111-111111111111',status:'ready'},202);
       if(path.endsWith('/reference')) {revision++;reference={start_seconds:0,end_seconds:12,explanation:'TEST ONLY',quality_flags:['synthetic']};generation=undefined;return json(reference);}

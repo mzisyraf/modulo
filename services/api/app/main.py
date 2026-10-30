@@ -1,9 +1,9 @@
 import asyncio
 from contextlib import asynccontextmanager, suppress
 
-from fastapi import FastAPI, Request
+from fastapi import FastAPI, Request, Query
 from fastapi.exceptions import RequestValidationError
-from fastapi.responses import FileResponse, JSONResponse
+from fastapi.responses import FileResponse, JSONResponse, Response
 from pydantic import BaseModel, ConfigDict
 from starlette.middleware.trustedhost import TrustedHostMiddleware
 
@@ -12,6 +12,8 @@ from .jobs import JobError, JobStore, MAX_UPLOAD_BYTES
 from .preset_generation import PresetError, PresetGenerator
 from .rig_generation import RigGenerator
 from .source_calibration import SourceCalibration
+from .song_tabs import SongTabs
+from .tab_notes import text_tab
 
 
 class ReferenceInterval(BaseModel):
@@ -26,12 +28,18 @@ class PresetRequest(BaseModel):
     source_calibration: SourceCalibration | None = None
 
 
-def create_app(store=None, generator=None, rig_generator=None):
+class TabsRequest(BaseModel):
+    model_config = ConfigDict(strict=True, extra="forbid")
+    retry: bool = False
+
+
+def create_app(store=None, generator=None, rig_generator=None, tabs_runner=None):
     @asynccontextmanager
     async def lifespan(app):
         jobs = store if store is not None else JobStore()
         jobs.start()
         app.state.jobs = jobs
+        app.state.tabs = SongTabs(jobs, tabs_runner)
         app.state.preset_error = None
         try:
             app.state.generator = generator if generator is not None else PresetGenerator.from_env()
@@ -57,6 +65,7 @@ def create_app(store=None, generator=None, rig_generator=None):
             cleanup.cancel()
             with suppress(asyncio.CancelledError):
                 await cleanup
+            await asyncio.to_thread(app.state.tabs.close)
             await asyncio.to_thread(jobs.close)
 
     app = FastAPI(title="modulo API", version="0.1.0", lifespan=lifespan)
@@ -104,6 +113,31 @@ def create_app(store=None, generator=None, rig_generator=None):
                 "separation_available": True, "preset_generation_available": bool(provider and provider.available),
                 "preset_budget_unlimited": bool(provider and provider.budget is None),
                 "rig_generation_available": bool(rig_provider and rig_provider.available)}
+
+    @app.post("/api/jobs/{job_id}/tabs", status_code=202)
+    def generate_tabs(job_id: str, selection: TabsRequest, request: Request):
+        return request.app.state.tabs.start(job_id, selection.retry)
+
+    @app.get("/api/jobs/{job_id}/tabs")
+    def get_tabs(job_id: str, request: Request, tuning: str = "standard", capo: int = Query(0, ge=0, le=12)):
+        return request.app.state.tabs.get(job_id, tuning, capo)
+
+    @app.delete("/api/jobs/{job_id}/tabs")
+    def cancel_tabs(job_id: str, request: Request):
+        return request.app.state.tabs.cancel(job_id)
+
+    @app.get("/api/jobs/{job_id}/tabs/files/{format}")
+    def tab_file(job_id: str, format: str, request: Request, tuning: str = "standard", capo: int = Query(0, ge=0, le=12)):
+        if format not in {"json", "txt", "mid"}:
+            raise JobError("tabs_file_missing", "Choose JSON, text or MIDI.", 404)
+        state=request.app.state.tabs.get(job_id,tuning,capo)
+        if state["status"]!="ready":raise JobError("tabs_not_ready","Generate full-song tabs first.",409)
+        headers={"Content-Disposition":f'attachment; filename="modulo-tabs.{format}"'}
+        if format=="json":return JSONResponse(state["result"],headers=headers)
+        if format=="txt":return Response(text_tab(state["result"]),media_type="text/plain",headers=headers)
+        path=request.app.state.jobs.directory(job_id)/'tabs-midi.mid'
+        if path.is_symlink() or not path.is_file() or path.stat().st_size>1024*1024:raise JobError("tabs_file_missing","MIDI is missing or invalid.",404)
+        return FileResponse(path,media_type="audio/midi",filename="modulo-tabs.mid")
 
     @app.get("/api/presets/example")
     def preset_example():
