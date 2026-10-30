@@ -1,0 +1,27 @@
+[Unit]
+Description=modulo judge API
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=modulo
+Group=modulo
+WorkingDirectory=/opt/modulo/current
+EnvironmentFile=/etc/modulo/provider.env
+Environment=HOME=/var/lib/modulo PYTHONDONTWRITEBYTECODE=1 PYTHONUNBUFFERED=1 MODAL_CONFIG_PATH=/etc/modulo/modal.toml
+ExecStart=/opt/modulo/runtime/api/bin/python -m uvicorn app.main:app --app-dir services/api --host 127.0.0.1 --port 8123 --workers 1 --no-proxy-headers
+Restart=on-failure
+RestartSec=3
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectHome=true
+ProtectSystem=strict
+ReadWritePaths=/var/lib/modulo
+MemoryHigh=850M
+MemoryMax=1G
+Nice=5
+UMask=0077
+
+[Install]
+WantedBy=multi-user.target

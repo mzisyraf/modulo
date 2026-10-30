@@ -1,0 +1,6 @@
+[Unit]
+Description=Renew modulo HTTPS certificate
+
+[Service]
+Type=oneshot
+ExecStart=/opt/pocket-certbot/bin/certbot renew --quiet --config-dir /etc/modulo-letsencrypt --work-dir /var/lib/modulo-certbot --logs-dir /var/log/modulo-certbot --deploy-hook "/usr/sbin/nginx -t && /bin/systemctl reload nginx"

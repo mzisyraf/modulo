@@ -1,0 +1,10 @@
+[Unit]
+Description=Check modulo certificate renewal twice daily
+
+[Timer]
+OnCalendar=*-*-* 04,16:17:00
+RandomizedDelaySec=900
+Persistent=true
+
+[Install]
+WantedBy=timers.target

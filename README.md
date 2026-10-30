@@ -2,6 +2,24 @@
 
 Turn a guitar sound in a mixed song into a browser preset you can play through.
 
+## Judges: open the live application
+
+**Demo: [modulo — Tone Match](https://modulo.69-169-102-112.sslip.io)**
+
+Use username **`judge`** and the application password supplied in the **Devpost testing instructions**. No installation, provider API keys or dedicated GPU is required. The password is deliberately absent from this public-facing repository; it is not the team's Token Factory or Modal credential.
+
+1. Open the demo in current desktop Chrome or Edge. For the full live tone workflow, connect a guitar/audio interface, use headphones and select **Tone Match → Connect**. Allow input access and play notes/chords during the silent ten-second calibration.
+2. Open **Choose sound**, upload a song you have permission to process and press **Prepare song**. WAV/MP3 files must be 10 seconds–4:55 and at most 50 MiB. Listen to Song/Guitar/Backing, select a 10–20 second guitar passage and press **Use this sound**.
+3. Press **Match tone**. NVIDIA Nemotron proposes individual gear settings and the browser automatically refines them. Press **Use this tone** when ready; nothing starts playing automatically.
+4. Open **Play & record → Start playing**. The visual signal chain stays editable. Recording options includes backing, camera and countdown; download takes before refreshing or closing the tab. **Stop all** stops playback and capture.
+5. For tablature, expand **Play & record → Practice with full-song tabs → Generate full-song tabs** after preparing a song. This covers the whole song and requires no guitar calibration or instrument.
+
+Without a guitar/interface, judges can still explore songs, generate draft full-song tabs and inspect the rig editor. Live calibration, tone matching and guitar performance require the instrument. Tone matching is an approximation and tabs are draft suggestions; neither promises exact equipment recovery or perfect transcription.
+
+**Where the AI runs:** NVIDIA Nemotron on **Nebius Token Factory** generates supported gear models and parameter values from measured source/reference descriptors. Modal GPUs run Demucs separation and Basic Pitch transcription. Live audio and refinement use browser CPU, keeping the guitar's real-time signal off the network. [Hosting and testing details](docs/JUDGE_HOSTING.md).
+
+## Project status
+
 **Status:** Tone Match follows **Connect → Choose sound → Match tone → Play & record**. The app uses cloud guitar separation, live-interface calibration and NVIDIA/Nebius generation of individual rig parameters, followed by automatic browser refinement and an explicit **Use this tone** action. The visual pedal/amp chain remains editable. [Cloud setup](docs/TEAM_CLOUD_SETUP.md) requires no local GPU. A backend key enables manual generation without application usage caps. [Current flow and verification](docs/GUIDED_FLOW.md). Audible matching and physical-interface acceptance remain open.
 
 - **Team:** Isyraf — AI/backend/integration; Dinnie — browser audio/DSP; Shazlin — frontend/UX.
