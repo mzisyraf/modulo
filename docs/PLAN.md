@@ -27,7 +27,7 @@ The event deadline of 30 October, 10:00 PDT converts to the preserved deadline a
 - Runtime use of Nebius Token Factory or Nebius AI Cloud, plus at least one NVIDIA open-source model.
 - A working demo/test-build URL, project description, track selection, public source repository with an open-source licence and reproducible setup instructions.
 - A public YouTube demo under three minutes, using material the team is authorized to show.
-- Describe NVIDIA/Nebius usage and provide platform feedback. Supply English materials and maintain judging access through the end of judging, currently 15 December 2026, 12:00 Pacific Time.
+- Describe NVIDIA/Nebius usage and provide platform feedback. Supply English materials and maintain judging access through the end of judging. The [official rules](https://nebiusglobalaihackathon.devpost.com/rules), rechecked 30 October, now list 23 December 2026, 12:00 Pacific Time (24 December, 04:00 MYT); this supersedes the earlier 15 December snapshot. See [delivery and acceptance checklist](DEMO_ACCEPTANCE.md).
 
 **Proposed track:** Best Apps and Agents. Make preset generation a meaningful runtime use of NVIDIA Nemotron through Nebius. Running Demucs on an NVIDIA GPU alone does not establish use of an NVIDIA-authored open-source model.
 

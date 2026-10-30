@@ -36,6 +36,8 @@ Use at least **six seconds** of clear source audio for independently validated r
 
 For a stable production preview, run `npm run build`, then `npm run preview` and open **http://127.0.0.1:4173** with the API on 8000. Development uses 5173; both previews proxy the same local API. Do not rebuild or edit the development app during a long calibration/refinement session: refresh/HMR can discard in-memory audio and recordings.
 
+For live play-along, **Start live input** and **Play backing passage** can be used in either order. Backing pause/restart keeps the same explicit input capture; **Stop audio** or navigation stops both. Original/extracted-guitar previews and local file/test-signal auditions retain exclusive playback. A saved performance records the processed guitar only. Synthetic native-browser checks cover these paths; physical interface/feedback, tight synchronization and measured latency still need the [hardware checklist](DEMO_ACCEPTANCE.md#connected-guitar-acceptance--20-minutes-hardware-required).
+
 ## Failure and retention
 
 Missing SDK/credentials, exhausted shared allowance, queue/worker failures and cancelled transfers appear as Cloud API failures. Check private `data/jobs/<job-id>/worker.log` or the Modal dashboard before manually retrying; failed attempts can incur charges. The local API bounds the entire remote operation to 20 minutes and attempts cancellation on timeout. Modal bounds GPU execution separately to ten minutes. A forced laptop/API crash can leave the remote job running until cancellation or its provider timeout; abandoned cloud audio is removed by the existing hourly expiry task after 24–25 hours.
