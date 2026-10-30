@@ -52,10 +52,7 @@ async (page) => {
   if (job.generation?.status !== "ready") return { real: true, job_id: id, checks, generation: job.generation, errors };
   check(job.generation.rig_proposal.provenance.provider === "nebius", "actual NVIDIA/Nebius custom settings returned");
   check(job.generation.target_tone_features.fine_bands.length === 24, "server measured fine target spectrum");
-  check(await p.getByRole("button", { name: "Apply custom rig", exact: true }).isDisabled(), "generation neither plays nor applies an unchecked graph");
-  await p.getByRole("button", { name: "Check custom rig", exact: true }).click();
-  await p.waitForFunction(() => Array.from(document.querySelectorAll("button")).some(b => b.textContent === "Apply custom rig" && !b.disabled), {}, { timeout: 90000 });
-  await p.getByRole("button", { name: "Refine individual settings locally", exact: true }).click();
+  // Default generation now refines and checks once locally; never start a second run.
   await p.waitForFunction(() => { const section = document.querySelector("#custom-rig-title")?.closest("section"); return (section?.textContent.includes("Training feature distance") && Array.from(section.querySelectorAll("button")).some(b => b.textContent === "Apply custom rig" && !b.disabled)) || section?.querySelector("[role=alert]"); }, {}, { timeout: 600000 });
   const refineError = await p.locator("#custom-rig-title").evaluate(node => node.closest("section").querySelector("[role=alert]")?.textContent);
   if (refineError) throw Error(refineError);
