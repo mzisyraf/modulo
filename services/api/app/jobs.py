@@ -397,6 +397,11 @@ class JobStore:
                     reference["tone_features"] = wav_tone_features(self.directory(job_id)/"guitar.wav", reference["start_seconds"], reference["end_seconds"])
                     if getattr(generator, "output_field", "preset") == "rig_proposal":
                         reference["temporal_features"] = wav_tone_features(self.directory(job_id)/"guitar.wav", reference["start_seconds"], reference["end_seconds"], temporal=True)
+                        start,end=reference["start_seconds"],reference["end_seconds"]
+                        split=start+(end-start)*.6
+                        reference["feature_windows"]=[{"tone":wav_tone_features(self.directory(job_id)/"guitar.wav",a,b),
+                                                       "temporal":wav_tone_features(self.directory(job_id)/"guitar.wav",a,b,temporal=True)}
+                                                      for a,b in [(start,split),(split,end)]]
                 except (OSError, ValueError, wave.Error):
                     raise PresetError("target_spectral_unavailable", "The target spectrum could not be measured. Choose a clearer guitar passage.", 422) from None
                 # Analysis adds time before billing; recheck reference/expiry after it finishes.
@@ -414,6 +419,8 @@ class JobStore:
                 outcome["target_rms_dbfs"] = reference["metrics"]["guitar_rms_dbfs"]
                 if "temporal_features" in reference:
                     outcome["target_temporal_features"] = reference["temporal_features"]
+                if "feature_windows" in reference:
+                    outcome["target_feature_windows"] = reference["feature_windows"]
         except PresetError as failure:
             outcome = {"status": "failed", "error": {"code": failure.code, "message": failure.message, "retryable": True}}
         except Exception:

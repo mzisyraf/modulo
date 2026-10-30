@@ -30,8 +30,10 @@ def test_custom_values_validated_before_return_and_durable_reservation(tmp_path)
     assert packet["band_edges_hz"] == [40, 120, 350, 1000, 3000, 8000, 16000]
     assert packet["envelope_lags_ms"] == [50, 100, 150, 200, 250, 300, 400, 500, 750, 1000]
     assert packet["band_delta_db"] == [0.] * 6
-    assert packet["source"]["origin"] == "file" and packet["target"] == {key: value for key, value in FEATURES.items() if key != "fine_bands"}
-    assert "fine_bands" not in packet["source"]["tone_features"]
+    assert packet['target']['fine_bands']==FEATURES['fine_bands'] and packet['source']['tone_features']['harmonic_profile']==FEATURES['harmonic_profile']
+    assert 'decay_counts' in packet['detail_notes']
+    assert packet["source"]["origin"] == "file" and packet["target"] == FEATURES
+    assert packet['source']['tone_features']['fine_bands']==FEATURES['fine_bands']
     assert "factory" not in packet and calls[0]["response_format"]["json_schema"]["strict"]
     assert json.loads((tmp_path / "budget.json").read_text())["reserved_usd"] == "0.20"
     engine.generate({**REFERENCE, "tone_features": FEATURES}, source)
@@ -122,6 +124,8 @@ def test_rig_api_measures_target_caches_own_kind_and_invalidates_reference(tmp_p
         assert result["status"] == "ready" and result["kind"] == "rig_proposal"
         assert result["rig_proposal"]["proposal"] == PROPOSAL and "preset" not in result
         assert "target_temporal_features" in result
+        assert len(result['target_feature_windows'])==2
+        assert all('envelope_acf' in row['temporal'] and 'harmonic_profile' in row['tone'] for row in result['target_feature_windows'])
         assert client.post(route, json=payload).json()["request_id"] == result["request_id"] and len(calls) == 1
         assert client.post(f"/api/jobs/{job_id}/reference", json={"start_seconds": 1, "end_seconds": 11}).status_code == 200
         assert client.post(route, json=payload).status_code == 409

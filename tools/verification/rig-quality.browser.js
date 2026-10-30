@@ -15,6 +15,7 @@ async (page) => {
     await p.goto("http://127.0.0.1:5173/");
     return await p.evaluate(async ({base,config,source,held,proposals,token,module,root}) => {
       const audio = await import(module), {compareAudio,levels,beatsBaseline} = await import(`${root}/tools/evaluation/metrics.mjs`);
+      const {RIG_SEARCH_VERSION}=await import('/src/rigSearch.ts');
       const {calibrateGuitarFile} = await import("/src/recordingCalibration.ts"), {toneFeatures} = await import("/src/audioFeatures.ts"), {temporalFeatures} = await import("/src/temporalFeatures.ts");
       const {refineRig,neutralRigProposal} = await import("/src/refineRig.ts");
       const decode = text => Uint8Array.from(atob(text),c=>c.charCodeAt(0));
@@ -25,7 +26,7 @@ async (page) => {
       async function render(file,proposal,output=-18){return (await audio.renderRigFile(file,audio.compileRigProposal(proposal,gain,output),{sampleRate:44100,tailSeconds:0})).buffer;}
       async function save(name,blob){const response=await fetch(`${base}/save/${name}`,{method:"POST",headers:{"Content-Type":"application/octet-stream","X-Eval-Token":token},body:blob});if(!response.ok)throw Error(`Could not save ${name}: ${response.status}`);}
       const targets={engine_sha256:config.engine_sha256,evaluation_sha256:config.evaluation_sha256,source_calibration:calibration.measurements,cases:[]};
-      const report={engine_sha256:config.engine_sha256,evaluation_sha256:config.evaluation_sha256,source_sha256:config.source_sha256,validation_sha256:config.validation_sha256,paired_same_performance:true,cases:[],audible_contexts:0};
+      const report={engine_sha256:config.engine_sha256,evaluation_sha256:config.evaluation_sha256,source_sha256:config.source_sha256,validation_sha256:config.validation_sha256,paired_same_performance:true,cases:[],audible_contexts:0,refinement_version:RIG_SEARCH_VERSION,cached_model_proposals:true};
       try {
         for(const row of config.cases){
           const loadTarget=async name=>{if(!/^[a-z-]+\.wav$/.test(name))throw Error("Invalid evaluation target filename");return new OfflineAudioContext(2,1,44100).decodeAudioData(await(await fetch(`${base}/${name}`)).arrayBuffer());};
@@ -36,17 +37,27 @@ async (page) => {
           const neutral=await render(input,neutralRigProposal()),heldNeutral=await render(validation,neutralRigProposal());
           const baseline=compareAudio(mono(neutral),targetMono,{sampleRate:44100,paired:true}),heldBaseline=compareAudio(mono(heldNeutral),mono(heldTarget),{sampleRate:44100,paired:true});
           const oracle=compareAudio(targetMono,targetMono,{sampleRate:44100,paired:true});
+          const inputDecoded=await new OfflineAudioContext(1,1,44100).decodeAudioData(await input.arrayBuffer()),inputSamples=inputDecoded.getChannelData(0),split=Math.round(inputSamples.length*.6);
+          const {encodeMonoWav}=await import('/src/localAudio.ts');
+          const targetWindows=[];
+          for(const [a,b] of [[0,split],[split,inputSamples.length]]){
+            const chunk=new File([encodeMonoWav(inputSamples.slice(a,b),44100)],'development.wav',{type:'audio/wav'});
+            const samples=row.target_file?targetMono.slice(a,b):mono(await render(chunk,row.target));
+            targetWindows.push({tone:toneFeatures(samples,44100),temporal:temporalFeatures(samples,44100)});
+          }
           const outcomes=[];
           for(const item of proposals.filter(item=>item.case===row.id && (!config.evaluate_prompt_version || item.prompt_version===config.evaluate_prompt_version))){
             if(item.status!=="ready"){outcomes.push({model:item.model,repeat:item.repeat,status:item.status,error:item.error});continue;}
             const proposal=audio.parseRigProposal(item.result.proposal),candidate=await render(input,proposal);
-            const refinement=await refineRig(input,proposal,gain,targetFeatures,{temporal:timing,targetRmsDbfs:levels(targetMono).rms_dbfs,progress:renders=>{window.__rigEvalProgress={case:row.id,model:item.model,repeat:item.repeat,renders};}});
+            const refinement=await refineRig(input,proposal,gain,targetFeatures,{temporal:timing,targetWindows,targetRmsDbfs:levels(targetMono).rms_dbfs,progress:renders=>{window.__rigEvalProgress={case:row.id,model:item.model,repeat:item.repeat,renders};}});
+            if(refinement.renders>80)throw Error('Refinement exceeded the actual render cap');
             const refined=await render(input,refinement.proposal,refinement.outputLevelDb),heldRaw=await render(validation,proposal),heldRefined=await render(validation,refinement.proposal,refinement.outputLevelDb);
             const rawMetrics=compareAudio(mono(candidate),targetMono,{sampleRate:44100,paired:true}),refinedMetrics=compareAudio(mono(refined),targetMono,{sampleRate:44100,paired:true});
             const heldMetrics=compareAudio(mono(heldRefined),mono(heldTarget),{sampleRate:44100,paired:true}),heldRawMetrics=compareAudio(mono(heldRaw),mono(heldTarget),{sampleRate:44100,paired:true});
             const modelTag=item.model.includes("super")?"super":"nano";
-            outcomes.push({model:item.model,prompt_version:item.prompt_version,repeat:item.repeat,status:"ready",audio_prefix:`${row.id}-${modelTag}-r${item.repeat}`,raw:rawMetrics,refined:refinedMetrics,refinement:{before:refinement.before,after:refinement.after,renders:refinement.renders,proposal:refinement.proposal,outputLevelDb:refinement.outputLevelDb},
+            outcomes.push({model:item.model,prompt_version:item.prompt_version,repeat:item.repeat,status:"ready",audio_prefix:`${row.id}-${modelTag}-r${item.repeat}`,raw:rawMetrics,refined:refinedMetrics,refinement:{before:refinement.before,after:refinement.after,renders:refinement.renders,proposal:refinement.proposal,outputLevelDb:refinement.outputLevelDb,validationBefore:refinement.validationBefore,validationAfter:refinement.validationAfter,retained:refinement.retained,version:refinement.version},
               beats_neutral:beatsBaseline(refinedMetrics,baseline),held_out:{not_used_for_refinement:true,raw:heldRawMetrics,refined:heldMetrics,neutral:heldBaseline,beats_neutral:beatsBaseline(heldMetrics,heldBaseline)},usage:item.usage});
+            await save('rig-report.json',new Blob([JSON.stringify({...report,cases:[...report.cases,{id:row.id,oracle_raw_loss:oracle.raw.loss,neutral:baseline,held_neutral:heldBaseline,outcomes}]},null,2)],{type:'application/json'}));
             if(item.repeat===0){
               const buffers={target,neutral,nemotron:candidate,refined};
               const commonRms=Math.min(.08,...Object.values(buffers).map(buffer=>{const x=levels(mono(buffer));let peak=0;for(let ch=0;ch<buffer.numberOfChannels;ch++)for(const sample of buffer.getChannelData(ch))peak=Math.max(peak,Math.abs(sample));return .9*x.rms/Math.max(peak,1e-12);}));

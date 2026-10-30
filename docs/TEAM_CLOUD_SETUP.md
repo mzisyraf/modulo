@@ -30,6 +30,8 @@ No model-service keys are required in the browser. In the main app choose **Guit
 
 After separation, listen and confirm a passage. Choose **Generate custom rig → Check custom rig → Refine individual settings locally → Apply custom rig**, then use **Play dry recording** and the actual model controls. The AI proposes explicit values for each selected model's controls; factory presets are not the answer space. Refinement runs on the laptop CPU, makes no extra model calls and preserves output protection. All processing/playback remains in the main app; `separation.html` has been removed. Spectral/dynamics comparisons are diagnostic and do not certify audible matching or physical interface latency.
 
+Use at least **six seconds** of clear source audio for independently validated refinement (the supplied sample qualifies). Shorter valid calibrations can still generate/check a rig. Refinement can add/swap supported effects, tests a separate excerpt and retains original timbre settings if validation fails. **Restore original proposal** returns to the model's untouched settings and requires a fresh Check before Apply. An improved feature score still needs listening review.
+
 For a stable production preview, run `npm run build`, then `npm run preview` and open **http://127.0.0.1:4173** with the API on 8000. Development uses 5173; both previews proxy the same local API. Do not rebuild or edit the development app during a long calibration/refinement session: refresh/HMR can discard in-memory audio and recordings.
 
 ## Failure and retention

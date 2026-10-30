@@ -14,7 +14,7 @@ from .temporal_features import LAGS_MS
 from .contracts import ROOT
 
 SUPER_MODEL = "nvidia/nemotron-3-super-120b-a12b"
-PROMPT_VERSION = "rig-features-v2"
+PROMPT_VERSION = "rig-features-v3"
 CATALOG_SHA = hashlib.sha256((ROOT / "contracts/rig-catalog.json").read_text(encoding="utf-8").encode()).hexdigest()
 DSP_SHA = audio_source_hash()
 logger = logging.getLogger(__name__)
@@ -75,7 +75,7 @@ class RigGenerator(PresetGenerator):
 
     @property
     def cache_key(self):
-        return f"{CATALOG_SHA}:{DSP_SHA}:{self.model}:{PROMPT_VERSION}:fine24-v1:fallback={self.allow_super_fallback}"
+        return f"{CATALOG_SHA}:{DSP_SHA}:{self.model}:{PROMPT_VERSION}:rich-descriptors-v1:fallback={self.allow_super_fallback}"
 
     def generate(self, reference, source_calibration=None):
         try:
@@ -100,14 +100,14 @@ class RigGenerator(PresetGenerator):
         catalog = [{"model_id": model["id"], "name": model["name"], "description": model["description"],
                     "parameters": [{key: parameter[key] for key in ("id", "type", "unit", "min", "max", "choices", "defaultValue") if key in parameter}
                                    for parameter in model["parameters"]]} for model in RIG_CATALOG]
-        # Keep v2 inference inputs stable; fine bands are reserved for the local rendered optimizer.
-        source_for_model = {**source, "tone_features": {key: value for key, value in source["tone_features"].items() if key != "fine_bands"}}
-        target_for_model = {key: value for key, value in target.items() if key != "fine_bands"}
+        source_for_model = source
+        target_for_model = {key: value for key, value in target.items() if value is not None}
         delta = [round(10 * math.log10((b + 1e-6) / (a + 1e-6)), 3) for a, b in zip(source["tone_features"]["bands"], target["bands"])]
         context = {"source": source_for_model, "target": target_for_model, "input_gain_db_fixed": baseline_gain(source),
                    "band_edges_hz": EDGES, "band_delta_db": delta, "envelope_lags_ms": LAGS_MS,
                    "neutral_output_rms_estimate_dbfs": source["rms_dbfs"] + baseline_gain(source) - 18,
                    "measurement_notes": "Six bands are normalized power in the listed frequency intervals. Deltas are desired energy ratios, not literal EQ knob values. Envelope correlations are RMS-envelope similarity at the listed lags; playing rhythm also affects them. Release ratio measures the envelope 100-500ms after its strongest peak.",
+                   "detail_notes": "fine_bands: 24 log-spaced power intervals 40-16000Hz. cepstrum: eight non-DC DCT coefficients of their log power, not a learned embedding. harmonic_profile: first six harmonic power fractions relative to an estimated periodic fundamental; harmonic_confidence is periodicity, not certainty of an effect. Polyphony and pickups confound it. envelope_acf: mean-centered RMS-envelope correlations at 10,20,...1000ms; rhythm can resemble echoes. decay_curve: mean amplitude ratios 50,100,200,400,800,1200ms after isolated attacks; decay_counts reports observations, zero means unavailable. Use these as uncertain evidence, not equipment identification.",
                    "target_metrics": reference.get("metrics", {}), "models": catalog,
                    "source_temporal": source.get("temporal_features"), "target_temporal": reference.get("temporal_features"),
                    "output": "Fixed protected output at -18dB; do not include input/output modules."}

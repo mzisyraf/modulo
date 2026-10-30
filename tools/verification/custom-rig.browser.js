@@ -66,6 +66,18 @@ async (page) => {
   await p.waitForFunction(()=>document.querySelector('#amp-title')?.textContent==='TEST ONLY individual delay');
   check(await p.getByText("AI custom rig · editable",{exact:true}).isVisible(),"actual shared rig has generated provenance");
   check(await p.getByRole("button",{name:"Play dry recording",exact:true}).isEnabled(),"same calibrated file reaches main audition");
+  await p.getByRole('button',{name:'Refine individual settings locally',exact:true}).click();
+  await p.getByRole('button',{name:'Cancel rendering',exact:true}).click();
+  await p.waitForFunction(()=>Array.from(document.querySelectorAll('button')).some(b=>b.textContent==='Refine individual settings locally'&&!b.disabled));
+  check(requests===1,'cancelling local refinement creates no paid request');
+  await p.getByRole('button',{name:'Refine individual settings locally',exact:true}).click();
+  await p.getByText(/Separate-excerpt validation/).waitFor({timeout:240000});
+  const validationText=await p.getByText(/Separate-excerpt validation/).innerText();
+  check(/(Validated refinement retained|original settings retained)/.test(validationText),'separate-excerpt validation exposes retain or rollback decision');
+  check(Number(validationText.match(/(\d+)\/80 local renders/)?.[1])<=80,'actual browser refinement stays within80 renders including validation');
+  check(requests===1,'chain search and validation make no extra model calls');
+  await p.getByRole('button',{name:'Restore original proposal',exact:true}).click();
+  check(await p.getByRole('button',{name:'Apply custom rig',exact:true}).isDisabled(),'restoring original requires a fresh render check before apply');
   await p.setViewportSize({width:390,height:844});
   check(await p.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),"narrow main flow has no document overflow");
   await p.getByRole("button",{name:"Live guitar",exact:true}).click();

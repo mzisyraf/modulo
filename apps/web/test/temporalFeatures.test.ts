@@ -9,4 +9,9 @@ test("timing descriptors ignore pure gain and distinguish echoes without interpr
   assert.ok(validTemporalFeatures(a)); assert.ok(temporalDistance(a, scaled) < 1e-7); assert.ok(temporalDistance(a, b) > .01);
   assert.throws(() => temporalFeatures(new Float32Array(rate * 3), rate));
   assert.throws(() => temporalDistance(a, { ...b, correlations: [Infinity] }));
+  assert.equal(a.envelope_acf!.length,100);
+  assert.ok(a.envelope_acf!.every((x,i)=>Math.abs(x-scaled.envelope_acf![i])<1e-6));
+  assert.ok(b.decay_curve!.some((x,i)=>x>a.decay_curve![i]+.05));
+  assert.ok(a.decay_counts!.some(x=>x>0));
+  assert.equal(validTemporalFeatures({...a,decay_counts:[33]}),false);
 });

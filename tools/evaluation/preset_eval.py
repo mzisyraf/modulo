@@ -30,7 +30,7 @@ def engine_hash():
 
 
 def evaluation_hash():
-    paths=["tools/evaluation/metrics.mjs","apps/web/src/audioFeatures.ts","apps/web/src/refinePreset.ts","apps/web/src/refineRig.ts","apps/web/src/temporalFeatures.ts"]
+    paths=["tools/evaluation/metrics.mjs","apps/web/src/audioFeatures.ts","apps/web/src/refinePreset.ts","apps/web/src/refineRig.ts","apps/web/src/rigSearch.ts","apps/web/src/temporalFeatures.ts"]
     return hashlib.sha256(b"".join((ROOT/name).read_bytes() for name in paths)).hexdigest()
 
 

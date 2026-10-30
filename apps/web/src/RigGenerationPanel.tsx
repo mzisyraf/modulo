@@ -15,7 +15,7 @@ export function RigGenerationPanel({ jobId, revision, recording, onApply, onRefe
   const [available, setAvailable] = useState(false), [submitting, setSubmitting] = useState(false), [refresh, setRefresh] = useState(0);
   const [busy, setBusy] = useState(false), [error, setError] = useState(""), [applied, setApplied] = useState(false), [renders, setRenders] = useState(0);
   const [quality, setQuality] = useState<{ candidate: RigScore; neutral: RigScore; key: string }>();
-  const [refinement, setRefinement] = useState<{ before: number; after: number; renders: number }>();
+  const [refinement, setRefinement] = useState<{ before: number; after: number; renders: number; validationBefore: number; validationAfter: number; retained: boolean }>();
   const [outputLevelDb, setOutputLevelDb] = useState(-18);
   const action = useRef<AbortController | null>(null), renderRun = useRef(0), submittingRef = useRef(false);
   const sourceKey = calibrationKey(recording?.measurements), draftKey = JSON.stringify([draft, outputLevelDb]), lastCandidate = useRef("");
@@ -72,7 +72,7 @@ export function RigGenerationPanel({ jobId, revision, recording, onApply, onRefe
     try {
       let candidate = draft, output = outputLevelDb;
       if (refine) {
-        const result = await refineRig(recording.file, draft, recording.inputGainDb, generation.target_tone_features, { signal: controller.signal, temporal: generation.target_temporal_features, targetRmsDbfs: generation.target_rms_dbfs, progress: count => { if (run === renderRun.current) setRenders(count); } });
+        const result = await refineRig(recording.file, draft, recording.inputGainDb, generation.target_tone_features, { signal: controller.signal, temporal: generation.target_temporal_features, targetRmsDbfs: generation.target_rms_dbfs, targetWindows: generation.target_feature_windows, progress: count => { if (run === renderRun.current) setRenders(count); } });
         if (run !== renderRun.current) return;
         candidate = result.proposal; output = result.outputLevelDb; setDraft(candidate); setOutputLevelDb(output); setApplied(false); setRefinement(result);
       }
@@ -102,8 +102,9 @@ export function RigGenerationPanel({ jobId, revision, recording, onApply, onRefe
       <ol>{draft.modules.map((module, index) => { const model = getGearModel(module.model_id); return <li key={index}><strong>{model.name}{module.enabled ? "" : " (bypassed)"}</strong><p>{model.parameters.map(parameter => { const value = module.parameters[parameter.id]; return `${parameter.label}: ${typeof value === "number" ? Number(value.toFixed(3)) : typeof value === "boolean" ? value ? "On" : "Off" : value}${parameter.unit ? ` ${parameter.unit}` : ""}`; }).join(" · ")}</p></li>; })}</ol>
       <button className="secondary" disabled={busy || !active} onClick={() => void check()}>Check custom rig</button>{" "}
       <button className="secondary" disabled={busy || !active} onClick={() => void check(true)}>Refine individual settings locally</button>
+      <button className="secondary" disabled={busy || !active} onClick={() => { setDraft(parseRigProposal(generation!.rig_proposal!.proposal)); setOutputLevelDb(-18); setRefinement(undefined); setQuality(undefined); setApplied(false); }}>Restore original proposal</button>
       {busy && <><p role="status">Rendering locally{renders ? ` · ${renders}/80 candidates` : ""}…</p><button className="stop" onClick={stop}>Cancel rendering</button></>}
-      {refinement && <p>Training feature distance {refinement.before.toFixed(2)} → {refinement.after.toFixed(2)} · {refinement.renders} local renders · protected output {outputLevelDb.toFixed(1)} dB. Adjust listening volume after applying if needed.</p>}
+      {refinement && <p>Training feature distance {refinement.before.toFixed(2)} → {refinement.after.toFixed(2)}. Separate-excerpt validation {refinement.validationBefore.toFixed(2)} → {refinement.validationAfter.toFixed(2)}. {refinement.retained ? "Validated refinement retained." : "No validated improvement; original settings retained."} {refinement.renders}/80 local renders · protected output {outputLevelDb.toFixed(1)} dB. Feature scores still need listening review.</p>}
       {quality && quality.key === draftKey && <p role="status">{!quality.candidate.safe ? "Output protection is heavily engaged; revise gain before applying." : quality.candidate.loss < quality.neutral.loss * .9 ? "Closer measured spectral balance than neutral; listen to verify." : "No clear spectral improvement over neutral; review or refine."} Rig {quality.candidate.loss.toFixed(2)} · neutral {quality.neutral.loss.toFixed(2)}. Lower is closer; this is not an accuracy percentage.</p>}
       <button disabled={busy || !active || !quality?.candidate.safe || quality.key !== draftKey} onClick={() => void apply()}>Apply custom rig</button>
       {applied && <p className="success-state" role="status">Custom rig applied. Its individual controls are editable below. Use Play dry recording or live input to hear it.</p>}

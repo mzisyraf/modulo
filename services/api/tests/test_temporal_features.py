@@ -14,5 +14,7 @@ def test_envelope_descriptors_match_browser_and_reject_invalid_values():
     browser = json.loads(subprocess.check_output(["node", "--input-type=module", "-e", script], cwd=ROOT, text=True))
     assert browser["correlations"] == pytest.approx(measured["correlations"], abs=1e-7)
     assert browser["release_ratio"] == pytest.approx(measured["release_ratio"], abs=1e-7)
+    for key in ['envelope_acf','decay_curve']: assert browser[key]==pytest.approx(measured[key],abs=1e-7)
+    assert browser['decay_counts']==measured['decay_counts']
     with pytest.raises(ValueError): temporal_features([0.] * (rate * 3), rate)
     with pytest.raises(ValueError): TemporalFeatures.model_validate({**measured, "correlations": [2.] * 10})

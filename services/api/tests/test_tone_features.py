@@ -20,6 +20,8 @@ def test_browser_and_python_spectral_parity():
     browser=json.loads(subprocess.run(["node","--input-type=module","-e",script],cwd=ROOT,input=json.dumps(samples),text=True,capture_output=True,check=True).stdout)
     assert actual['bands']==pytest.approx(browser['bands'],abs=1e-10)
     assert actual['fine_bands']==pytest.approx(browser['fine_bands'],abs=1e-10)
+    for key in ['cepstrum','harmonic_profile']: assert actual[key]==pytest.approx(browser[key],abs=1e-8)
+    assert actual['harmonic_confidence']==pytest.approx(browser['harmonic_confidence'],abs=1e-8)
     for key in ['centroid_hz','flatness','crest_db']:assert actual[key]==pytest.approx(browser[key],abs=1e-8)
     assert actual['bands'][2]>.9
 
